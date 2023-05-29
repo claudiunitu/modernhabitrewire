@@ -19,12 +19,6 @@ public class UrlReaderService extends AccessibilityService {
 
     public UrlReaderService() {
 
-        Log.d("UrlReaderService", "Instantiated.");
-
-
-
-
-
         this.supportedBrowsers = this.getSupportedBrowsers();
     }
 
@@ -65,7 +59,7 @@ public class UrlReaderService extends AccessibilityService {
 
                 // check if it is a forbidden package
                 if(isForbiddenPackage(packageName)) {
-                    Log.d("UrlReaderService", packageName + "  :  " + "denied");
+//                    Log.d("UrlReaderService", packageName + "  :  " + "denied");
                     this.performRedirect("localhost", packageName);
                     return;
                 }
@@ -80,7 +74,7 @@ public class UrlReaderService extends AccessibilityService {
                 }
                 //this is not supported browser, so exit
                 if (browserConfig == null) {
-                    Log.d("UrlReaderService", "Not a browser.");
+//                    Log.d("UrlReaderService", "Not a browser.");
                     return;
                 }
 
@@ -92,7 +86,7 @@ public class UrlReaderService extends AccessibilityService {
                 }
 
                 if(android.util.Patterns.WEB_URL.matcher(capturedUrl).matches() && this.isForbiddenWebsite(capturedUrl)) {
-                    Log.d("UrlReaderService", packageName + "  :  " + capturedUrl);
+//                    Log.d("UrlReaderService", packageName + "  :  " + capturedUrl);
                     this.performRedirect("localhost", packageName);
                     return;
                 }
@@ -137,7 +131,7 @@ public class UrlReaderService extends AccessibilityService {
                 String strres = n.getViewIdResourceName();
                 if (n.getText() != null) {
                     String txt = n.getText().toString();
-                    Log.d("Track", strres + "  :  " + txt);
+//                    Log.d("Track", strres + "  :  " + txt);
                 }
                 getChild(n);
             }
@@ -188,13 +182,13 @@ public class UrlReaderService extends AccessibilityService {
 
     @Override
     public void onInterrupt() {
-        Log.d("UrlReaderService", "Error.");
+//        Log.d("UrlReaderService", "Error.");
     }
 
     @Override
     public void onServiceConnected() {
 
-        Log.d("UrlReaderService", "Connected.");
+//        Log.d("UrlReaderService", "Connected.");
         this.registerChargerBroadcastReceiver();
 
     }
