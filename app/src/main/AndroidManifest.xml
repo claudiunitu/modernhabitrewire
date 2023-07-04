@@ -27,16 +27,6 @@
                 android:name="android.app.lib_name"
                 android:value="" />
         </activity>
-+
-<!--        <receiver-->
-<!--            android:name=".ChargingState"-->
-<!--            android:enabled="true"-->
-<!--            android:exported="true">-->
-<!--            <intent-filter>-->
-<!--                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />-->
-<!--                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />-->
-<!--            </intent-filter>-->
-<!--        </receiver>-->
 
         <service
             android:name=".UrlReaderService"
@@ -52,6 +42,16 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibilityservice" />
         </service>
+        <receiver
+            android:name=".MyDeviceAdminReceiver"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/deviceAdminReceiver" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

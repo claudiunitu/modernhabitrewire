@@ -28,6 +28,7 @@ import android.widget.Toast;
 
 public class MainActivity extends AppCompatActivity {
 
+    private static final int REQUEST_CODE_ENABLE_ADMIN = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,6 +49,24 @@ public class MainActivity extends AppCompatActivity {
     protected void onStart() {
         super.onStart();
 
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQUEST_CODE_ENABLE_ADMIN) {
+            if (resultCode == RESULT_OK) {
+                // Device administration is enabled
+            } else {
+                // Device administration is not enabled
+            }
+        }
+    }
+
+    private void requestDeviceAdminPermission() {
+        Intent intent = new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN);
+        intent.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, new ComponentName(this, MyDeviceAdminReceiver.class));
+        intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Enable device administration to protect app uninstallation.");
+        startActivityForResult(intent, REQUEST_CODE_ENABLE_ADMIN);
     }
 
 
