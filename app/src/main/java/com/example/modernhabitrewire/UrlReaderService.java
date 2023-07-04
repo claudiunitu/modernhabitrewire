@@ -1,16 +1,21 @@
 package com.example.modernhabitrewire;
 
 import android.accessibilityservice.AccessibilityService;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.BroadcastReceiver;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Binder;
+import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 
 import androidx.annotation.NonNull;
+import androidx.core.app.NotificationCompat;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,6 +27,7 @@ public class UrlReaderService extends AccessibilityService {
         this.supportedBrowsers = this.getSupportedBrowsers();
     }
 
+    private final String NOTIFICATION_CHANNEL_ID = "123456789";
     private List<SupportedBrowserConfig> supportedBrowsers;
     private String[] forbiddenUrlPatterns =  {
             "facebook.com",
@@ -39,7 +45,33 @@ public class UrlReaderService extends AccessibilityService {
     };
 
 
+    @Override
+    public void onInterrupt() {
+        Log.e("UrlReaderService", "Error.");
+    }
 
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        createNotificationChannel();
+    }
+
+//    @Override
+//    public int onStartCommand(Intent intent, int flags, int startId){
+//
+//        return START_STICKY;
+//    }
+
+    @Override
+    public void onServiceConnected() {
+
+        Log.d("UrlReaderService", "Connected.");
+        this.registerChargerBroadcastReceiver();
+        final int NOTIFICATION_ID = 987456321;
+        NotificationManager notificationManager = getSystemService(NotificationManager.class);
+        notificationManager.notify(NOTIFICATION_ID,this.buildNotification());
+
+    }
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent accessibilityEvent) {
@@ -61,6 +93,29 @@ public class UrlReaderService extends AccessibilityService {
             parentNodeInfo.recycle();
 
         }
+    }
+
+    private void createNotificationChannel() {
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){
+            NotificationChannel channel = new NotificationChannel(
+                    this.NOTIFICATION_CHANNEL_ID,
+                    "Modern Habit Rewire Notification Channel",
+                    NotificationManager.IMPORTANCE_DEFAULT);
+            NotificationManager notificationManager = getSystemService(NotificationManager.class);
+            notificationManager.createNotificationChannel(channel);
+        }
+
+    }
+
+    private Notification buildNotification() {
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, this.NOTIFICATION_CHANNEL_ID)
+                .setContentTitle("Modern Habit Rewire Blocking Service")
+                .setContentText("Blocking stuff")
+                .setSmallIcon(R.drawable.ic_launcher_foreground);
+//                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+//                .setCategory(NotificationCompat.CATEGORY_SERVICE);
+        return builder.build();
     }
 
     private void redirectIfNeeded(AccessibilityNodeInfo parentNodeInfo,String packageName) {
@@ -178,18 +233,7 @@ public class UrlReaderService extends AccessibilityService {
     }
 
 
-    @Override
-    public void onInterrupt() {
-        Log.e("UrlReaderService", "Error.");
-    }
 
-    @Override
-    public void onServiceConnected() {
-
-        Log.d("UrlReaderService", "Connected.");
-        this.registerChargerBroadcastReceiver();
-
-    }
 
     private void registerChargerBroadcastReceiver() {
         BroadcastReceiver chargerBroadcastReceiver = new ChargingState();
