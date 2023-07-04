@@ -7,9 +7,7 @@ import android.app.NotificationManager;
 import android.content.BroadcastReceiver;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.os.Binder;
 import android.os.Build;
-import android.os.IBinder;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -19,6 +17,7 @@ import androidx.core.app.NotificationCompat;
 
 import java.util.ArrayList;
 import java.util.List;
+
 
 public class UrlReaderService extends AccessibilityService {
 
@@ -66,6 +65,7 @@ public class UrlReaderService extends AccessibilityService {
     public void onServiceConnected() {
 
         Log.d("UrlReaderService", "Connected.");
+
         this.registerChargerBroadcastReceiver();
         final int NOTIFICATION_ID = 987456321;
         NotificationManager notificationManager = getSystemService(NotificationManager.class);
@@ -94,6 +94,8 @@ public class UrlReaderService extends AccessibilityService {
 
         }
     }
+
+
 
     private void createNotificationChannel() {
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){
