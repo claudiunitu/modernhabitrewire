@@ -28,6 +28,7 @@ public class UrlReaderService extends AccessibilityService {
     }
 
     private final String NOTIFICATION_CHANNEL_ID = "123456789";
+    private final int NOTIFICATION_ID = 987456321;
     private List<SupportedBrowserConfig> supportedBrowsers;
     private String[] forbiddenUrlPatterns =  {
             "facebook.com",
@@ -48,12 +49,15 @@ public class UrlReaderService extends AccessibilityService {
     @Override
     public void onInterrupt() {
         Log.e("UrlReaderService", "Error.");
+        // Remove the notification when the service is interrupted
+        NotificationManager notificationManager = getSystemService(NotificationManager.class);
+        notificationManager.cancel(this.NOTIFICATION_ID);
     }
 
     @Override
     public void onCreate() {
         super.onCreate();
-        createNotificationChannel();
+        createNotification();
     }
 
 //    @Override
@@ -67,9 +71,8 @@ public class UrlReaderService extends AccessibilityService {
 
         Log.d("UrlReaderService", "Connected.");
         this.registerChargerBroadcastReceiver();
-        final int NOTIFICATION_ID = 987456321;
-        NotificationManager notificationManager = getSystemService(NotificationManager.class);
-        notificationManager.notify(NOTIFICATION_ID,this.buildNotification());
+        
+        
 
     }
 
@@ -95,7 +98,7 @@ public class UrlReaderService extends AccessibilityService {
         }
     }
 
-    private void createNotificationChannel() {
+    private void createNotification() {
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){
             NotificationChannel channel = new NotificationChannel(
                     this.NOTIFICATION_CHANNEL_ID,
@@ -103,19 +106,27 @@ public class UrlReaderService extends AccessibilityService {
                     NotificationManager.IMPORTANCE_DEFAULT);
             NotificationManager notificationManager = getSystemService(NotificationManager.class);
             notificationManager.createNotificationChannel(channel);
+            notificationManager.notify(this.NOTIFICATION_ID,this.buildNotification());
         }
 
     }
 
     private Notification buildNotification() {
 
+        Intent notificationIntent = new Intent(this, MainActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
+
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, this.NOTIFICATION_CHANNEL_ID)
-                .setContentTitle("Modern Habit Rewire Blocking Service")
-                .setContentText("Blocking stuff")
-                .setSmallIcon(R.drawable.ic_launcher_foreground);
-//                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-//                .setCategory(NotificationCompat.CATEGORY_SERVICE);
+            .setContentTitle("Modern Habit Rewire Blocking Service")
+            .setContentText("Blocking stuff")
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .setColor(Color.GREEN);
+
         return builder.build();
+
+        
     }
 
     private void redirectIfNeeded(AccessibilityNodeInfo parentNodeInfo,String packageName) {
