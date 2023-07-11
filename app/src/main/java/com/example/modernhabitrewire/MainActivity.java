@@ -1,7 +1,9 @@
 package com.example.modernhabitrewire;
 
+import android.app.ActivityManager;
 import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 
@@ -31,6 +33,12 @@ public class MainActivity extends AppCompatActivity {
         super.onStart();
     }
 
+    @Override
+    public void onBackPressed() {
+        super.onBackPressed();
+        this.finish();
+    }
+
     private void requestDeviceAdminPermission() {
         Intent intent = new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN);
         intent.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, new ComponentName(this, MyDeviceAdminReceiver.class));
@@ -47,8 +55,20 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void requestAccessibilityPermission(){
-        Intent accessibilitySettingsIntent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
-        startActivity(accessibilitySettingsIntent);
+        if(!this.isServiceRunning((UrlReaderService.class))) {
+            Intent accessibilitySettingsIntent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+            startActivity(accessibilitySettingsIntent);
+        }
+    }
+
+    private boolean isServiceRunning(Class<?> serviceClass) {
+        ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+        for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
+            if (serviceClass.getName().equals(service.service.getClassName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
 
