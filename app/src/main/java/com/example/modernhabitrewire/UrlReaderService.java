@@ -4,9 +4,11 @@ import android.accessibilityservice.AccessibilityService;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.Color;
 import android.os.Build;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
@@ -25,6 +27,8 @@ public class UrlReaderService extends AccessibilityService {
 
         this.supportedBrowsers = this.getSupportedBrowsers();
     }
+
+    private BroadcastReceiver chargerBroadcastReceiver;
 
     private final String NOTIFICATION_CHANNEL_ID = "123456789";
     private final int NOTIFICATION_ID = 987456321;
@@ -48,15 +52,17 @@ public class UrlReaderService extends AccessibilityService {
     @Override
     public void onInterrupt() {
         Log.e("UrlReaderService", "Error.");
-        // Remove the notification when the service is interrupted
-        NotificationManager notificationManager = getSystemService(NotificationManager.class);
-        notificationManager.cancel(this.NOTIFICATION_ID);
+        this.onServiceClose();
     }
 
     @Override
     public void onCreate() {
         super.onCreate();
         createNotification();
+    }
+    @Override
+    public void onDestroy() {
+        this.onServiceClose();
     }
 
 //    @Override
@@ -71,8 +77,8 @@ public class UrlReaderService extends AccessibilityService {
         Log.d("UrlReaderService", "Connected.");
 
         this.registerChargerBroadcastReceiver();
-        
-        
+
+
 
     }
 
@@ -99,6 +105,7 @@ public class UrlReaderService extends AccessibilityService {
     }
 
     private void createNotification() {
+        Log.d("UrlReaderService", "Creating notification");
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){
             NotificationChannel channel = new NotificationChannel(
                     this.NOTIFICATION_CHANNEL_ID,
@@ -114,7 +121,7 @@ public class UrlReaderService extends AccessibilityService {
     private Notification buildNotification() {
 
         Intent notificationIntent = new Intent(this, MainActivity.class);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, this.NOTIFICATION_CHANNEL_ID)
             .setContentTitle("Modern Habit Rewire Blocking Service")
@@ -126,7 +133,7 @@ public class UrlReaderService extends AccessibilityService {
 
         return builder.build();
 
-        
+
     }
 
     private void redirectIfNeeded(AccessibilityNodeInfo parentNodeInfo,String packageName) {
@@ -244,13 +251,22 @@ public class UrlReaderService extends AccessibilityService {
     }
 
 
+    private void onServiceClose() {
+        NotificationManager notificationManager = getSystemService(NotificationManager.class);
+        notificationManager.cancel(this.NOTIFICATION_ID);
+        this.unregisterBroadcastReceiver();
+    }
 
 
     private void registerChargerBroadcastReceiver() {
-        BroadcastReceiver chargerBroadcastReceiver = new ChargingState();
+        this.chargerBroadcastReceiver = new ChargingState();
         IntentFilter filter =new IntentFilter();
         filter.addAction(Intent.ACTION_POWER_CONNECTED);
         filter.addAction(Intent.ACTION_POWER_DISCONNECTED);
         this.registerReceiver(chargerBroadcastReceiver, filter);
+    }
+
+    private void unregisterBroadcastReceiver() {
+        unregisterReceiver(this.chargerBroadcastReceiver);
     }
 }

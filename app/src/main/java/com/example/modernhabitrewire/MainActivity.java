@@ -23,10 +23,8 @@ public class MainActivity extends AppCompatActivity {
         Log.d("MainActivity", "Created.");
 
         this.requestDeviceAdminPermission();
-
-        this.requestNotificationPermission();
-
         this.requestAccessibilityPermission();
+        this.requestNotificationPermission();
 
     }
 
@@ -38,7 +36,7 @@ public class MainActivity extends AppCompatActivity {
     private void requestDeviceAdminPermission() {
         Intent intent = new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN);
         intent.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, new ComponentName(this, MyDeviceAdminReceiver.class));
-        intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Enable device administration to protect app uninstallation.");
+        intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Enable device administration to protect app closing and uninstallation.");
         startActivity(intent);
     }
 
