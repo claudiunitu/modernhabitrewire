@@ -13,6 +13,7 @@ import android.os.Build;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
@@ -51,7 +52,7 @@ public class UrlReaderService extends AccessibilityService {
 
     @Override
     public void onInterrupt() {
-        Log.e("UrlReaderService", "Error.");
+//        Log.e("UrlReaderService", "Error.");
         this.onServiceClose();
     }
 
@@ -65,47 +66,70 @@ public class UrlReaderService extends AccessibilityService {
         this.onServiceClose();
     }
 
-//    @Override
-//    public int onStartCommand(Intent intent, int flags, int startId){
-//
-//        return START_STICKY;
-//    }
-
     @Override
     public void onServiceConnected() {
-
-        Log.d("UrlReaderService", "Connected.");
-
+//        Log.d("UrlReaderService", "Connected.");
+        this.showServiceStartToastNotification();
         this.registerChargerBroadcastReceiver();
+    }
 
-
-
+    private void onServiceClose() {
+        NotificationManager notificationManager = getSystemService(NotificationManager.class);
+        notificationManager.cancel(this.NOTIFICATION_ID);
+        this.unregisterBroadcastReceiver();
+        this.showServiceStopToastNotification();
     }
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent accessibilityEvent) {
-        if(ChargingState.isCharging) {
-            return;
-        }
-        final int eventType = accessibilityEvent.getEventType();
-        if(eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
-
-            AccessibilityNodeInfo parentNodeInfo = accessibilityEvent.getSource();
-            if (parentNodeInfo == null) {
+        try {
+            if(ChargingState.isCharging) {
                 return;
             }
+            final int eventType = accessibilityEvent.getEventType();
+            if(eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
 
-            String packageName = accessibilityEvent.getPackageName().toString();
+                AccessibilityNodeInfo parentNodeInfo = accessibilityEvent.getSource();
+                if (parentNodeInfo == null) {
+                    return;
+                }
 
-            this.redirectIfNeeded( parentNodeInfo, packageName);
+                String packageName = accessibilityEvent.getPackageName().toString();
 
-            parentNodeInfo.recycle();
+                this.redirectIfNeeded( parentNodeInfo, packageName);
 
+                parentNodeInfo.recycle();
+
+            }
         }
+        catch(Exception e) {
+            CharSequence errorText = e.getMessage();
+            int duration = Toast.LENGTH_SHORT;
+
+            Toast toast = Toast.makeText(this, errorText, duration);
+            toast.show();
+        }
+
+    }
+
+    private void showServiceStartToastNotification() {
+        CharSequence errorText = "Modern Habbit Rewire Service Started";
+        int duration = Toast.LENGTH_SHORT;
+
+        Toast toast = Toast.makeText(this, errorText, duration);
+        toast.show();
+    }
+
+    private void showServiceStopToastNotification() {
+        CharSequence errorText = "Modern Habbit Rewire Service Stopped";
+        int duration = Toast.LENGTH_SHORT;
+
+        Toast toast = Toast.makeText(this, errorText, duration);
+        toast.show();
     }
 
     private void createNotification() {
-        Log.d("UrlReaderService", "Creating notification");
+//        Log.d("UrlReaderService", "Creating notification");
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){
             NotificationChannel channel = new NotificationChannel(
                     this.NOTIFICATION_CHANNEL_ID,
@@ -150,7 +174,7 @@ public class UrlReaderService extends AccessibilityService {
 
     private Boolean redirectIfForbiddenPackage(String packageName) {
         if(isForbiddenPackage(packageName)) {
-            Log.d("UrlReaderService", packageName + "  :  " + "denied");
+//            Log.d("UrlReaderService", packageName + "  :  " + "denied");
             this.performRedirect();
             return true;
         }
@@ -167,7 +191,7 @@ public class UrlReaderService extends AccessibilityService {
         }
         //this is not supported browser, so exit
         if (browserConfig == null) {
-            Log.d("UrlReaderService", "Not a browser.");
+//            Log.d("UrlReaderService", "Not a browser.");
             return false;
         }
 
@@ -179,7 +203,7 @@ public class UrlReaderService extends AccessibilityService {
         }
 
         if(android.util.Patterns.WEB_URL.matcher(capturedUrl).matches() && this.isForbiddenWebsite(capturedUrl)) {
-            Log.d("UrlReaderService", packageName + "  :  " + capturedUrl);
+//            Log.d("UrlReaderService", packageName + "  :  " + capturedUrl);
             this.performRedirect();
             return true;
         }
@@ -251,11 +275,7 @@ public class UrlReaderService extends AccessibilityService {
     }
 
 
-    private void onServiceClose() {
-        NotificationManager notificationManager = getSystemService(NotificationManager.class);
-        notificationManager.cancel(this.NOTIFICATION_ID);
-        this.unregisterBroadcastReceiver();
-    }
+
 
 
     private void registerChargerBroadcastReceiver() {

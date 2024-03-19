@@ -9,7 +9,7 @@ import android.os.Bundle;
 
 import androidx.appcompat.app.AppCompatActivity;
 import android.provider.Settings;
-import android.util.Log;
+
 
 import androidx.core.app.NotificationManagerCompat;
 
@@ -20,7 +20,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        Log.d("MainActivity", "Created.");
+//        Log.d("MainActivity", "Created.");
 
         this.requestDeviceAdminPermission();
         this.requestAccessibilityPermission();
