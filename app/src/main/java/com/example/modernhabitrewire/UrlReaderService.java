@@ -10,7 +10,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Color;
 import android.os.Build;
-import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.Toast;
@@ -33,8 +32,8 @@ public class UrlReaderService extends AccessibilityService {
 
     private final String NOTIFICATION_CHANNEL_ID = "123456789";
     private final int NOTIFICATION_ID = 987456321;
-    private List<SupportedBrowserConfig> supportedBrowsers;
-    private String[] forbiddenUrlPatterns =  {
+    private final List<SupportedBrowserConfig> supportedBrowsers;
+    private final String[] forbiddenUrlPatterns =  {
             "facebook.com",
             "9gag.com",
             "youtube.com",
@@ -45,7 +44,7 @@ public class UrlReaderService extends AccessibilityService {
             "realitatea.net",
             "rt.com"
     };
-    private String[] forbiddenPackageNames = {
+    private final String[] forbiddenPackageNames = {
             "com.google.android.youtube"
     };
 
@@ -63,6 +62,7 @@ public class UrlReaderService extends AccessibilityService {
     }
     @Override
     public void onDestroy() {
+        super.onDestroy();
         this.onServiceClose();
     }
 
@@ -78,6 +78,10 @@ public class UrlReaderService extends AccessibilityService {
         notificationManager.cancel(this.NOTIFICATION_ID);
         this.unregisterBroadcastReceiver();
         this.showServiceStopToastNotification();
+        if (chargerBroadcastReceiver != null) {
+            unregisterReceiver(chargerBroadcastReceiver);
+            chargerBroadcastReceiver = null;
+        }
     }
 
     @Override
@@ -96,7 +100,7 @@ public class UrlReaderService extends AccessibilityService {
 
                 String packageName = accessibilityEvent.getPackageName().toString();
 
-                this.redirectIfNeeded( parentNodeInfo, packageName);
+                this.cascadeRedirect( parentNodeInfo, packageName);
 
                 parentNodeInfo.recycle();
 
@@ -112,20 +116,20 @@ public class UrlReaderService extends AccessibilityService {
 
     }
 
-    private void showServiceStartToastNotification() {
-        CharSequence errorText = "Modern Habbit Rewire Service Started";
+    private void showToast(String message){
+
         int duration = Toast.LENGTH_SHORT;
 
-        Toast toast = Toast.makeText(this, errorText, duration);
+        Toast toast = Toast.makeText(this, message, duration);
         toast.show();
     }
 
-    private void showServiceStopToastNotification() {
-        CharSequence errorText = "Modern Habbit Rewire Service Stopped";
-        int duration = Toast.LENGTH_SHORT;
+    private void showServiceStartToastNotification() {
+        this.showToast("Modern Habit Rewire Service Started");
+    }
 
-        Toast toast = Toast.makeText(this, errorText, duration);
-        toast.show();
+    private void showServiceStopToastNotification() {
+        this.showToast("Modern Habit Rewire Service Stopped");
     }
 
     private void createNotification() {
@@ -160,7 +164,7 @@ public class UrlReaderService extends AccessibilityService {
 
     }
 
-    private void redirectIfNeeded(AccessibilityNodeInfo parentNodeInfo,String packageName) {
+    private void cascadeRedirect(AccessibilityNodeInfo parentNodeInfo, String packageName) {
         // check if it is a forbidden package
         if(this.redirectIfForbiddenPackage(packageName)) {
             return;
@@ -176,6 +180,7 @@ public class UrlReaderService extends AccessibilityService {
         if(isForbiddenPackage(packageName)) {
 //            Log.d("UrlReaderService", packageName + "  :  " + "denied");
             this.performRedirect();
+            this.showToast("Forbidden app: " + packageName);
             return true;
         }
         return false;
@@ -205,6 +210,7 @@ public class UrlReaderService extends AccessibilityService {
         if(android.util.Patterns.WEB_URL.matcher(capturedUrl).matches() && this.isForbiddenWebsite(capturedUrl)) {
 //            Log.d("UrlReaderService", packageName + "  :  " + capturedUrl);
             this.performRedirect();
+            this.showToast("Forbidden url: " + capturedUrl);
             return true;
         }
         return false;
@@ -237,7 +243,7 @@ public class UrlReaderService extends AccessibilityService {
     private String captureUrl(AccessibilityNodeInfo info, SupportedBrowserConfig config) {
 
         List<AccessibilityNodeInfo> nodes = info.findAccessibilityNodeInfosByViewId(config.addressBarId);
-        if (nodes == null || nodes.size() <= 0) {
+        if (nodes == null || nodes.isEmpty()) {
             return null;
         }
 
@@ -257,8 +263,8 @@ public class UrlReaderService extends AccessibilityService {
     }
 
     private boolean isForbiddenWebsite(String url) {
-        for (int i = 0; i < this.forbiddenUrlPatterns.length; i++) {
-            if(url.contains(this.forbiddenUrlPatterns[i])) {
+        for (String forbiddenUrlPattern : this.forbiddenUrlPatterns) {
+            if (url.contains(forbiddenUrlPattern)) {
                 return true;
             }
         }
@@ -266,8 +272,8 @@ public class UrlReaderService extends AccessibilityService {
     }
 
     private boolean isForbiddenPackage(String packageId) {
-        for (int i = 0; i < this.forbiddenPackageNames.length; i++) {
-            if(packageId.equals(this.forbiddenPackageNames[i])) {
+        for (String forbiddenPackageName : this.forbiddenPackageNames) {
+            if (packageId.equals(forbiddenPackageName)) {
                 return true;
             }
         }
