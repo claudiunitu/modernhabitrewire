@@ -23,7 +23,10 @@ import java.util.List;
 
 public class UrlReaderService extends AccessibilityService {
 
+    private AppPreferencesManager appPreferencesManager;
+
     public UrlReaderService() {
+
 
         this.supportedBrowsers = this.getSupportedBrowsers();
     }
@@ -33,20 +36,7 @@ public class UrlReaderService extends AccessibilityService {
     private final String NOTIFICATION_CHANNEL_ID = "123456789";
     private final int NOTIFICATION_ID = 987456321;
     private final List<SupportedBrowserConfig> supportedBrowsers;
-    private final String[] forbiddenUrlPatterns =  {
-            "facebook.com",
-            "9gag.com",
-            "youtube.com",
-            "mediafax.ro",
-            "hotnews.ro",
-            "digi24.ro",
-            "antena3.ro",
-            "realitatea.net",
-            "rt.com"
-    };
-    private final String[] forbiddenPackageNames = {
-            "com.google.android.youtube"
-    };
+    private AppPreferencesManager urlManager;
 
 
     @Override
@@ -58,6 +48,8 @@ public class UrlReaderService extends AccessibilityService {
     @Override
     public void onCreate() {
         super.onCreate();
+        appPreferencesManager = new AppPreferencesManager(this);
+        urlManager = new AppPreferencesManager(this);
         createNotification();
     }
     @Override
@@ -87,7 +79,7 @@ public class UrlReaderService extends AccessibilityService {
     @Override
     public void onAccessibilityEvent(AccessibilityEvent accessibilityEvent) {
         try {
-            if(ChargingState.isCharging) {
+            if(!appPreferencesManager.getIsBlockerActive()) {
                 return;
             }
             final int eventType = accessibilityEvent.getEventType();
@@ -235,6 +227,7 @@ public class UrlReaderService extends AccessibilityService {
         browsers.add( new SupportedBrowserConfig("com.opera.mini.native", "com.opera.mini.native:id/url_field"));
         browsers.add( new SupportedBrowserConfig("com.duckduckgo.mobile.android", "com.duckduckgo.mobile.android:id/omnibarTextInput"));
         browsers.add( new SupportedBrowserConfig("com.microsoft.emmx", "com.microsoft.emmx:id/url_bar"));
+        browsers.add( new SupportedBrowserConfig("com.brave.browser", "com.brave.browser:id/url_bar"));
 
 
         return browsers;
@@ -263,7 +256,8 @@ public class UrlReaderService extends AccessibilityService {
     }
 
     private boolean isForbiddenWebsite(String url) {
-        for (String forbiddenUrlPattern : this.forbiddenUrlPatterns) {
+        List<String> forbiddenUrls = urlManager.getForbiddenUrls();
+        for (String forbiddenUrlPattern : forbiddenUrls) {
             if (url.contains(forbiddenUrlPattern)) {
                 return true;
             }
@@ -272,10 +266,13 @@ public class UrlReaderService extends AccessibilityService {
     }
 
     private boolean isForbiddenPackage(String packageId) {
-        for (String forbiddenPackageName : this.forbiddenPackageNames) {
+        for (String forbiddenPackageName : urlManager.getForbiddenApps()) {
             if (packageId.equals(forbiddenPackageName)) {
                 return true;
             }
+        }
+        if(appPreferencesManager.getForbidSettingsSwitchValue()){
+            return packageId.equals("com.android.settings");
         }
         return false;
     }

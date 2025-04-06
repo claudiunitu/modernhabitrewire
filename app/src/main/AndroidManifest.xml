@@ -28,6 +28,12 @@
                 android:value="" />
         </activity>
 
+        <activity
+            android:name=".UrlListEditorActivity"
+            android:exported="true"
+            android:theme="@style/Theme.ModernHabitRewire.NoActionBar"
+            android:parentActivityName=".MainActivity"/>
+
         <service
             android:name=".UrlReaderService"
             android:enabled="true"

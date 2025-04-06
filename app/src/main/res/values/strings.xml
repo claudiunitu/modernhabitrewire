@@ -1,5 +1,20 @@
 <resources>
     <string name="app_name">Modern Habit Rewire</string>
     <string name="action_settings">Settings</string>
+    <string name="ForbiddenURLsListLabel">Forbidden URLs</string>
+    <string name="AddURLButtonLabel">Add Forbidden URL</string>
+    <string name="AddURLInputHint">Enter new forbidden URL</string>
+    <string name="EditUrlListButtonLabel">Edit Forbidden URLs</string>
+    <string name="N_A">N/A</string>
+    <string name="Remove">Remove</string>
+    <string name="ActivateButtonLabel">Activate</string>
+    <string name="ButtonBlockerDeactivateLabel">Deactivate Blocker</string>
+    <string name="ButtonBlockerActivateLabel">Activate Blocker</string>
+    <string name="BlockerDeactivationKeyPlaceholder">Deactivation Key</string>
+    <string name="BlockerDeactivationKeySetButtonlabel">Set Deactivation Key</string>
+    <string name="BlockerDeactivationKeyUnsetButtonlabel">Unset Deactivation Key</string>
+    <string name="LabelNotSet">Label not set</string>
+    <string name="ChargingBypassSwitchLabel">Bypass when charging</string>
+    <string name="ForbidSettingsSwitch">Forbid opening OS settings</string>
 
 </resources>
