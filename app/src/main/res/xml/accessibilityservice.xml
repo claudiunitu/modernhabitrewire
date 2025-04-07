@@ -3,20 +3,12 @@
 
 <accessibility-service
     xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeWindowContentChanged"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+
     android:canRetrieveWindowContent="true"
-    android:notificationTimeout="1000"
+    android:notificationTimeout="0"
     android:settingsActivity="com.example.android.accessibility.ServiceSettingsActivity"
     >
 
-<!--    <accessibility-service-->
-<!--        xmlns:android="http://schemas.android.com/apk/res/android"-->
-<!--        android:accessibilityEventTypes="typeAllMask"-->
-<!--        android:canRetrieveWindowContent="true"-->
-<!--        android:notificationTimeout="100"-->
-<!--        android:settingsActivity="com.example.android.accessibility.ServiceSettingsActivity"-->
-<!--        android:packageNames="com.android.chrome|org.mozilla.firefox|com.opera.browser|com.opera.mini.native|com.duckduckgo.mobile.android|com.microsoft.emmx"-->
-<!--        >-->
-
-
     </accessibility-service>
+

@@ -63,6 +63,7 @@ public class UrlReaderService extends AccessibilityService {
 
     @Override
     public void onServiceConnected() {
+
 //        Log.d("UrlReaderService", "Connected.");
         this.showServiceStartToastNotification();
         this.registerChargerBroadcastReceiver();
@@ -74,8 +75,13 @@ public class UrlReaderService extends AccessibilityService {
         this.unregisterBroadcastReceiver();
         this.showServiceStopToastNotification();
         if (chargerBroadcastReceiver != null) {
-            unregisterReceiver(chargerBroadcastReceiver);
-            chargerBroadcastReceiver = null;
+            try {
+                unregisterReceiver(chargerBroadcastReceiver);
+            } catch (IllegalArgumentException e) {
+                //Log.e("UrlReaderService", "Error unregistering receiver: " + e.getMessage());
+            } finally {
+                chargerBroadcastReceiver = null;
+            }
         }
     }
 
@@ -86,7 +92,7 @@ public class UrlReaderService extends AccessibilityService {
                 return;
             }
             final int eventType = accessibilityEvent.getEventType();
-            if(eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
+            if(eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED || eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
 
                 AccessibilityNodeInfo parentNodeInfo = accessibilityEvent.getSource();
                 if (parentNodeInfo == null) {
@@ -94,8 +100,6 @@ public class UrlReaderService extends AccessibilityService {
                 }
 
                 String packageName = accessibilityEvent.getPackageName().toString();
-
-
 
                 this.cascadeRedirect( parentNodeInfo, packageName);
 
@@ -157,6 +161,7 @@ public class UrlReaderService extends AccessibilityService {
             .setOngoing(true)
             .setColor(Color.GREEN);
 
+
         return builder.build();
 
 
@@ -181,41 +186,35 @@ public class UrlReaderService extends AccessibilityService {
 
     }
 
-
-
-    private boolean redirectIfOpenedThisAppInSettings(AccessibilityNodeInfo node, String packageName) {
-
-        // TODO: the pattern to recognize that the device is on the current app OS settings page
+    private Boolean isPatternForCurrentAppInOSSettingsView(AccessibilityNodeInfo node, String packageName) {
         if (node == null || !SETTINGS_PACKAGE.equals(packageName)) {
             return false;
         }
 
-        performRedirect();
-        showToast("Uninstalling the app through settings is not allowed.");
-        Log.d("AccessibilityService", "Prevented uninstall attempt via settings.");
-        return true;
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        if (root == null) {
+            return false;
+        }
 
-//        AccessibilityNodeInfo root = getRootInActiveWindow();
-//        if (root == null) {
-//            return false;
-//        }
+        if (!findRecursiveNodesWithContent(root, APP_NAME)) {
+            return false;
+        }
 
+        return findRecursiveNodesWithContent(root, "info") ||
+               findRecursiveNodesWithContent(root, "permi") ||
+               findRecursiveNodesWithContent(root, "notif") ||
+               findRecursiveNodesWithContent(root, "vers");
+    }
 
+    private boolean redirectIfOpenedThisAppInSettings(AccessibilityNodeInfo node, String packageName) {
 
-//        boolean isAppName = findRecursiveNodesWithContent(root, APP_NAME);
-//        boolean containsTitleInfo = findRecursiveNodesWithContent(root, "info");
-//        boolean containsPermissionInfo = findRecursiveNodesWithContent(root, "permi");
-//        boolean containsNotificationInfo = findRecursiveNodesWithContent(root, "notif");
-//        boolean containsVersionInfo = findRecursiveNodesWithContent(root, "vers");
-
-//        if (containsTitleInfo) {
-//            performRedirect();
-//            showToast("Uninstalling the app through settings is not allowed.");
+        if (isPatternForCurrentAppInOSSettingsView(node, packageName)) {
+            performRedirect();
+            showToast("Uninstalling the app through settings is not allowed.");
 //            Log.d("AccessibilityService", "Prevented uninstall attempt via settings.");
-//            return true;
-//        }
-//
-//        return false;
+            return true;
+        }
+        return false;
     }
 
 
@@ -235,6 +234,7 @@ public class UrlReaderService extends AccessibilityService {
         for (SupportedBrowserConfig supportedConfig: supportedBrowsers) {
             if (supportedConfig.packageName.equals(packageName)) {
                 browserConfig = supportedConfig;
+                break;
             }
         }
         //this is not supported browser, so exit
@@ -275,12 +275,13 @@ public class UrlReaderService extends AccessibilityService {
     private List<SupportedBrowserConfig> getSupportedBrowsers() {
         List<SupportedBrowserConfig> browsers = new ArrayList<>();
         browsers.add( new SupportedBrowserConfig("com.android.chrome", "com.android.chrome:id/url_bar"));
+        browsers.add( new SupportedBrowserConfig("com.brave.browser", "com.brave.browser:id/url_bar"));
         browsers.add( new SupportedBrowserConfig("org.mozilla.firefox", "org.mozilla.firefox:id/mozac_browser_toolbar_url_view"));
         browsers.add( new SupportedBrowserConfig("com.opera.browser", "com.opera.browser:id/url_field"));
         browsers.add( new SupportedBrowserConfig("com.opera.mini.native", "com.opera.mini.native:id/url_field"));
         browsers.add( new SupportedBrowserConfig("com.duckduckgo.mobile.android", "com.duckduckgo.mobile.android:id/omnibarTextInput"));
         browsers.add( new SupportedBrowserConfig("com.microsoft.emmx", "com.microsoft.emmx:id/url_bar"));
-        browsers.add( new SupportedBrowserConfig("com.brave.browser", "com.brave.browser:id/url_bar"));
+
 
 
         return browsers;
@@ -355,10 +356,15 @@ public class UrlReaderService extends AccessibilityService {
         }
 
         for (int i = 0; i < node.getChildCount(); i++) {
-            Boolean found = findRecursiveNodesWithContent(node.getChild(i), query);
+
+            AccessibilityNodeInfo child = node.getChild(i);
+            Boolean found = findRecursiveNodesWithContent(child, query);
+
             if (found) {
+                child.recycle();
                 return true;
             }
+            child.recycle();
 
         }
         return false;
