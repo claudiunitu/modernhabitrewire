@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Color;
 import android.os.Build;
+import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.Toast;
@@ -22,7 +23,9 @@ import java.util.List;
 
 
 public class UrlReaderService extends AccessibilityService {
-
+    private static final String SETTINGS_PACKAGE = "com.android.settings";
+    private static final String APP_NAME = "Modern Habit Rewire";
+    private static final String APP_INFO_TITLE = "App info";
     private AppPreferencesManager appPreferencesManager;
 
     public UrlReaderService() {
@@ -92,6 +95,8 @@ public class UrlReaderService extends AccessibilityService {
 
                 String packageName = accessibilityEvent.getPackageName().toString();
 
+
+
                 this.cascadeRedirect( parentNodeInfo, packageName);
 
                 parentNodeInfo.recycle();
@@ -107,6 +112,7 @@ public class UrlReaderService extends AccessibilityService {
         }
 
     }
+
 
     private void showToast(String message){
 
@@ -166,7 +172,52 @@ public class UrlReaderService extends AccessibilityService {
         if(this.redirectIfForbiddenUrl (parentNodeInfo,packageName) ){
             return;
         }
+
+        // forbid accessing the app settings in order to prevent uninstalling or stopping the app
+        if( appPreferencesManager.getForbidSettingsSwitchValue()){
+            redirectIfOpenedThisAppInSettings(parentNodeInfo,packageName);
+            return;
+        }
+
     }
+
+
+
+    private boolean redirectIfOpenedThisAppInSettings(AccessibilityNodeInfo node, String packageName) {
+
+        // TODO: the pattern to recognize that the device is on the current app OS settings page
+        if (node == null || !SETTINGS_PACKAGE.equals(packageName)) {
+            return false;
+        }
+
+        performRedirect();
+        showToast("Uninstalling the app through settings is not allowed.");
+        Log.d("AccessibilityService", "Prevented uninstall attempt via settings.");
+        return true;
+
+//        AccessibilityNodeInfo root = getRootInActiveWindow();
+//        if (root == null) {
+//            return false;
+//        }
+
+
+
+//        boolean isAppName = findRecursiveNodesWithContent(root, APP_NAME);
+//        boolean containsTitleInfo = findRecursiveNodesWithContent(root, "info");
+//        boolean containsPermissionInfo = findRecursiveNodesWithContent(root, "permi");
+//        boolean containsNotificationInfo = findRecursiveNodesWithContent(root, "notif");
+//        boolean containsVersionInfo = findRecursiveNodesWithContent(root, "vers");
+
+//        if (containsTitleInfo) {
+//            performRedirect();
+//            showToast("Uninstalling the app through settings is not allowed.");
+//            Log.d("AccessibilityService", "Prevented uninstall attempt via settings.");
+//            return true;
+//        }
+//
+//        return false;
+    }
+
 
     private Boolean redirectIfForbiddenPackage(String packageName) {
         if(isForbiddenPackage(packageName)) {
@@ -207,6 +258,8 @@ public class UrlReaderService extends AccessibilityService {
         }
         return false;
     }
+
+
 
 
     private static class SupportedBrowserConfig {
@@ -271,9 +324,6 @@ public class UrlReaderService extends AccessibilityService {
                 return true;
             }
         }
-        if(appPreferencesManager.getForbidSettingsSwitchValue()){
-            return packageId.equals("com.android.settings");
-        }
         return false;
     }
 
@@ -291,5 +341,26 @@ public class UrlReaderService extends AccessibilityService {
 
     private void unregisterBroadcastReceiver() {
         unregisterReceiver(this.chargerBroadcastReceiver);
+    }
+
+    private Boolean findRecursiveNodesWithContent(AccessibilityNodeInfo node, String query) {
+        if (node == null) return false;
+
+        CharSequence text = node.getText();
+        CharSequence desc = node.getContentDescription();
+
+        if ((text != null && text.toString().toLowerCase().contains(query.toLowerCase())) ||
+                (desc != null && desc.toString().toLowerCase().contains(query.toLowerCase()))) {
+            return true;
+        }
+
+        for (int i = 0; i < node.getChildCount(); i++) {
+            Boolean found = findRecursiveNodesWithContent(node.getChild(i), query);
+            if (found) {
+                return true;
+            }
+
+        }
+        return false;
     }
 }
