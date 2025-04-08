@@ -54,16 +54,13 @@ public class UninstallerForbidderAccessibilityService extends AccessibilityServi
                 return;
             }
 
-            AccessibilityNodeInfo parentNodeInfo = accessibilityEvent.getSource();
-            if (parentNodeInfo == null) {
-                return;
-            }
+
 
             CharSequence packageName = accessibilityEvent.getPackageName();
 
-            this.cascadeRedirect( parentNodeInfo, packageName);
+            this.cascadeRedirect( accessibilityEvent, packageName);
 
-            parentNodeInfo.recycle();
+
 
         }
         catch(Exception e) {
@@ -94,11 +91,11 @@ public class UninstallerForbidderAccessibilityService extends AccessibilityServi
     }
 
 
-    private void cascadeRedirect(AccessibilityNodeInfo parentNodeInfo, CharSequence packageName) {
+    private void cascadeRedirect(AccessibilityEvent accessibilityEvent, CharSequence packageName) {
 
         // forbid accessing the app settings in order to prevent uninstalling or stopping the app
         if( appPreferencesManagerSingleton.getForbidSettingsSwitchValue()){
-            redirectIfOpenedThisAppInSettings(parentNodeInfo,packageName);
+            redirectIfOpenedThisAppInSettings(accessibilityEvent,packageName);
             return;
         }
 
@@ -124,9 +121,17 @@ public class UninstallerForbidderAccessibilityService extends AccessibilityServi
                 findRecursiveNodesWithContent(root, "vers");
     }
 
-    private boolean redirectIfOpenedThisAppInSettings(AccessibilityNodeInfo node, CharSequence packageName) {
+    private boolean redirectIfOpenedThisAppInSettings(AccessibilityEvent accessibilityEvent, CharSequence packageName) {
 
-        if (isPatternForCurrentAppInOSSettingsView(node, packageName)) {
+        AccessibilityNodeInfo parentNodeInfo = accessibilityEvent.getSource();
+        if (parentNodeInfo == null) {
+            return false;
+        }
+        boolean isPatternForCurrentAppInOSSettingsView = isPatternForCurrentAppInOSSettingsView(parentNodeInfo, packageName);
+        parentNodeInfo.recycle();
+
+
+        if (isPatternForCurrentAppInOSSettingsView) {
             performRedirect();
             showToast("Uninstalling the app through settings is not allowed.");
 //            Log.d("AccessibilityService", "Prevented uninstall attempt via settings.");

@@ -6,7 +6,7 @@
     android:accessibilityEventTypes="typeWindowStateChanged"
 
     android:canRetrieveWindowContent="true"
-    android:notificationTimeout="150"
+    android:notificationTimeout="50"
     android:settingsActivity="com.example.android.accessibility.ServiceSettingsActivity"
     >
 

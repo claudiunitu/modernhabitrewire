@@ -63,16 +63,13 @@ public class ScreenReaderAccessibilityService extends AccessibilityService {
                 return;
             }
 
-            AccessibilityNodeInfo parentNodeInfo = accessibilityEvent.getSource();
-            if (parentNodeInfo == null) {
-                return;
-            }
+
 
             CharSequence packageName = accessibilityEvent.getPackageName();
 
-            this.cascadeRedirect( parentNodeInfo, packageName);
+            this.cascadeRedirect( accessibilityEvent, packageName);
 
-            parentNodeInfo.recycle();
+
 
         }
         catch(Exception e) {
@@ -105,14 +102,14 @@ public class ScreenReaderAccessibilityService extends AccessibilityService {
 
 
 
-    private void cascadeRedirect(AccessibilityNodeInfo parentNodeInfo, CharSequence packageName) {
+    private void cascadeRedirect(AccessibilityEvent accessibilityEvent, CharSequence packageName) {
         // check if it is a forbidden package
         if(this.redirectIfForbiddenPackage(packageName)) {
             return;
         }
 
         // check if forbidden url
-        if(this.redirectIfForbiddenUrl (parentNodeInfo,packageName) ){
+        if(this.redirectIfForbiddenUrl (accessibilityEvent,packageName) ){
             return;
         }
     }
@@ -128,7 +125,20 @@ public class ScreenReaderAccessibilityService extends AccessibilityService {
         return false;
     }
 
-    private Boolean redirectIfForbiddenUrl (AccessibilityNodeInfo parentNodeInfo,CharSequence packageName){
+    private Boolean redirectIfForbiddenUrl (AccessibilityEvent accessibilityEvent,CharSequence packageName){
+
+        //check if the event was triggered by a textEdit class (address bar)
+
+        CharSequence className = accessibilityEvent.getClassName();
+        if(className == null){
+            return false;
+        }
+
+        String classNameString = "android.widget.EditText";
+        if(!className.equals(classNameString)){
+            return false;
+        }
+
         // check if the event was triggered by a browser and if it accessed a forbidden url
         SupportedBrowserConfig browserConfig = null;
         for (SupportedBrowserConfig supportedConfig: supportedBrowsers) {
@@ -143,7 +153,14 @@ public class ScreenReaderAccessibilityService extends AccessibilityService {
             return false;
         }
 
+        AccessibilityNodeInfo parentNodeInfo = accessibilityEvent.getSource();
+        if (parentNodeInfo == null) {
+            return false;
+        }
+
         String capturedUrl = captureUrl(parentNodeInfo, browserConfig);
+
+        parentNodeInfo.recycle();
 
 
         if (capturedUrl == null) {
@@ -187,9 +204,9 @@ public class ScreenReaderAccessibilityService extends AccessibilityService {
         return browsers;
     }
 
-    private String captureUrl(AccessibilityNodeInfo info, SupportedBrowserConfig config) {
+    private String captureUrl(AccessibilityNodeInfo parentNodeInfo, SupportedBrowserConfig config) {
 
-        List<AccessibilityNodeInfo> nodes = info.findAccessibilityNodeInfosByViewId(config.addressBarId);
+        List<AccessibilityNodeInfo> nodes = parentNodeInfo.findAccessibilityNodeInfosByViewId(config.addressBarId);
         if (nodes == null || nodes.isEmpty()) {
             return null;
         }
