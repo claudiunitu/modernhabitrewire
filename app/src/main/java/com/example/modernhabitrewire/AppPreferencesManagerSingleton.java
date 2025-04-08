@@ -6,7 +6,9 @@ import android.content.SharedPreferences;
 import java.util.ArrayList;
 import java.util.List;
 
-public class AppPreferencesManager {
+public class AppPreferencesManagerSingleton {
+
+    private static AppPreferencesManagerSingleton _instance = null;
     private static final String PREF_NAME = "global_preferences";
     private static final String KEY_FORBIDDEN_URL_LIST = "forbidden_url_list";
     private static final String KEY_FORBIDDEN_APP_LIST = "forbidden_app_list";
@@ -17,29 +19,70 @@ public class AppPreferencesManager {
     private static final String BYPASS_SWITCH_VALUE = "bypass_switch_value";
     private static final String FORBID_SETTINGS_SWITCH_VALUE = "forbid_settings_switch_value";
 
-    private final SharedPreferences prefs;
+    private SharedPreferences prefs;
     private List<String> cachedUrls = null;
     private List<String> cachedApps = null;
+    private Boolean cachedIsBlockerActiveValue = null;
+    private Boolean cachedSettingsSwitchValue = null;
+
+    private Boolean cachedBypassSwitchValue = null;
 
 
-    public AppPreferencesManager(Context context) {
+    public AppPreferencesManagerSingleton(Context context) {
         prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        setForbiddenUrls(getForbiddenUrls());
+        setForbiddenApps(getForbiddenApps());
+        setIsBlockerActive(getIsBlockerActive());
+        setIsBlockerActive(getIsBlockerActive());
+        setForbidSettingsSwitchValue(getForbidSettingsSwitchValue());
+        setBypassSwitchValue(getBypassSwitchValue());
     }
 
+    public static AppPreferencesManagerSingleton getInstance(Context context) {
+        if (_instance == null) {
+            _instance = new AppPreferencesManagerSingleton(context);
+        }
+        return AppPreferencesManagerSingleton._instance;
+    }
+
+
     public void setForbidSettingsSwitchValue(Boolean flag){
+        cachedSettingsSwitchValue = flag;
         prefs.edit().putBoolean(FORBID_SETTINGS_SWITCH_VALUE, flag).apply();
     }
 
     public Boolean getForbidSettingsSwitchValue(){
-        return prefs.getBoolean(FORBID_SETTINGS_SWITCH_VALUE, false);
+
+        if (cachedSettingsSwitchValue != null) {
+            return cachedSettingsSwitchValue;
+        }
+
+        return prefs.getBoolean(FORBID_SETTINGS_SWITCH_VALUE, getDefaultSettingsSwitchValue());
+    }
+
+    public void setIsBlockerActive(Boolean flag) {
+        cachedIsBlockerActiveValue = flag;
+        prefs.edit().putBoolean(KEY_IS_BLOCKER_ACTIVE, flag).apply();
+    }
+
+    public Boolean getIsBlockerActive() {
+        if (cachedIsBlockerActiveValue != null) {
+            return cachedIsBlockerActiveValue;
+        }
+
+        return prefs.getBoolean(KEY_IS_BLOCKER_ACTIVE, getDefaultIsBlockerActiveValue());
     }
 
     public void setBypassSwitchValue(Boolean flag){
+        cachedBypassSwitchValue = flag;
         prefs.edit().putBoolean(BYPASS_SWITCH_VALUE, flag).apply();
     }
 
     public Boolean getBypassSwitchValue(){
-        return prefs.getBoolean(BYPASS_SWITCH_VALUE, false);
+        if (cachedBypassSwitchValue != null) {
+            return cachedBypassSwitchValue;
+        }
+        return prefs.getBoolean(BYPASS_SWITCH_VALUE, getDefaultBypassSwitchValue());
     }
 
     public void setDeactivationKey(String key){
@@ -49,16 +92,9 @@ public class AppPreferencesManager {
     public String getDeactivationKey(){
         return prefs.getString(DEACTIVATION_KEY, "");
     }
-    public Boolean getIsBlockerActive() {
-        return prefs.getBoolean(KEY_IS_BLOCKER_ACTIVE, false);
-    }
 
-    public void setIsBlockerActive() {
-        prefs.edit().putBoolean(KEY_IS_BLOCKER_ACTIVE, true).apply();
-    }
-    public void setIsBlockerInactive() {
-        prefs.edit().putBoolean(KEY_IS_BLOCKER_ACTIVE, false).apply();
-    }
+
+
 
     public List<String> getForbiddenUrls() {
         if (cachedUrls != null) {
@@ -117,6 +153,17 @@ public class AppPreferencesManager {
         return new ArrayList<>(List.of(
                 "com.google.android.youtube"
         ));
+    }
+
+    private Boolean getDefaultIsBlockerActiveValue (){
+        return false;
+    }
+    private Boolean getDefaultSettingsSwitchValue (){
+        return false;
+    }
+
+    private Boolean getDefaultBypassSwitchValue (){
+        return false;
     }
 
 }

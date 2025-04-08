@@ -6,7 +6,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.RecyclerView;
 public class UrlListEditorActivity extends AppCompatActivity {
 
-    private AppPreferencesManager appPreferencesManager;
+    private AppPreferencesManagerSingleton appPreferencesManagerSingleton;
     private UrlListRecyclerAdapter adapter;
 
     @Override
@@ -15,14 +15,14 @@ public class UrlListEditorActivity extends AppCompatActivity {
         setContentView(R.layout.activity_url_list_editor);
 
 
-        appPreferencesManager = new AppPreferencesManager(this);
+        appPreferencesManagerSingleton = AppPreferencesManagerSingleton.getInstance(this);
 
         EditText urlInput = findViewById(R.id.urlInput);
         Button addButton = findViewById(R.id.addButton);
         RecyclerView recyclerView = findViewById(R.id.urlRecyclerView);
 
-        adapter = new UrlListRecyclerAdapter(appPreferencesManager.getForbiddenUrls(), url -> {
-            appPreferencesManager.removeUrl(url);
+        adapter = new UrlListRecyclerAdapter(appPreferencesManagerSingleton.getForbiddenUrls(), url -> {
+            appPreferencesManagerSingleton.removeUrl(url);
             refreshList();
         });
 
@@ -31,7 +31,7 @@ public class UrlListEditorActivity extends AppCompatActivity {
         addButton.setOnClickListener(v -> {
             String newUrl = urlInput.getText().toString().trim();
             if (!newUrl.isEmpty()) {
-                appPreferencesManager.addUrl(newUrl);
+                appPreferencesManagerSingleton.addUrl(newUrl);
                 urlInput.setText("");
                 refreshList();
             }
@@ -39,7 +39,7 @@ public class UrlListEditorActivity extends AppCompatActivity {
     }
 
     private void refreshList() {
-        adapter.updateList(appPreferencesManager.getForbiddenUrls());
+        adapter.updateList(appPreferencesManagerSingleton.getForbiddenUrls());
     }
 
 
