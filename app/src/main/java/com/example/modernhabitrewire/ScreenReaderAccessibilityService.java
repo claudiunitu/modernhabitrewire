@@ -57,7 +57,7 @@ public class ScreenReaderAccessibilityService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent accessibilityEvent) {
-//        Log.d("Content changed", "onAccessibilityEvent");
+        Log.d("Content changed", "onAccessibilityEvent");
         try {
             if(!appPreferencesManagerSingleton.getIsBlockerActive()) {
                 return;
@@ -66,6 +66,9 @@ public class ScreenReaderAccessibilityService extends AccessibilityService {
 
 
             CharSequence packageName = accessibilityEvent.getPackageName();
+            if(packageName == null){
+                return;
+            }
 
             this.cascadeRedirect( accessibilityEvent, packageName);
 
