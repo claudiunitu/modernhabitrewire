@@ -44,7 +44,6 @@ public class MainActivity extends AppCompatActivity {
         appPreferencesManagerSingleton = AppPreferencesManagerSingleton.getInstance(this);
 
         initializeBlockerTogglerButton();
-        initializeUrlEditorButton();
         initializeDeactivationKeySetterButton();
         initializeDeactivationKeySetterTextViewState();
         initializeDeactivationKeyDeblockerTextViewState();
@@ -190,7 +189,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void onBlockerActiveStateChange() {
-        initializeUrlEditorButton();
+
         initializeBlockerTogglerButton();
         initializeDeactivationKeySetterButton();
         initializeDeactivationKeyDeblockerTextViewState();
@@ -206,10 +205,7 @@ public class MainActivity extends AppCompatActivity {
             togglerButton.setText(R.string.ButtonBlockerActivateLabel);
         }
     }
-    private void initializeUrlEditorButton(){
-        Button urlEditorButton = findViewById(R.id.button_go_to_edit_urls);
-        urlEditorButton.setEnabled(!appPreferencesManagerSingleton.getIsBlockerActive());
-    }
+
     private void initializeDeactivationKeySetterButton(){
         Button deactivationKeyButton = findViewById(R.id.deactivationKeyButton);
         TextView keyTextView =  findViewById(R.id.deactivationKeySetterInputText);

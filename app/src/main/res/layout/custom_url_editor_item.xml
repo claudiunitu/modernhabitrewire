@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-android:orientation="horizontal"
-android:layout_width="match_parent"
-android:layout_height="wrap_content"
-android:padding="16dp">
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="5dp">
 
     <TextView
         android:id="@+id/url_text"
@@ -11,9 +11,11 @@ android:padding="16dp">
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="@string/N_A"
+        android:textColor="@android:color/primary_text_light"
+        android:textIsSelectable="false"
         android:textSize="16sp" />
 
-<!-- Delete button as an ImageView -->
+    <!-- Delete button as an ImageView -->
     <ImageView
         android:id="@+id/delete_button"
         android:layout_width="24dp"

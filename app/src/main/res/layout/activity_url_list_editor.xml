@@ -32,7 +32,7 @@
 
         android:layout_marginBottom="8dp"
         android:layout_weight="1"
-        android:background="#E7EEF8"
+        android:background="@android:color/background_light"
         android:scrollbars="vertical"
         android:visibility="visible"
         app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
