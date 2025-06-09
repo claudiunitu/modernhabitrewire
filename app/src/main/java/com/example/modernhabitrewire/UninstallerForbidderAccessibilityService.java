@@ -58,6 +58,10 @@ public class UninstallerForbidderAccessibilityService extends AccessibilityServi
 
             CharSequence packageName = accessibilityEvent.getPackageName();
 
+            if(packageName == null){
+                return;
+            }
+
             this.cascadeRedirect( accessibilityEvent, packageName);
 
 
