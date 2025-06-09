@@ -57,7 +57,7 @@ public class ScreenReaderAccessibilityService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent accessibilityEvent) {
-        Log.d("Content changed", "onAccessibilityEvent");
+        //Log.d("Content changed", "onAccessibilityEvent");
         try {
             if(!appPreferencesManagerSingleton.getIsBlockerActive()) {
                 return;
