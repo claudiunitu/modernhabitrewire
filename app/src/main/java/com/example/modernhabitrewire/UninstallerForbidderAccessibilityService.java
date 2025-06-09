@@ -118,7 +118,9 @@ public class UninstallerForbidderAccessibilityService extends AccessibilityServi
         return findRecursiveNodesWithContent(root, "info") ||
                 findRecursiveNodesWithContent(root, "permi") ||
                 findRecursiveNodesWithContent(root, "notif") ||
-                findRecursiveNodesWithContent(root, "vers");
+                findRecursiveNodesWithContent(root, "vers") ||
+                findRecursiveNodesWithContent(root, "admin") ||
+                findRecursiveNodesWithContent(root, "instal");
     }
 
     private boolean redirectIfOpenedThisAppInSettings(AccessibilityEvent accessibilityEvent, CharSequence packageName) {

@@ -15,6 +15,6 @@
     <string name="BlockerDeactivationKeyUnsetButtonlabel">Unset Deactivation Key</string>
     <string name="LabelNotSet">Label not set</string>
     <string name="ChargingBypassSwitchLabel">Bypass when charging</string>
-    <string name="ForbidSettingsSwitch">Forbid opening OS settings</string>
+    <string name="ForbidSettingsSwitch">Disallow uninstall</string>
 
 </resources>
