@@ -2,7 +2,6 @@ package com.example.modernhabitrewire;
 
 import android.accessibilityservice.AccessibilityService;
 
-import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.Toast;
@@ -240,7 +239,7 @@ public class ScreenReaderAccessibilityService extends AccessibilityService {
     }
 
     private boolean isForbiddenPackage(CharSequence packageId) {
-        for (String forbiddenPackageName : appPreferencesManagerSingleton.getForbiddenApps()) {
+        for (String forbiddenPackageName : appPreferencesManagerSingleton.getForbiddenAppsPackages()) {
             if (packageId.equals(forbiddenPackageName)) {
                 return true;
             }

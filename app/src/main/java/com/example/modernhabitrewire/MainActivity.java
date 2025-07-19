@@ -65,6 +65,11 @@ public class MainActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
+    public void onEditAppPackagesListClick(View view){
+        Intent intent = new Intent(MainActivity.this,AppPackagesListEditorActivity.class);
+        startActivity(intent);
+    }
+
     public void onActivateBlockerListClick(View view){
 //        ChargingState.isCharging
         if(appPreferencesManagerSingleton.getIsBlockerActive()){

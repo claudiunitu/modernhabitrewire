@@ -17,7 +17,7 @@ public class UrlListEditorActivity extends AppCompatActivity {
 
         appPreferencesManagerSingleton = AppPreferencesManagerSingleton.getInstance(this);
 
-        EditText urlInput = findViewById(R.id.urlInput);
+        EditText urlInput = findViewById(R.id.packageNameInput);
         Button addButton = findViewById(R.id.addButton);
         RecyclerView recyclerView = findViewById(R.id.urlRecyclerView);
 
@@ -31,7 +31,7 @@ public class UrlListEditorActivity extends AppCompatActivity {
         addButton.setOnClickListener(v -> {
             String newUrl = urlInput.getText().toString().trim();
             if (!newUrl.isEmpty()) {
-                appPreferencesManagerSingleton.addUrl(newUrl);
+                appPreferencesManagerSingleton.addForbiddenUrl(newUrl);
                 urlInput.setText("");
                 refreshList();
             }

@@ -31,7 +31,7 @@ public class AppPreferencesManagerSingleton {
     public AppPreferencesManagerSingleton(Context context) {
         prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
         setForbiddenUrls(getForbiddenUrls());
-        setForbiddenApps(getForbiddenApps());
+        setForbiddenApps(getForbiddenAppsPackages());
         setIsBlockerActive(getIsBlockerActive());
         setIsBlockerActive(getIsBlockerActive());
         setForbidSettingsSwitchValue(getForbidSettingsSwitchValue());
@@ -106,14 +106,12 @@ public class AppPreferencesManagerSingleton {
         }
         return new ArrayList<>(List.of(raw.split(",")));
     }
-
-    public void setForbiddenApps(List<String> apps) {
-        cachedApps = new ArrayList<>(apps); // update cache
-        String joined = String.join(",", cachedApps);
-        prefs.edit().putString(KEY_FORBIDDEN_APP_LIST, joined).apply();
+    public void setForbiddenUrls(List<String> urls) {
+        cachedUrls = new ArrayList<>(urls); // update cache
+        String joined = String.join(",", cachedUrls);
+        prefs.edit().putString(KEY_FORBIDDEN_URL_LIST, joined).apply();
     }
-
-    public List<String> getForbiddenApps() {
+    public List<String> getForbiddenAppsPackages() {
         if (cachedApps != null) {
             return cachedApps;
         }
@@ -124,25 +122,41 @@ public class AppPreferencesManagerSingleton {
         return new ArrayList<>(List.of(raw.split(",")));
     }
 
-    public void setForbiddenUrls(List<String> urls) {
-        cachedUrls = new ArrayList<>(urls); // update cache
-        String joined = String.join(",", cachedUrls);
-        prefs.edit().putString(KEY_FORBIDDEN_URL_LIST, joined).apply();
+    public void setForbiddenApps(List<String> apps) {
+        cachedApps = new ArrayList<>(apps); // update cache
+        String joined = String.join(",", cachedApps);
+        prefs.edit().putString(KEY_FORBIDDEN_APP_LIST, joined).apply();
     }
 
-    public void addUrl(String url) {
+
+
+    public void addForbiddenUrl(String url) {
         List<String> urls = getForbiddenUrls();
         if (!urls.contains(url)) {
             urls.add(url);
             setForbiddenUrls(urls);
         }
     }
-
     public void removeUrl(String url) {
         List<String> urls = getForbiddenUrls();
         urls.remove(url);
         setForbiddenUrls(urls);
     }
+
+    public void addForbiddenAppPackage(String appPackage) {
+        List<String> appsPackages = getForbiddenAppsPackages();
+        if (!appsPackages.contains(appPackage)) {
+            appsPackages.add(appPackage);
+            setForbiddenApps(appsPackages);
+        }
+    }
+    public void removeAppPackage(String appPackage) {
+        List<String> appsPackages = getForbiddenAppsPackages();
+        appsPackages.remove(appPackage);
+        setForbiddenApps(appsPackages);
+    }
+
+
 
     private List<String> getDefaultUrls() {
         return new ArrayList<>(List.of(

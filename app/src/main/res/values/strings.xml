@@ -16,5 +16,9 @@
     <string name="LabelNotSet">Label not set</string>
     <string name="ChargingBypassSwitchLabel">Bypass when charging</string>
     <string name="ForbidSettingsSwitch">Disallow uninstall</string>
+    <string name="ForbiddenAppPackagesListLabel">Forbidden app packages</string>
+    <string name="AddForbiddenAppPackageInputHint">Add new forbidden app package</string>
+    <string name="AddForbiddenAppPackageButtonLabel">Add Forbidden App Package</string>
+    <string name="EditPackagesListButtonLabel">Edit Forbidden App Packages</string>
 
 </resources>

@@ -34,6 +34,12 @@
             android:theme="@style/Theme.ModernHabitRewire.NoActionBar"
             android:parentActivityName=".MainActivity"/>
 
+        <activity
+            android:name=".AppPackagesListEditorActivity"
+            android:exported="true"
+            android:theme="@style/Theme.ModernHabitRewire.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
         <service
             android:name=".ScreenReaderAccessibilityService"
             android:enabled="true"
