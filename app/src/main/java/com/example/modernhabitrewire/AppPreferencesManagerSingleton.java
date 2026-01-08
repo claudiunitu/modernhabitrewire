@@ -21,6 +21,7 @@ public class AppPreferencesManagerSingleton {
     private static final String KEY_LAST_BUDGET_RESET_DATE = "last_budget_reset_date";
     private static final String KEY_TEMP_ALLOW_APP_LAUNCH = "temp_allow_app_launch";
     private static final String KEY_LAST_INTERCEPTED_APP = "last_intercepted_app";
+    private static final String KEY_LAST_INTERCEPTED_URL = "last_intercepted_url";
     private static final String KEY_DAILY_SESSION_COUNT = "daily_session_count";
     private static final String KEY_BASE_WAIT_TIME_SECONDS = "base_wait_time_seconds";
     private static final String KEY_COST_INCREMENT_FACTOR = "cost_increment_factor";
@@ -160,6 +161,14 @@ public class AppPreferencesManagerSingleton {
 
     public void setLastInterceptedApp(String packageName) {
         prefs.edit().putString(KEY_LAST_INTERCEPTED_APP, packageName).apply();
+    }
+
+    public String getLastInterceptedUrl() {
+        return prefs.getString(KEY_LAST_INTERCEPTED_URL, "");
+    }
+
+    public void setLastInterceptedUrl(String url) {
+        prefs.edit().putString(KEY_LAST_INTERCEPTED_URL, url).apply();
     }
 
     public int getDailySessionCount() {

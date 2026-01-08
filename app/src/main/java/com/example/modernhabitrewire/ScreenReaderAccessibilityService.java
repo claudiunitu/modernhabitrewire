@@ -55,11 +55,10 @@ public class ScreenReaderAccessibilityService extends AccessibilityService {
                 return;
             }
 
-            // App-blocking logic has been removed. This service now only handles URL blocking.
             redirectIfForbiddenUrl(accessibilityEvent, packageName);
 
         } catch (Exception e) {
-            // It's better to log the exception than to show a toast for a background service.
+            // Log exception
         }
     }
 
@@ -77,7 +76,6 @@ public class ScreenReaderAccessibilityService extends AccessibilityService {
 
     private boolean redirectIfForbiddenUrl(AccessibilityEvent accessibilityEvent, CharSequence packageName) {
         CharSequence className = accessibilityEvent.getClassName();
-        // This service should only care about edits to EditText fields (like address bars)
         if (className == null || !className.equals("android.widget.EditText")) {
             return false;
         }
@@ -91,7 +89,7 @@ public class ScreenReaderAccessibilityService extends AccessibilityService {
         }
 
         if (browserConfig == null) {
-            return false; // Not a supported browser
+            return false;
         }
 
         AccessibilityNodeInfo parentNodeInfo = accessibilityEvent.getSource();
@@ -137,13 +135,13 @@ public class ScreenReaderAccessibilityService extends AccessibilityService {
             return null;
         }
 
-        AccessibilityNodeInfo addressBarNodeInfo = nodes.get(0);
         String url = null;
-        // The !isFocused() check was removed to reliably capture URLs across different browsers and states.
-        if (addressBarNodeInfo.getText() != null) {
-            url = addressBarNodeInfo.getText().toString();
+        for (AccessibilityNodeInfo node : nodes) {
+            if (url == null && node.getText() != null) {
+                url = node.getText().toString();
+            }
+            node.recycle(); // Ensure every node in the list is recycled
         }
-        addressBarNodeInfo.recycle();
         return url;
     }
 

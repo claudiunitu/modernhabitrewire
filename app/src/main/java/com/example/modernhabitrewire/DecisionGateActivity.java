@@ -73,13 +73,9 @@ public class DecisionGateActivity extends AppCompatActivity {
 
     private void startFrictionDelay() {
         proceedButton.setEnabled(false);
-        
-        // Physics: Base Wait Time (from settings) * Current Cost Multiplier
         int baseWait = appPreferencesManager.getBaseWaitTimeSeconds();
         double multiplier = budgetEngine.calculateCurrentMultiplier();
-        
         countdownSeconds = (int) (baseWait * multiplier);
-        
         frictionTextView.setVisibility(View.VISIBLE);
         runCountdown();
     }
@@ -96,11 +92,17 @@ public class DecisionGateActivity extends AppCompatActivity {
 
     private void launchTargetApp() {
         appPreferencesManager.setTempAllowAppLaunch(true);
-        String packageName = appPreferencesManager.getLastInterceptedApp();
-        Intent launchIntent = getPackageManager().getLaunchIntentForPackage(packageName);
-        if (launchIntent != null) {
-            startActivity(launchIntent);
+        
+        // Explicitly re-launch the target package (Browser or App) to force task switching
+        String targetPackage = appPreferencesManager.getLastInterceptedApp();
+        if (targetPackage != null && !targetPackage.isEmpty()) {
+            Intent intent = getPackageManager().getLaunchIntentForPackage(targetPackage);
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
+            }
         }
+        
         finish();
     }
 

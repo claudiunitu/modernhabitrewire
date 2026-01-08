@@ -43,6 +43,9 @@
         <activity
             android:name=".DecisionGateActivity"
             android:exported="true"
+            android:taskAffinity=".firewall"
+            android:noHistory="true"
+            android:excludeFromRecents="true"
             android:theme="@style/Theme.ModernHabitRewire.NoActionBar" />
 
         <service

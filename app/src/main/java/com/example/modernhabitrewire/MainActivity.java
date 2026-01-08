@@ -50,28 +50,24 @@ public class MainActivity extends AppCompatActivity {
         refreshBlockerButton();
         refreshKeyButton();
         
-        // Visibility logic for keys
         findViewById(R.id.deactivationKeySetterInputText).setVisibility(
             appPreferencesManager.getDeactivationKey().isEmpty() ? View.VISIBLE : View.INVISIBLE);
         findViewById(R.id.deactivationKeyUnblockerInputText).setVisibility(
             appPreferencesManager.getIsBlockerActive() ? View.VISIBLE : View.INVISIBLE);
 
-        // Switches
         ((SwitchCompat) findViewById(R.id.bypassSwitch)).setChecked(appPreferencesManager.getBypassSwitchValue());
         ((SwitchCompat) findViewById(R.id.forbidSettingsSwitch)).setChecked(appPreferencesManager.getForbidSettingsSwitchValue());
 
-        // Physics Settings
+        // Sync restored physics settings to UI
         ((EditText) findViewById(R.id.dailyBudgetInput)).setText(String.valueOf(appPreferencesManager.getDailyBudgetMinutes()));
         ((EditText) findViewById(R.id.baseWaitInput)).setText(String.valueOf(appPreferencesManager.getBaseWaitTimeSeconds()));
         ((EditText) findViewById(R.id.costFactorInput)).setText(String.format(Locale.getDefault(), "%.1f", appPreferencesManager.getCostIncrementFactor()));
     }
 
     private void setWatchers() {
-        // Toggle Watchers
         ((SwitchCompat) findViewById(R.id.bypassSwitch)).setOnCheckedChangeListener((v, checked) -> appPreferencesManager.setBypassSwitchValue(checked));
         ((SwitchCompat) findViewById(R.id.forbidSettingsSwitch)).setOnCheckedChangeListener((v, checked) -> appPreferencesManager.setForbidSettingsSwitchValue(checked));
 
-        // Physics Watchers
         ((EditText) findViewById(R.id.dailyBudgetInput)).addTextChangedListener(new SimpleWatcher(s -> {
             try { appPreferencesManager.setDailyBudgetMinutes(Integer.parseInt(s)); } catch (Exception ignored) {}
         }));
@@ -82,14 +78,11 @@ public class MainActivity extends AppCompatActivity {
             try { appPreferencesManager.setCostIncrementFactor(Float.parseFloat(s)); } catch (Exception ignored) {}
         }));
 
-        // Key watcher for button state
         ((EditText) findViewById(R.id.deactivationKeySetterInputText)).addTextChangedListener(new SimpleWatcher(s -> refreshKeyButton()));
     }
 
     private void updateUiStates() {
         boolean active = appPreferencesManager.getIsBlockerActive();
-        
-        // Disable settings while active
         findViewById(R.id.bypassSwitch).setEnabled(!active);
         findViewById(R.id.forbidSettingsSwitch).setEnabled(!active);
         findViewById(R.id.dailyBudgetInput).setEnabled(!active);
