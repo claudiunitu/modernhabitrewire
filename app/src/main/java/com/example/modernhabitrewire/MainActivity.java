@@ -15,7 +15,7 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
 import android.widget.Button;
-import android.widget.TextView;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import androidx.appcompat.widget.SwitchCompat;
@@ -23,271 +23,144 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 
-import java.util.Objects;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
-    private AppPreferencesManagerSingleton appPreferencesManagerSingleton;
-
+    private AppPreferencesManagerSingleton appPreferencesManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-//        Log.d("MainActivity", "Created.");
+        appPreferencesManager = AppPreferencesManagerSingleton.getInstance(this);
+
         this.backButtonPressedDispatcher();
         this.requestDeviceAdminPermission();
         this.requestAccessibilityPermission();
         this.requestNotificationPermission();
         this.requestPostNotificationPermision();
 
-        appPreferencesManagerSingleton = AppPreferencesManagerSingleton.getInstance(this);
-
-        initializeBlockerTogglerButton();
-        initializeDeactivationKeySetterButton();
-        initializeDeactivationKeySetterTextViewState();
-        initializeDeactivationKeyDeblockerTextViewState();
-        initializeBypassSwitchState();
-        initializeForbidSettingsSwitchState();
-        setKeyDeactivationTextWatcher();
-        setBypassSwitchWatcher();
-        setForbidSettingsSwitchWatcher();
-
+        initializeUI();
+        setWatchers();
+        updateUiStates();
     }
 
-    @Override
-    protected void onStart() {
-        super.onStart();
+    private void initializeUI() {
+        refreshBlockerButton();
+        refreshKeyButton();
+        
+        // Visibility logic for keys
+        findViewById(R.id.deactivationKeySetterInputText).setVisibility(
+            appPreferencesManager.getDeactivationKey().isEmpty() ? View.VISIBLE : View.INVISIBLE);
+        findViewById(R.id.deactivationKeyUnblockerInputText).setVisibility(
+            appPreferencesManager.getIsBlockerActive() ? View.VISIBLE : View.INVISIBLE);
+
+        // Switches
+        ((SwitchCompat) findViewById(R.id.bypassSwitch)).setChecked(appPreferencesManager.getBypassSwitchValue());
+        ((SwitchCompat) findViewById(R.id.forbidSettingsSwitch)).setChecked(appPreferencesManager.getForbidSettingsSwitchValue());
+
+        // Physics Settings
+        ((EditText) findViewById(R.id.dailyBudgetInput)).setText(String.valueOf(appPreferencesManager.getDailyBudgetMinutes()));
+        ((EditText) findViewById(R.id.baseWaitInput)).setText(String.valueOf(appPreferencesManager.getBaseWaitTimeSeconds()));
+        ((EditText) findViewById(R.id.costFactorInput)).setText(String.format(Locale.getDefault(), "%.1f", appPreferencesManager.getCostIncrementFactor()));
     }
 
-    public void onEditUrlListClick(View view){
-        Intent intent = new Intent(MainActivity.this,UrlListEditorActivity.class);
-        startActivity(intent);
+    private void setWatchers() {
+        // Toggle Watchers
+        ((SwitchCompat) findViewById(R.id.bypassSwitch)).setOnCheckedChangeListener((v, checked) -> appPreferencesManager.setBypassSwitchValue(checked));
+        ((SwitchCompat) findViewById(R.id.forbidSettingsSwitch)).setOnCheckedChangeListener((v, checked) -> appPreferencesManager.setForbidSettingsSwitchValue(checked));
+
+        // Physics Watchers
+        ((EditText) findViewById(R.id.dailyBudgetInput)).addTextChangedListener(new SimpleWatcher(s -> {
+            try { appPreferencesManager.setDailyBudgetMinutes(Integer.parseInt(s)); } catch (Exception ignored) {}
+        }));
+        ((EditText) findViewById(R.id.baseWaitInput)).addTextChangedListener(new SimpleWatcher(s -> {
+            try { appPreferencesManager.setBaseWaitTimeSeconds(Integer.parseInt(s)); } catch (Exception ignored) {}
+        }));
+        ((EditText) findViewById(R.id.costFactorInput)).addTextChangedListener(new SimpleWatcher(s -> {
+            try { appPreferencesManager.setCostIncrementFactor(Float.parseFloat(s)); } catch (Exception ignored) {}
+        }));
+
+        // Key watcher for button state
+        ((EditText) findViewById(R.id.deactivationKeySetterInputText)).addTextChangedListener(new SimpleWatcher(s -> refreshKeyButton()));
     }
 
-    public void onEditAppPackagesListClick(View view){
-        Intent intent = new Intent(MainActivity.this,AppPackagesListEditorActivity.class);
-        startActivity(intent);
+    private void updateUiStates() {
+        boolean active = appPreferencesManager.getIsBlockerActive();
+        
+        // Disable settings while active
+        findViewById(R.id.bypassSwitch).setEnabled(!active);
+        findViewById(R.id.forbidSettingsSwitch).setEnabled(!active);
+        findViewById(R.id.dailyBudgetInput).setEnabled(!active);
+        findViewById(R.id.baseWaitInput).setEnabled(!active);
+        findViewById(R.id.costFactorInput).setEnabled(!active);
+        findViewById(R.id.deactivationKeySetterInputText).setEnabled(!active);
+        findViewById(R.id.deactivationKeyButton).setEnabled(!active);
     }
 
-    public void onActivateBlockerListClick(View view){
-//        ChargingState.isCharging
-        if(appPreferencesManagerSingleton.getIsBlockerActive()){
-            startBlockerDeactivationFlow();
-        } else {
-            startBlockerActivationFlow();
-        }
-    }
+    public void onEditUrlListClick(View v) { startActivity(new Intent(this, UrlListEditorActivity.class)); }
+    public void onEditAppPackagesListClick(View v) { startActivity(new Intent(this, AppPackagesListEditorActivity.class)); }
 
-    private void initializeDeactivationKeySetterTextViewState(){
-        TextView keyTextView =  findViewById(R.id.deactivationKeySetterInputText);
-        keyTextView.setEnabled(!appPreferencesManagerSingleton.getIsBlockerActive());
-        if(appPreferencesManagerSingleton.getIsBlockerActive() || !appPreferencesManagerSingleton.getDeactivationKey().isEmpty()) {
-            keyTextView.setVisibility(View.INVISIBLE);
-            keyTextView.clearFocus();
-        } else {
-            keyTextView.setVisibility(View.VISIBLE);
-        }
-
-    }
-    private void initializeDeactivationKeyDeblockerTextViewState(){
-        TextView keyTextView =  findViewById(R.id.deactivationKeyUnblockerInputText);
-        keyTextView.setEnabled(appPreferencesManagerSingleton.getIsBlockerActive());
-        if(appPreferencesManagerSingleton.getIsBlockerActive() && !appPreferencesManagerSingleton.getDeactivationKey().isEmpty()) {
-            keyTextView.setVisibility(View.VISIBLE);
-        } else {
-            keyTextView.setVisibility(View.INVISIBLE);
-            keyTextView.clearFocus();
-        }
-
-    }
-
-    private void initializeBypassSwitchState(){
-        SwitchCompat bypassSwitch =  findViewById(R.id.bypassSwitch);
-        bypassSwitch.setChecked(appPreferencesManagerSingleton.getBypassSwitchValue());
-        bypassSwitch.setEnabled(!appPreferencesManagerSingleton.getIsBlockerActive());
-    }
-
-    private void initializeForbidSettingsSwitchState(){
-        SwitchCompat forbidSettingsSwitch =  findViewById(R.id.forbidSettingsSwitch);
-        forbidSettingsSwitch.setChecked(appPreferencesManagerSingleton.getForbidSettingsSwitchValue());
-        forbidSettingsSwitch.setEnabled(!appPreferencesManagerSingleton.getIsBlockerActive());
-    }
-
-    public void onDeactivationKeyButtonClick(View view){
-        TextView keyTextView =  findViewById(R.id.deactivationKeySetterInputText);
-        String text = keyTextView.getText().toString();
-        if(Objects.equals(appPreferencesManagerSingleton.getDeactivationKey(), "")){
-
-            if (!text.isEmpty()){
-                appPreferencesManagerSingleton.setDeactivationKey(text);
+    public void onActivateBlockerListClick(View v) {
+        if (appPreferencesManager.getIsBlockerActive()) {
+            EditText input = findViewById(R.id.deactivationKeyUnblockerInputText);
+            if (appPreferencesManager.getDeactivationKey().equals(input.getText().toString()) || (appPreferencesManager.getBypassSwitchValue() && ChargingState.isCharging)) {
+                input.setText("");
+                appPreferencesManager.setIsBlockerActive(false);
+                initializeUI();
+                updateUiStates();
             } else {
-                Toast toast = Toast.makeText(this, "Error. Key cannot be empty.",  Toast.LENGTH_SHORT);
-                toast.show();
+                Toast.makeText(this, "Incorrect Key", Toast.LENGTH_SHORT).show();
             }
         } else {
-            appPreferencesManagerSingleton.setDeactivationKey("");
-        }
-        keyTextView.setText("");
-        keyTextView.clearFocus();
-        initializeDeactivationKeySetterTextViewState();
-
-    }
-
-    public void startBlockerDeactivationFlow(){
-        TextView keyTextView =  findViewById(R.id.deactivationKeyUnblockerInputText);
-        String keyText = keyTextView.getText().toString();
-        if(appPreferencesManagerSingleton.getDeactivationKey().equals(keyText) || isBypassingByChargingState()){
-            keyTextView.setText("");
-            appPreferencesManagerSingleton.setIsBlockerActive(false);
-            onBlockerActiveStateChange();
-
-        } else {
-            Toast toast = Toast.makeText(this, "Error. Deactivation key is incorrect.",  Toast.LENGTH_SHORT);
-            toast.show();
-        }
-
-    }
-    public void startBlockerActivationFlow(){
-        if(appPreferencesManagerSingleton.getDeactivationKey().isEmpty()){
-            Toast toast = Toast.makeText(this, "Error. Set deactivation key first.",  Toast.LENGTH_SHORT);
-            toast.show();
-            return;
-        }
-        appPreferencesManagerSingleton.setIsBlockerActive(true);
-        onBlockerActiveStateChange();
-    }
-
-    private Boolean isBypassingByChargingState(){
-        if(appPreferencesManagerSingleton.getBypassSwitchValue()) {
-            return ChargingState.isCharging;
-        } else {
-            return false;
-        }
-    }
-
-    private void setKeyDeactivationTextWatcher() {
-        TextView keyTextView =  findViewById(R.id.deactivationKeySetterInputText);
-        keyTextView.addTextChangedListener(new TextWatcher() {
-
-            public void onTextChanged(CharSequence s, int start, int before, int count) {}
-
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
-            public void afterTextChanged(Editable s) {
-                initializeDeactivationKeySetterButton();
+            if (appPreferencesManager.getDeactivationKey().isEmpty()) {
+                Toast.makeText(this, "Set key first", Toast.LENGTH_SHORT).show();
+                return;
             }
-        });
-    }
-    private void setBypassSwitchWatcher() {
-        SwitchCompat bypassSwitch =  findViewById(R.id.bypassSwitch);
-        bypassSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            this.appPreferencesManagerSingleton.setBypassSwitchValue(isChecked);
-        });
-    }
-
-    private void setForbidSettingsSwitchWatcher() {
-        SwitchCompat forbidSettingsSwitch =  findViewById(R.id.forbidSettingsSwitch);
-        forbidSettingsSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            this.appPreferencesManagerSingleton.setForbidSettingsSwitchValue(isChecked);
-        });
-    }
-
-    private void onBlockerActiveStateChange() {
-
-        initializeBlockerTogglerButton();
-        initializeDeactivationKeySetterButton();
-        initializeDeactivationKeyDeblockerTextViewState();
-        initializeBypassSwitchState();
-        initializeForbidSettingsSwitchState();
-    }
-
-    private void initializeBlockerTogglerButton(){
-        Button togglerButton = findViewById(R.id.button_blocker_activate);
-        if(appPreferencesManagerSingleton.getIsBlockerActive()){
-            togglerButton.setText(R.string.ButtonBlockerDeactivateLabel);
-        } else {
-            togglerButton.setText(R.string.ButtonBlockerActivateLabel);
+            appPreferencesManager.setIsBlockerActive(true);
+            initializeUI();
+            updateUiStates();
         }
     }
 
-    private void initializeDeactivationKeySetterButton(){
-        Button deactivationKeyButton = findViewById(R.id.deactivationKeyButton);
-        TextView keyTextView =  findViewById(R.id.deactivationKeySetterInputText);
-        String currentKeyTextBox = keyTextView.getText().toString();
-        String savedPrefKey = appPreferencesManagerSingleton.getDeactivationKey();
-
-        if(savedPrefKey.isEmpty()){
-            deactivationKeyButton.setText(R.string.BlockerDeactivationKeySetButtonlabel);
-        } else {
-            deactivationKeyButton.setText(R.string.BlockerDeactivationKeyUnsetButtonlabel);
-        }
-
-//        deactivationKeyButton.setEnabled(!appPreferencesManager.getIsBlockerActive() || !currentKeyTextBox.isEmpty() || !savedPrefKey.isEmpty());
-        if(appPreferencesManagerSingleton.getIsBlockerActive()){
-            deactivationKeyButton.setEnabled(false);
-        } else if (!savedPrefKey.isEmpty()) {
-            deactivationKeyButton.setEnabled(true);
-        } else if (currentKeyTextBox.isEmpty()) {
-            deactivationKeyButton.setEnabled(false);
-        } else {
-            deactivationKeyButton.setEnabled(true);
-
-        }
-    }
-
-    private void backButtonPressedDispatcher(){
-        this.getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
-            @Override
-            public void handleOnBackPressed() {
-                finish();
+    public void onDeactivationKeyButtonClick(View v) {
+        EditText input = findViewById(R.id.deactivationKeySetterInputText);
+        if (appPreferencesManager.getDeactivationKey().isEmpty()) {
+            if (!input.getText().toString().isEmpty()) {
+                appPreferencesManager.setDeactivationKey(input.getText().toString());
+            } else {
+                Toast.makeText(this, "Cannot be empty", Toast.LENGTH_SHORT).show();
             }
-        });
-    }
-
-    private void requestDeviceAdminPermission() {
-        Intent intent = new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN);
-        intent.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, new ComponentName(this, MyDeviceAdminReceiver.class));
-        intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Enable device administration to protect app closing and uninstallation.");
-        startActivity(intent);
-    }
-
-    private void requestNotificationPermission() {
-        if(!NotificationManagerCompat.from(this).areNotificationsEnabled()){
-            Intent notificationSettingsIntent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS);
-            notificationSettingsIntent.putExtra(Settings.EXTRA_APP_PACKAGE, this.getPackageName());
-            startActivity(notificationSettingsIntent);
+        } else {
+            appPreferencesManager.setDeactivationKey("");
         }
-    }
-    private void requestPostNotificationPermision(){
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            String permission = android.Manifest.permission.POST_NOTIFICATIONS;
-            if (ContextCompat.checkSelfPermission(this, permission)
-                    != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this, new String[]{ permission }, 1);
-            }
-        }
+        input.setText("");
+        initializeUI();
     }
 
-    private void requestAccessibilityPermission() {
-        if (!isAccessibilityServiceEnabled(this, ScreenReaderAccessibilityService.class)) {
-            Intent accessibilitySettingsIntent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
-            startActivity(accessibilitySettingsIntent);
-        }
+    private void refreshBlockerButton() {
+        ((Button) findViewById(R.id.button_blocker_activate)).setText(appPreferencesManager.getIsBlockerActive() ? R.string.ButtonBlockerDeactivateLabel : R.string.ButtonBlockerActivateLabel);
     }
 
-
-    private boolean isAccessibilityServiceEnabled(Context context, Class<?> service) {
-        String prefString = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
-        if (prefString == null) return false;
-        final String serviceId = context.getPackageName() + "/" + service.getName();
-        return prefString.toLowerCase().contains(serviceId.toLowerCase());
+    private void refreshKeyButton() {
+        Button b = findViewById(R.id.deactivationKeyButton);
+        b.setText(appPreferencesManager.getDeactivationKey().isEmpty() ? R.string.BlockerDeactivationKeySetButtonlabel : R.string.BlockerDeactivationKeyUnsetButtonlabel);
     }
 
+    private void backButtonPressedDispatcher() { getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) { @Override public void handleOnBackPressed() { finish(); } }); }
+    private void requestDeviceAdminPermission() { startActivity(new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, new ComponentName(this, MyDeviceAdminReceiver.class)).putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Protect uninstallation.")); }
+    private void requestNotificationPermission() { if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) { startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName())); } }
+    private void requestPostNotificationPermision() { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) { ActivityCompat.requestPermissions(this, new String[]{ android.Manifest.permission.POST_NOTIFICATIONS }, 1); } }
+    private void requestAccessibilityPermission() { if (!isAccessEnabled(this, AttentionFirewallService.class)) { startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)); } }
+    private boolean isAccessEnabled(Context c, Class<?> s) { String p = Settings.Secure.getString(c.getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES); return p != null && p.toLowerCase().contains((c.getPackageName() + "/" + s.getName()).toLowerCase()); }
 
-
-
-
-
-
+    private interface TextListener { void onTextChanged(String s); }
+    private static class SimpleWatcher implements TextWatcher {
+        private final TextListener l;
+        public SimpleWatcher(TextListener l) { this.l = l; }
+        @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+        @Override public void onTextChanged(CharSequence s, int start, int before, int count) { l.onTextChanged(s.toString()); }
+        @Override public void afterTextChanged(Editable s) {}
+    }
 }

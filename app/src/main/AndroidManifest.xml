@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" 
+        tools:ignore="QueryAllPackagesPermission" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -13,19 +17,15 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.ModernHabitRewire"
         tools:targetApi="35">
+        
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:theme="@style/Theme.ModernHabitRewire.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-
-            <meta-data
-                android:name="android.app.lib_name"
-                android:value="" />
         </activity>
 
         <activity
@@ -39,37 +39,26 @@
             android:exported="true"
             android:theme="@style/Theme.ModernHabitRewire.NoActionBar"
             android:parentActivityName=".MainActivity" />
+            
+        <activity
+            android:name=".DecisionGateActivity"
+            android:exported="true"
+            android:theme="@style/Theme.ModernHabitRewire.NoActionBar" />
 
         <service
-            android:name=".ScreenReaderAccessibilityService"
+            android:name=".AttentionFirewallService"
             android:enabled="true"
             android:exported="true"
-            android:label="Window Content Changed Service"
+            android:label="Attention Firewall Service"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />
             </intent-filter>
-
-
             <meta-data
                 android:name="android.accessibilityservice"
-                android:resource="@xml/window_content_changed_accessibility_service" />
+                android:resource="@xml/attention_firewall_accessibility_service" />
         </service>
-        <service
-            android:name=".UninstallerForbidderAccessibilityService"
-            android:enabled="true"
-            android:exported="true"
-            android:label="Window Status Changed Service"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
 
-
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/window_status_changed_accessibility_service" />
-        </service>
         <receiver
             android:name=".MyDeviceAdminReceiver"
             android:exported="true"
@@ -82,5 +71,4 @@
             </intent-filter>
         </receiver>
     </application>
-
 </manifest>

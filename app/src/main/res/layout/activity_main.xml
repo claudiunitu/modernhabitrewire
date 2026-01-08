@@ -5,143 +5,165 @@
     android:id="@+id/coordinatorLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:visibility="visible"
-    tools:context=".MainActivity"
-    tools:visibility="visible">
+    android:padding="8dp"
+    tools:context=".MainActivity">
 
     <TextView
-        android:id="@+id/textView2"
+        android:id="@+id/textViewTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
+        android:layout_marginTop="16dp"
         android:text="@string/app_name"
-        android:visibility="visible"
+        android:textSize="24sp"
+        android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.498"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        tools:visibility="visible" />
+        app:layout_constraintTop_toTopOf="parent" />
 
-    <Button
-        android:id="@+id/button_go_to_edit_urls"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="72dp"
-        android:onClick="onEditUrlListClick"
-        android:text="@string/EditUrlListButtonLabel"
-        android:visibility="visible"
-        app:layout_constraintBottom_toTopOf="@+id/deactivationKeyUnblockerInputText"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintStart_toStartOf="parent"
-        tools:visibility="visible" />
-
-    <Button
-        android:id="@+id/button_go_to_edit_packages"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="12dp"
-        android:onClick="onEditAppPackagesListClick"
-        android:text="@string/EditPackagesListButtonLabel"
-        android:visibility="visible"
-        app:layout_constraintBottom_toTopOf="@+id/deactivationKeyUnblockerInputText"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/button_go_to_edit_urls"
-        tools:visibility="visible" />
-
-    <Button
-        android:id="@+id/button_blocker_activate"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="8dp"
-        android:onClick="onActivateBlockerListClick"
-        android:text="@string/LabelNotSet"
-        app:layout_constraintBottom_toTopOf="@+id/bypassSwitch"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <EditText
-        android:id="@+id/deactivationKeySetterInputText"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="8dp"
-        android:ems="10"
-        android:hint="@string/BlockerDeactivationKeyPlaceholder"
-        android:inputType="text|textNoSuggestions"
-        android:textIsSelectable="false"
-        app:layout_constraintBottom_toTopOf="@+id/deactivationKeyButton"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <Button
-        android:id="@+id/deactivationKeyButton"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="24dp"
-        android:onClick="onDeactivationKeyButtonClick"
-        android:text="@string/LabelNotSet"
-        app:layout_constraintBottom_toTopOf="@+id/button_go_to_edit_urls"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <EditText
-        android:id="@+id/deactivationKeyUnblockerInputText"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="8dp"
-        android:ems="10"
-        android:hint="@string/BlockerDeactivationKeyPlaceholder"
-        android:inputType="text|textNoSuggestions"
-        app:layout_constraintBottom_toTopOf="@+id/button_blocker_activate"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <androidx.appcompat.widget.SwitchCompat
-        android:id="@+id/bypassSwitch"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="8dp"
-        android:checked="false"
-        android:text="@string/ChargingBypassSwitchLabel"
-        app:layout_constraintBottom_toTopOf="@+id/forbidSettingsSwitch"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintStart_toStartOf="parent"
-        tools:checked="false" />
-
-    <androidx.appcompat.widget.SwitchCompat
-        android:id="@+id/forbidSettingsSwitch"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="32dp"
-        android:checked="false"
-        android:text="@string/ForbidSettingsSwitch"
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="16dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintTop_toBottomOf="@+id/textViewTitle">
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <Button
+                android:id="@+id/button_go_to_edit_urls"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:onClick="onEditUrlListClick"
+                android:text="@string/EditUrlListButtonLabel" />
+
+            <Button
+                android:id="@+id/button_go_to_edit_packages"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:onClick="onEditAppPackagesListClick"
+                android:text="@string/EditPackagesListButtonLabel" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="16dp"
+                android:background="?android:attr/listDivider" />
+
+            <EditText
+                android:id="@+id/deactivationKeySetterInputText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/BlockerDeactivationKeyPlaceholder"
+                android:inputType="text|textNoSuggestions" />
+
+            <Button
+                android:id="@+id/deactivationKeyButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:onClick="onDeactivationKeyButtonClick"
+                android:text="@string/LabelNotSet" />
+
+            <EditText
+                android:id="@+id/deactivationKeyUnblockerInputText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:hint="Enter Key to Deactivate"
+                android:inputType="text|textNoSuggestions" />
+
+            <Button
+                android:id="@+id/button_blocker_activate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:onClick="onActivateBlockerListClick"
+                android:text="@string/LabelNotSet" />
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/bypassSwitch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/ChargingBypassSwitchLabel" />
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/forbidSettingsSwitch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/ForbidSettingsSwitch" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="16dp"
+                android:background="?android:attr/listDivider" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Interaction Physics"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="Daily Budget (Mins):" />
+                <EditText
+                    android:id="@+id/dailyBudgetInput"
+                    android:layout_width="100dp"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"
+                    android:text="30" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="Base Wait Time (Secs):" />
+                <EditText
+                    android:id="@+id/baseWaitInput"
+                    android:layout_width="100dp"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"
+                    android:text="30" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="Cost Factor (>= 1.0):" />
+                <EditText
+                    android:id="@+id/costFactorInput"
+                    android:layout_width="100dp"
+                    android:layout_height="wrap_content"
+                    android:inputType="numberDecimal"
+                    android:text="1.0" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </ScrollView>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

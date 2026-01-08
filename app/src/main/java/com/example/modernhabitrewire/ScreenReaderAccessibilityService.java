@@ -1,32 +1,24 @@
 package com.example.modernhabitrewire;
 
 import android.accessibilityservice.AccessibilityService;
-
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.Toast;
-
 import androidx.annotation.NonNull;
-
-
 import java.util.ArrayList;
 import java.util.List;
-
 
 public class ScreenReaderAccessibilityService extends AccessibilityService {
     private AppPreferencesManagerSingleton appPreferencesManagerSingleton;
 
     public ScreenReaderAccessibilityService() {
-
         this.supportedBrowsers = this.getSupportedBrowsers();
     }
 
     private final List<SupportedBrowserConfig> supportedBrowsers;
 
-
     @Override
     public void onInterrupt() {
-//        Log.e("UrlReaderService", "Error.");
         this.onServiceClose();
     }
 
@@ -34,8 +26,8 @@ public class ScreenReaderAccessibilityService extends AccessibilityService {
     public void onCreate() {
         super.onCreate();
         appPreferencesManagerSingleton = AppPreferencesManagerSingleton.getInstance(this);
-
     }
+
     @Override
     public void onDestroy() {
         super.onDestroy();
@@ -44,10 +36,7 @@ public class ScreenReaderAccessibilityService extends AccessibilityService {
 
     @Override
     public void onServiceConnected() {
-
-//        Log.d("UrlReaderService", "Connected.");
         this.showServiceStartToastNotification();
-
     }
 
     private void onServiceClose() {
@@ -56,41 +45,26 @@ public class ScreenReaderAccessibilityService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent accessibilityEvent) {
-        //Log.d("Content changed", "onAccessibilityEvent");
         try {
-            if(!appPreferencesManagerSingleton.getIsBlockerActive()) {
+            if (!appPreferencesManagerSingleton.getIsBlockerActive()) {
                 return;
             }
-
-
 
             CharSequence packageName = accessibilityEvent.getPackageName();
-            if(packageName == null){
+            if (packageName == null) {
                 return;
             }
 
-            this.cascadeRedirect( accessibilityEvent, packageName);
+            // App-blocking logic has been removed. This service now only handles URL blocking.
+            redirectIfForbiddenUrl(accessibilityEvent, packageName);
 
-
-
+        } catch (Exception e) {
+            // It's better to log the exception than to show a toast for a background service.
         }
-        catch(Exception e) {
-            CharSequence errorText = e.getMessage();
-            int duration = Toast.LENGTH_SHORT;
-
-            Toast toast = Toast.makeText(this, errorText, duration);
-            toast.show();
-        }
-
     }
 
-
-    private void showToast(String message){
-
-        int duration = Toast.LENGTH_SHORT;
-
-        Toast toast = Toast.makeText(this, message, duration);
-        toast.show();
+    private void showToast(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 
     private void showServiceStartToastNotification() {
@@ -101,58 +75,23 @@ public class ScreenReaderAccessibilityService extends AccessibilityService {
         this.showToast("Modern Habit Rewire Service Stopped");
     }
 
-
-
-
-    private void cascadeRedirect(AccessibilityEvent accessibilityEvent, CharSequence packageName) {
-        // check if it is a forbidden package
-        if(this.redirectIfForbiddenPackage(packageName)) {
-            return;
-        }
-
-        // check if forbidden url
-        if(this.redirectIfForbiddenUrl (accessibilityEvent,packageName) ){
-            return;
-        }
-    }
-
-
-    private Boolean redirectIfForbiddenPackage(CharSequence packageName) {
-        if(isForbiddenPackage(packageName)) {
-//            Log.d("UrlReaderService", packageName + "  :  " + "denied");
-            this.performRedirect();
-            this.showToast("Forbidden app: " + packageName);
-            return true;
-        }
-        return false;
-    }
-
-    private Boolean redirectIfForbiddenUrl (AccessibilityEvent accessibilityEvent,CharSequence packageName){
-
-        //check if the event was triggered by a textEdit class (address bar)
-
+    private boolean redirectIfForbiddenUrl(AccessibilityEvent accessibilityEvent, CharSequence packageName) {
         CharSequence className = accessibilityEvent.getClassName();
-        if(className == null){
+        // This service should only care about edits to EditText fields (like address bars)
+        if (className == null || !className.equals("android.widget.EditText")) {
             return false;
         }
 
-        String classNameString = "android.widget.EditText";
-        if(!className.equals(classNameString)){
-            return false;
-        }
-
-        // check if the event was triggered by a browser and if it accessed a forbidden url
         SupportedBrowserConfig browserConfig = null;
-        for (SupportedBrowserConfig supportedConfig: supportedBrowsers) {
+        for (SupportedBrowserConfig supportedConfig : supportedBrowsers) {
             if (packageName.equals(supportedConfig.packageName)) {
                 browserConfig = supportedConfig;
                 break;
             }
         }
-        //this is not supported browser, so exit
+
         if (browserConfig == null) {
-//            Log.d("UrlReaderService", "Not a browser.");
-            return false;
+            return false; // Not a supported browser
         }
 
         AccessibilityNodeInfo parentNodeInfo = accessibilityEvent.getSource();
@@ -161,25 +100,15 @@ public class ScreenReaderAccessibilityService extends AccessibilityService {
         }
 
         String capturedUrl = captureUrl(parentNodeInfo, browserConfig);
-
         parentNodeInfo.recycle();
 
-
-        if (capturedUrl == null) {
-            return false;
-        }
-
-        if(android.util.Patterns.WEB_URL.matcher(capturedUrl).matches() && this.isForbiddenWebsite(capturedUrl)) {
-//            Log.d("UrlReaderService", packageName + "  :  " + capturedUrl);
+        if (capturedUrl != null && android.util.Patterns.WEB_URL.matcher(capturedUrl).matches() && this.isForbiddenWebsite(capturedUrl)) {
             this.performRedirect();
             this.showToast("Forbidden url: " + capturedUrl);
             return true;
         }
         return false;
     }
-
-
-
 
     private static class SupportedBrowserConfig {
         public String packageName, addressBarId;
@@ -189,25 +118,20 @@ public class ScreenReaderAccessibilityService extends AccessibilityService {
         }
     }
 
-
     @NonNull
     private List<SupportedBrowserConfig> getSupportedBrowsers() {
         List<SupportedBrowserConfig> browsers = new ArrayList<>();
-        browsers.add( new SupportedBrowserConfig("com.android.chrome", "com.android.chrome:id/url_bar"));
-        browsers.add( new SupportedBrowserConfig("com.brave.browser", "com.brave.browser:id/url_bar"));
-        browsers.add( new SupportedBrowserConfig("org.mozilla.firefox", "org.mozilla.firefox:id/mozac_browser_toolbar_url_view"));
-        browsers.add( new SupportedBrowserConfig("com.opera.browser", "com.opera.browser:id/url_field"));
-        browsers.add( new SupportedBrowserConfig("com.opera.mini.native", "com.opera.mini.native:id/url_field"));
-        browsers.add( new SupportedBrowserConfig("com.duckduckgo.mobile.android", "com.duckduckgo.mobile.android:id/omnibarTextInput"));
-        browsers.add( new SupportedBrowserConfig("com.microsoft.emmx", "com.microsoft.emmx:id/url_bar"));
-
-
-
+        browsers.add(new SupportedBrowserConfig("com.android.chrome", "com.android.chrome:id/url_bar"));
+        browsers.add(new SupportedBrowserConfig("com.brave.browser", "com.brave.browser:id/url_bar"));
+        browsers.add(new SupportedBrowserConfig("org.mozilla.firefox", "org.mozilla.firefox:id/mozac_browser_toolbar_url_view"));
+        browsers.add(new SupportedBrowserConfig("com.opera.browser", "com.opera.browser:id/url_field"));
+        browsers.add(new SupportedBrowserConfig("com.opera.mini.native", "com.opera.mini.native:id/url_field"));
+        browsers.add(new SupportedBrowserConfig("com.duckduckgo.mobile.android", "com.duckduckgo.mobile.android:id/omnibarTextInput"));
+        browsers.add(new SupportedBrowserConfig("com.microsoft.emmx", "com.microsoft.emmx:id/url_bar"));
         return browsers;
     }
 
     private String captureUrl(AccessibilityNodeInfo parentNodeInfo, SupportedBrowserConfig config) {
-
         List<AccessibilityNodeInfo> nodes = parentNodeInfo.findAccessibilityNodeInfosByViewId(config.addressBarId);
         if (nodes == null || nodes.isEmpty()) {
             return null;
@@ -215,11 +139,10 @@ public class ScreenReaderAccessibilityService extends AccessibilityService {
 
         AccessibilityNodeInfo addressBarNodeInfo = nodes.get(0);
         String url = null;
-        if (!addressBarNodeInfo.isFocused() && addressBarNodeInfo.getText() != null) {
-
+        // The !isFocused() check was removed to reliably capture URLs across different browsers and states.
+        if (addressBarNodeInfo.getText() != null) {
             url = addressBarNodeInfo.getText().toString();
         }
-
         addressBarNodeInfo.recycle();
         return url;
     }
@@ -237,14 +160,4 @@ public class ScreenReaderAccessibilityService extends AccessibilityService {
         }
         return false;
     }
-
-    private boolean isForbiddenPackage(CharSequence packageId) {
-        for (String forbiddenPackageName : appPreferencesManagerSingleton.getForbiddenAppsPackages()) {
-            if (packageId.equals(forbiddenPackageName)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
 }

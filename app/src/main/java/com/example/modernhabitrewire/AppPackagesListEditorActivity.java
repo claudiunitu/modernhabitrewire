@@ -24,8 +24,8 @@ public class AppPackagesListEditorActivity extends AppCompatActivity {
         Button addButton = findViewById(R.id.addButton);
         RecyclerView recyclerView = findViewById(R.id.appPackageRecyclerView);
 
-        adapter = new AppPackagesListRecyclerAdapter(appPreferencesManagerSingleton.getForbiddenAppsPackages(), packageName -> {
-            appPreferencesManagerSingleton.removeAppPackage(packageName);
+        adapter = new AppPackagesListRecyclerAdapter(appPreferencesManagerSingleton.getExtractiveAppsPackages(), packageName -> {
+            appPreferencesManagerSingleton.removeExtractiveAppPackage(packageName);
             refreshList();
         });
 
@@ -34,7 +34,7 @@ public class AppPackagesListEditorActivity extends AppCompatActivity {
         addButton.setOnClickListener(v -> {
             String newAppPackage = packageNameInput.getText().toString().trim();
             if (!newAppPackage.isEmpty()) {
-                appPreferencesManagerSingleton.addForbiddenAppPackage(newAppPackage);
+                appPreferencesManagerSingleton.addExtractiveAppPackage(newAppPackage);
                 packageNameInput.setText("");
                 refreshList();
             }
@@ -42,7 +42,7 @@ public class AppPackagesListEditorActivity extends AppCompatActivity {
     }
 
     private void refreshList() {
-        adapter.updateList(appPreferencesManagerSingleton.getForbiddenAppsPackages());
+        adapter.updateList(appPreferencesManagerSingleton.getExtractiveAppsPackages());
     }
 
 
