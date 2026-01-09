@@ -31,13 +31,15 @@ public class AttentionFirewallService extends AccessibilityService {
     private AppPreferencesManagerSingleton appPreferencesManager;
     private DopamineBudgetEngine dopamineBudgetEngine;
     
-    // Sticky Session State: Pauses interception for an approved app until minimized/closed
+    // Sticky Session State
     private String activeStickyPackage = null;
-    private long sessionStartTime = 0;
     
-    // Dynamic list of IMEs to avoid fragility across devices (e.g., FlorisBoard)
+    // Cost Tracking Logic: Accumulate only forbidden time
+    private final Set<String> sessionApprovedPatterns = new HashSet<>();
+    private long accumulatedForbiddenTimeMs = 0;
+    private long lastForbiddenStartTime = 0;
+    
     private final Set<String> installedImePackages = new HashSet<>();
-    
     private List<SupportedBrowserConfig> supportedBrowsers;
 
     @Override
@@ -77,7 +79,11 @@ public class AttentionFirewallService extends AccessibilityService {
         int eventType = event.getEventType();
 
         // 1. SYSTEM & SELF EXCLUSION
-        if (packageName.equals(APP_PACKAGE)) return;
+        if (packageName.equals(APP_PACKAGE)) {
+            // Pause timer while user is in the Decision Gate or Settings
+            updateForbiddenTimer(false);
+            return;
+        }
 
         // 2. HARD LOCK (Uninstall/Admin Protection)
         if (appPreferencesManager.getForbidSettingsSwitchValue() && DANGER_PACKAGES.contains(packageName)) {
@@ -96,56 +102,49 @@ public class AttentionFirewallService extends AccessibilityService {
                 Log.d(TAG, "Sticky session START for approved package: " + packageName);
                 appPreferencesManager.setTempAllowAppLaunch(false);
                 startStickySession(packageName);
-                return; // LOCK SESSION IMMEDIATELY
-            }
-            
-            // Allow transient system UI, keyboards, and launchers to pass during transition
-            if (isTransientSystemOverlay(packageName) || isLauncherPackage(packageName)) {
                 return; 
             }
             
-            // If switch to another full-screen app, discard approval
-            if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && event.isFullScreen()) {
-                Log.d(TAG, "Approval discarded. User switched to: " + packageName);
+            if (!event.isFullScreen() || isTransientSystemOverlay(packageName) || isLauncherPackage(packageName)) {
+                return; 
+            }
+            
+            if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
                 appPreferencesManager.setTempAllowAppLaunch(false);
             }
         }
 
-        // 5. STICKY SESSION GUARD
-        // While in a sticky session, stop ALL checks for that package.
-        if (activeStickyPackage != null && packageName.equals(activeStickyPackage)) {
-            return; 
-        }
-
-        // 6. SESSION TERMINATION (Robust Logic)
+        // 5. SESSION TERMINATION
         if (activeStickyPackage != null && eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            // Stay in session if it's a keyboard or system component
-            if (packageName.equals(activeStickyPackage) || isTransientSystemOverlay(packageName)) {
-                return; 
-            }
-
-            // End session if user went to Launcher (Minimized) or switched to another App
-            if (isLauncherPackage(packageName)) {
-                Log.d(TAG, "Ending sticky session for " + activeStickyPackage + " (Home/Minimized)");
-                endStickySession();
-            } else if (event.isFullScreen()) {
-                // Only end if it's a confirmed switch to another app window
-                Log.d(TAG, "Ending sticky session for " + activeStickyPackage + " due to app switch to " + packageName);
-                endStickySession();
+            if (!packageName.equals(activeStickyPackage) && !isTransientSystemOverlay(packageName)) {
+                if (isLauncherPackage(packageName) || event.isFullScreen()) {
+                    Log.d(TAG, "Ending session for " + activeStickyPackage + " due to switch to " + packageName);
+                    endStickySession();
+                }
             }
         }
 
-        // 7. INTERCEPTION LOGIC
+        // 6. INTERCEPTION & MONITORING
         if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             handleAppInterception(packageName);
         } else if (eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
             handleUrlInterception(packageName);
+        }
+        
+        // 7. LIVE BUDGET ENFORCEMENT
+        if (activeStickyPackage != null) {
+            checkLiveBudgetExhaustion();
         }
     }
 
     private void handleAppInterception(String packageName) {
         List<String> extractiveApps = appPreferencesManager.getExtractiveAppsPackages();
         if (extractiveApps.contains(packageName)) {
+            if (activeStickyPackage != null && activeStickyPackage.equals(packageName)) {
+                updateForbiddenTimer(true);
+                return;
+            }
+
             dopamineBudgetEngine.resetBudgetIfNeeded();
             if (dopamineBudgetEngine.hasBudget()) {
                 appPreferencesManager.setLastInterceptedApp(packageName);
@@ -154,17 +153,22 @@ public class AttentionFirewallService extends AccessibilityService {
             } else {
                 performGlobalAction(GLOBAL_ACTION_HOME);
             }
+        } else {
+            if (activeStickyPackage != null && packageName.equals(activeStickyPackage)) {
+                updateForbiddenTimer(false);
+            }
         }
     }
 
     private void handleUrlInterception(String packageName) {
-        if (activeStickyPackage != null && activeStickyPackage.equals(packageName)) return;
-
         for (SupportedBrowserConfig config : supportedBrowsers) {
             if (packageName.equals(config.packageName)) {
                 checkBrowserUrl(config);
-                break;
+                return;
             }
+        }
+        if (activeStickyPackage != null && packageName.equals(activeStickyPackage)) {
+            updateForbiddenTimer(false);
         }
     }
 
@@ -185,60 +189,94 @@ public class AttentionFirewallService extends AccessibilityService {
             bar = findUrlBarByContentDescription(root);
         }
 
-        if (bar != null) {
-            if (bar.getText() != null) {
-                String currentUrl = bar.getText().toString().toLowerCase();
-                for (String forbiddenPattern : appPreferencesManager.getForbiddenUrls()) {
-                    if (currentUrl.contains(forbiddenPattern.toLowerCase())) {
-                        dopamineBudgetEngine.resetBudgetIfNeeded();
-                        appPreferencesManager.setLastInterceptedApp(config.packageName);
-                        appPreferencesManager.setLastInterceptedUrl(forbiddenPattern);
-                        triggerDecisionGate();
-                        break;
-                    }
+        if (bar != null && bar.getText() != null) {
+            String currentUrl = bar.getText().toString().toLowerCase();
+            String matchedPattern = null;
+            for (String pattern : appPreferencesManager.getForbiddenUrls()) {
+                if (currentUrl.contains(pattern.toLowerCase())) {
+                    matchedPattern = pattern;
+                    break;
                 }
+            }
+
+            if (matchedPattern != null) {
+                updateForbiddenTimer(true);
+                if (activeStickyPackage != null && config.packageName.equals(activeStickyPackage)) {
+                    if (!sessionApprovedPatterns.contains(matchedPattern)) {
+                        appPreferencesManager.setLastInterceptedApp(config.packageName);
+                        appPreferencesManager.setLastInterceptedUrl(matchedPattern);
+                        triggerDecisionGate();
+                    }
+                } else {
+                    appPreferencesManager.setLastInterceptedApp(config.packageName);
+                    appPreferencesManager.setLastInterceptedUrl(matchedPattern);
+                    triggerDecisionGate();
+                }
+            } else {
+                updateForbiddenTimer(false);
             }
             bar.recycle();
         }
         root.recycle();
     }
 
-    private AccessibilityNodeInfo findUrlBarByContentDescription(AccessibilityNodeInfo root) {
-        List<String> hints = Arrays.asList("address", "url", "search bar");
-        return findNodeByContentDescription(root, hints);
-    }
-
-    private AccessibilityNodeInfo findNodeByContentDescription(AccessibilityNodeInfo node, List<String> hints) {
-        if (node == null) return null;
-        CharSequence desc = node.getContentDescription();
-        if (desc != null) {
-            String d = desc.toString().toLowerCase();
-            for (String hint : hints) {
-                if (d.contains(hint)) return node;
+    private void updateForbiddenTimer(boolean isForbidden) {
+        long now = System.currentTimeMillis();
+        if (isForbidden) {
+            if (lastForbiddenStartTime == 0) {
+                lastForbiddenStartTime = now;
+            }
+        } else {
+            if (lastForbiddenStartTime != 0) {
+                accumulatedForbiddenTimeMs += (now - lastForbiddenStartTime);
+                lastForbiddenStartTime = 0;
             }
         }
-        for (int i = 0; i < node.getChildCount(); i++) {
-            AccessibilityNodeInfo child = node.getChild(i);
-            AccessibilityNodeInfo result = findNodeByContentDescription(child, hints);
-            if (result != null) return result;
-            if (child != null) child.recycle();
+    }
+
+    private void checkLiveBudgetExhaustion() {
+        if (lastForbiddenStartTime == 0 && accumulatedForbiddenTimeMs == 0) return;
+
+        long currentForbiddenSegment = (lastForbiddenStartTime == 0) ? 0 : (System.currentTimeMillis() - lastForbiddenStartTime);
+        long totalForbiddenTime = accumulatedForbiddenTimeMs + currentForbiddenSegment;
+        
+        double multiplier = dopamineBudgetEngine.calculateCurrentMultiplier();
+        long virtualCostMs = (long) (totalForbiddenTime * multiplier);
+        long remainingBudgetMs = appPreferencesManager.getRemainingDopamineBudgetMs();
+
+        if (virtualCostMs >= remainingBudgetMs) {
+            Log.d(TAG, "LIVE BUDGET EXHAUSTED. Kicking user out.");
+            performGlobalAction(GLOBAL_ACTION_HOME);
+            endStickySession();
         }
-        return null;
     }
 
     private void startStickySession(String packageName) {
+        String interceptedUrl = appPreferencesManager.getLastInterceptedUrl();
+        
+        if (activeStickyPackage != null && activeStickyPackage.equals(packageName)) {
+            if (!interceptedUrl.isEmpty()) sessionApprovedPatterns.add(interceptedUrl);
+            return;
+        }
+
         activeStickyPackage = packageName;
-        sessionStartTime = System.currentTimeMillis();
+        sessionApprovedPatterns.clear();
+        if (!interceptedUrl.isEmpty()) sessionApprovedPatterns.add(interceptedUrl);
+        
+        accumulatedForbiddenTimeMs = 0;
+        lastForbiddenStartTime = System.currentTimeMillis();
         dopamineBudgetEngine.incrementSessionCount();
     }
 
     private void endStickySession() {
-        if (sessionStartTime != 0) {
-            long timeSpent = System.currentTimeMillis() - sessionStartTime;
-            dopamineBudgetEngine.depleteBudget(timeSpent);
-            activeStickyPackage = null;
-            sessionStartTime = 0;
+        updateForbiddenTimer(false);
+        if (accumulatedForbiddenTimeMs > 0) {
+            dopamineBudgetEngine.depleteBudget(accumulatedForbiddenTimeMs);
         }
+        activeStickyPackage = null;
+        sessionApprovedPatterns.clear();
+        accumulatedForbiddenTimeMs = 0;
+        lastForbiddenStartTime = 0;
     }
 
     private boolean isApprovedPackage(String packageName) {
@@ -247,13 +285,11 @@ public class AttentionFirewallService extends AccessibilityService {
     }
 
     private boolean isTransientSystemOverlay(String packageName) {
-        // Dynamically identified keyboards (IMEs)
         if (installedImePackages.contains(packageName)) return true;
-        
         String p = packageName.toLowerCase();
         return p.equals("android") || p.contains("systemui") || p.contains("permissioncontroller") ||
                p.contains("inputmethod") || p.contains("latin") || p.contains("keyboard") || 
-               p.contains("board") || p.contains("ime");
+               p.contains("board") || p.contains("ime") || p.equals("com.android.settings");
     }
 
     private boolean isLauncherPackage(String packageName) {
@@ -292,6 +328,28 @@ public class AttentionFirewallService extends AccessibilityService {
             if (child != null) child.recycle();
         }
         return false;
+    }
+
+    private AccessibilityNodeInfo findUrlBarByContentDescription(AccessibilityNodeInfo root) {
+        return findNodeByContentDescription(root, Arrays.asList("address", "url", "search bar"));
+    }
+
+    private AccessibilityNodeInfo findNodeByContentDescription(AccessibilityNodeInfo node, List<String> hints) {
+        if (node == null) return null;
+        CharSequence desc = node.getContentDescription();
+        if (desc != null) {
+            String d = desc.toString().toLowerCase();
+            for (String hint : hints) {
+                if (d.contains(hint)) return node;
+            }
+        }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            AccessibilityNodeInfo result = findNodeByContentDescription(child, hints);
+            if (result != null) return result;
+            if (child != null) child.recycle();
+        }
+        return null;
     }
 
     @Override public void onInterrupt() {}
