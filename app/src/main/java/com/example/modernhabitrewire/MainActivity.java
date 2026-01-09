@@ -111,11 +111,11 @@ public class MainActivity extends AppCompatActivity {
                 initializeUI();
                 updateUiStates();
             } else {
-                Toast.makeText(this, "Incorrect Key", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(R.string.incorrect_key), Toast.LENGTH_SHORT).show();
             }
         } else {
             if (appPreferencesManager.getDeactivationKey().isEmpty()) {
-                Toast.makeText(this, "Set key first", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(R.string.set_key_first), Toast.LENGTH_SHORT).show();
                 return;
             }
             appPreferencesManager.setIsBlockerActive(true);
@@ -130,7 +130,7 @@ public class MainActivity extends AppCompatActivity {
             if (!input.getText().toString().isEmpty()) {
                 appPreferencesManager.setDeactivationKey(input.getText().toString());
             } else {
-                Toast.makeText(this, "Cannot be empty", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(R.string.cannot_be_empty), Toast.LENGTH_SHORT).show();
             }
         } else {
             appPreferencesManager.setDeactivationKey("");
@@ -142,7 +142,7 @@ public class MainActivity extends AppCompatActivity {
     public void onResetStatsClick(View v) {
         budgetEngine.resetAllStats();
         initializeUI();
-        Toast.makeText(this, "All stats reset", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, getString(R.string.all_stats_reset), Toast.LENGTH_SHORT).show();
     }
 
     private void refreshBlockerButton() {
