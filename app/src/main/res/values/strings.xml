@@ -28,9 +28,9 @@
     <string name="cancel">Cancel</string>
     <string name="enter_key_to_deactivate">Enter Key to Deactivate</string>
     <string name="interaction_physics">Interaction Physics</string>
-    <string name="daily_budget">Daily Budget (DUR):</string>
+    <string name="daily_budget">Daily Budget (DU):</string>
     <string name="base_wait_time">Base Wait Time (Secs):</string>
-    <string name="cost_factor">Cost Factor (>= 1.0):</string>
+    <string name="cost_factor">Base Multiplier (>= 1.0):</string>
     <string name="reset_daily_stats_debug">Reset Daily Stats (Debug)</string>
 
     <!-- Notification strings -->
@@ -48,4 +48,18 @@
     <string name="set_key_first">Set key first</string>
     <string name="cannot_be_empty">Cannot be empty</string>
     <string name="all_stats_reset">All stats reset</string>
+
+    <!-- Help Page Strings -->
+    <string name="help_title">Help &amp; Guide</string>
+    <string name="help_intro_title">Project Overview</string>
+    <string name="help_intro_content">Modern Habit Rewire is a behavioral intervention tool designed to combat digital compulsion. It implements an \"Economic Physics\" model that treats attention as a finite resource.</string>
+    
+    <string name="help_guide_title">How to Rewire Your Habits</string>
+    <string name="help_guide_content">1. Permissions: Grant Accessibility, Device Admin, and Notification permissions.\n2. The Lists: Define your \"Extractive Apps\" and \"Forbidden URLs\".\n3. Set Your Budget: Define your Daily Allowance Units (DU).\n4. Set the Key: Create a Deactivation Key as your self-binding contract.</string>
+    
+    <string name="help_physics_title">The Economic Physics</string>
+    <string name="help_physics_content">The app uses a non-linear escalation model. Frequent re-entry and prolonged immersion become increasingly expensive in terms of your daily budget (DU). Staying \"clean\" allows your system to recover over time.</string>
+    
+    <string name="help_security_title">Security &amp; Friction</string>
+    <string name="help_security_content">The Deactivation Key prevents you from changing settings or deactivating the blocker in moments of low impulse control. The Decision Gate introduces a mandatory wait time before accessing restricted apps.</string>
 </resources>

@@ -22,7 +22,6 @@ import android.widget.Toast;
 import androidx.appcompat.widget.SwitchCompat;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationManagerCompat;
-import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 
 import java.util.Locale;
@@ -136,6 +135,7 @@ public class MainActivity extends AppCompatActivity {
 
     public void onEditUrlListClick(View v) { startActivity(new Intent(this, UrlListEditorActivity.class)); }
     public void onEditAppPackagesListClick(View v) { startActivity(new Intent(this, AppPackagesListEditorActivity.class)); }
+    public void onHelpClick(View v) { startActivity(new Intent(this, HelpActivity.class)); }
 
     public void onActivateBlockerListClick(View v) {
         if (appPreferencesManager.getIsBlockerActive()) {
