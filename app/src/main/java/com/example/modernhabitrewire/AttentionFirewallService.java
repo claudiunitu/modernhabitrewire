@@ -53,8 +53,8 @@ public class AttentionFirewallService extends AccessibilityService {
     private long lastForbiddenStartTime = 0;
     private boolean isForbiddenConfirmed = false;
     
-    // Forced Cleanup Logic
-    private boolean suppressForbiddenInterception = false;
+    // Forced Cleanup / Lockout Logic
+    private boolean isBudgetLockedOut = false;
     
     private final Set<String> installedImePackages = new HashSet<>();
     private final Set<String> launcherPackages = new HashSet<>();
@@ -209,15 +209,24 @@ public class AttentionFirewallService extends AccessibilityService {
         }
 
         // 5. SESSION WATCHDOG & TERMINATION
-        if (activeStickyPackage != null && eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            if (event.isFullScreen() && !packageName.equals(activeStickyPackage) && !isTransientSystemOverlay(packageName)) {
-                Log.d(TAG, "Watchdog: Ending session for " + activeStickyPackage + " due to switch to " + packageName);
-                endStickySession();
-                suppressForbiddenInterception = false; 
+        if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            boolean isTransient = isTransientSystemOverlay(packageName);
+            boolean isLauncher = isLauncherPackage(packageName);
+            boolean isExtractive = appPreferencesManager.getExtractiveAppsPackages().contains(packageName);
+            
+            if (activeStickyPackage != null) {
+                if (event.isFullScreen() && !packageName.equals(activeStickyPackage) && !isTransient) {
+                    Log.d(TAG, "Watchdog: Ending session for " + activeStickyPackage + " due to switch to " + packageName);
+                    endStickySession();
+                    // Move to safe context clears lockout
+                    if (!isExtractive && !isTransient && !isLauncher) {
+                        isBudgetLockedOut = false;
+                    }
+                }
+            } else if (!isTransient && !isLauncher && !isExtractive) {
+                // Moving to a truly safe app clears the lockout
+                isBudgetLockedOut = false;
             }
-        } else if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && !isTransientSystemOverlay(packageName) && !isLauncherPackage(packageName)) {
-             // Safe context: user switched to a non-restricted app that isn't the current sticky app
-             suppressForbiddenInterception = false;
         }
 
         // 6. INTERCEPTION & MONITORING
@@ -238,20 +247,13 @@ public class AttentionFirewallService extends AccessibilityService {
     private void handleAppInterception(String packageName) {
         List<String> extractiveApps = appPreferencesManager.getExtractiveAppsPackages();
         
-        boolean isBrowser = false;
-        for (SupportedBrowserConfig config : supportedBrowsers) {
-            if (packageName.equals(config.packageName)) {
-                isBrowser = true;
-                break;
-            }
+        // Guard: If we are locked out, allow extractive apps to open passively (no blocking, no timer)
+        if (isBudgetLockedOut && activeStickyPackage == null) {
+            Log.d(TAG, "Passive state: letting extractive app launch without intercepting.");
+            return;
         }
 
         if (extractiveApps.contains(packageName)) {
-            if (suppressForbiddenInterception) {
-                performGlobalAction(GLOBAL_ACTION_HOME);
-                return;
-            }
-
             if (activeStickyPackage != null && activeStickyPackage.equals(packageName)) {
                 updateForbiddenTimer(true);
                 return;
@@ -263,7 +265,8 @@ public class AttentionFirewallService extends AccessibilityService {
                 appPreferencesManager.setLastInterceptedUrl(""); 
                 triggerDecisionGate();
             } else {
-                suppressForbiddenInterception = true;
+                Log.d(TAG, "No budget for app launch. Forcing lockout.");
+                isBudgetLockedOut = true;
                 performGlobalAction(GLOBAL_ACTION_HOME);
             }
         }
@@ -279,8 +282,8 @@ public class AttentionFirewallService extends AccessibilityService {
     }
 
     private void checkBrowserUrl(SupportedBrowserConfig config) {
-        if (suppressForbiddenInterception && activeStickyPackage == null) {
-            // Residual forbidden state, no agency, ignore browser completely
+        // Guard: If locked out and not in a session, ignore browser completely
+        if (isBudgetLockedOut && activeStickyPackage == null) {
             return;
         }
 
@@ -318,7 +321,8 @@ public class AttentionFirewallService extends AccessibilityService {
             }
 
             if (matchedPattern != null) {
-                if (suppressForbiddenInterception) {
+                // If we are already locked out, do NOT trigger redirects again
+                if (isBudgetLockedOut) {
                     performGlobalAction(GLOBAL_ACTION_HOME);
                     bar.recycle();
                     root.recycle();
@@ -339,14 +343,15 @@ public class AttentionFirewallService extends AccessibilityService {
                         appPreferencesManager.setLastInterceptedUrl(matchedPattern);
                         triggerDecisionGate();
                     } else {
-                        suppressForbiddenInterception = true;
+                        Log.d(TAG, "No budget for URL launch. Forcing lockout.");
+                        isBudgetLockedOut = true;
                         performGlobalAction(GLOBAL_ACTION_HOME);
                     }
                 }
             } else {
-                // Explicitly safe URL (user navigated away from forbidden content)
+                // Explicit safety evidence: navigated away from forbidden content
                 if (isForbiddenConfirmed) {
-                    suppressForbiddenInterception = false;
+                    isBudgetLockedOut = false;
                     updateForbiddenTimer(false);
                 }
             }
@@ -390,15 +395,15 @@ public class AttentionFirewallService extends AccessibilityService {
         long unitCost = Math.round((totalForbiddenTimeMs / 1000.0) * multiplier);
 
         if (remainingUnits <= 0 || unitCost >= remainingUnits) {
-            Log.d(TAG, "POTENTIAL EXHAUSTED. Forcing cleanup and redirect.");
-            suppressForbiddenInterception = true;
+            Log.d(TAG, "LIVE BUDGET EXHAUSTED. Forcing lockout and cleanup.");
+            isBudgetLockedOut = true;
             endStickySession();
             performGlobalAction(GLOBAL_ACTION_HOME);
         }
     }
 
     private void startStickySession(String packageName) {
-        suppressForbiddenInterception = false;
+        isBudgetLockedOut = false; // Fresh session clears lockout
         String interceptedUrl = appPreferencesManager.getLastInterceptedUrl();
         
         if (activeStickyPackage != null && activeStickyPackage.equals(packageName)) {
