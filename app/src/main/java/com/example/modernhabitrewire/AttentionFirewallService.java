@@ -2,8 +2,15 @@ package com.example.modernhabitrewire;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -11,10 +18,12 @@ import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
 
 import androidx.annotation.NonNull;
+import androidx.core.app.NotificationCompat;
 
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 public class AttentionFirewallService extends AccessibilityService {
@@ -22,6 +31,8 @@ public class AttentionFirewallService extends AccessibilityService {
     private static final String TAG = "AttentionFirewall";
     private static final String APP_NAME = "Modern Habit Rewire";
     private static final String APP_PACKAGE = "com.example.modernhabitrewire";
+    private static final String CHANNEL_ID = "firewall_stats_channel";
+    private static final int NOTIFICATION_ID = 1;
     
     private static final List<String> DANGER_PACKAGES = Arrays.asList(
             "com.android.settings", "com.android.packageinstaller", 
@@ -42,6 +53,17 @@ public class AttentionFirewallService extends AccessibilityService {
     private final Set<String> installedImePackages = new HashSet<>();
     private List<SupportedBrowserConfig> supportedBrowsers;
 
+    private final Handler notificationHandler = new Handler(Looper.getMainLooper());
+    private final Runnable notificationTicker = new Runnable() {
+        @Override
+        public void run() {
+            updateStatsNotification();
+            if (lastForbiddenStartTime != 0) {
+                notificationHandler.postDelayed(this, 1000);
+            }
+        }
+    };
+
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
@@ -50,12 +72,66 @@ public class AttentionFirewallService extends AccessibilityService {
         this.supportedBrowsers = getSupportedBrowsers();
         
         refreshImeList();
+        createNotificationChannel();
+        updateStatsNotification();
 
         AccessibilityServiceInfo info = new AccessibilityServiceInfo();
         info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED | AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED;
         info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC;
         info.flags = AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS | AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
         setServiceInfo(info);
+    }
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID, "Firewall Live Stats", 
+                    NotificationManager.IMPORTANCE_LOW);
+            channel.setDescription("Shows real-time budget and session statistics");
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
+            }
+        }
+    }
+
+    private void updateStatsNotification() {
+        boolean active = appPreferencesManager.getIsBlockerActive();
+        long remaining = appPreferencesManager.getRemainingDopamineBudgetMs();
+        double cost = dopamineBudgetEngine.calculateCurrentMultiplier();
+        
+        long currentSegment = (lastForbiddenStartTime == 0) ? 0 : (System.currentTimeMillis() - lastForbiddenStartTime);
+        long sessionForbiddenTotal = accumulatedForbiddenTimeMs + currentSegment;
+
+        String status = active ? "Blocker: ACTIVE" : "Blocker: INACTIVE";
+        String stats = String.format(Locale.getDefault(), 
+                "Budget: %s | Session: %s | Cost: %.1fx",
+                formatMillis(remaining), formatMillis(sessionForbiddenTotal), cost);
+
+        Intent intent = new Intent(this, MainActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, 
+                PendingIntent.FLAG_IMMUTABLE);
+
+        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle(status)
+                .setContentText(stats)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setOngoing(true)
+                .setContentIntent(pendingIntent)
+                .setOnlyAlertOnce(true)
+                .build();
+
+        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager != null) {
+            manager.notify(NOTIFICATION_ID, notification);
+        }
+    }
+
+    private String formatMillis(long ms) {
+        long seconds = (ms / 1000) % 60;
+        long minutes = (ms / (1000 * 60)) % 60;
+        long hours = (ms / (1000 * 60 * 60));
+        return String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds);
     }
 
     private void refreshImeList() {
@@ -80,8 +156,9 @@ public class AttentionFirewallService extends AccessibilityService {
 
         // 1. SYSTEM & SELF EXCLUSION
         if (packageName.equals(APP_PACKAGE)) {
-            // Pause timer while user is in the Decision Gate or Settings
-            updateForbiddenTimer(false);
+            // Keep timer running if it was already running (Decision Gate/Settings shouldn't pause it)
+            // But we don't start it here.
+            updateStatsNotification();
             return;
         }
 
@@ -94,7 +171,10 @@ public class AttentionFirewallService extends AccessibilityService {
         }
 
         // 3. FIREWALL MASTER TOGGLE
-        if (!appPreferencesManager.getIsBlockerActive()) return;
+        if (!appPreferencesManager.getIsBlockerActive()) {
+            updateStatsNotification();
+            return;
+        }
 
         // 4. APPROVAL HANDLING (Transition from Decision Gate)
         if (appPreferencesManager.getTempAllowAppLaunch()) {
@@ -135,10 +215,21 @@ public class AttentionFirewallService extends AccessibilityService {
         if (activeStickyPackage != null) {
             checkLiveBudgetExhaustion();
         }
+
+        updateStatsNotification();
     }
 
     private void handleAppInterception(String packageName) {
         List<String> extractiveApps = appPreferencesManager.getExtractiveAppsPackages();
+        
+        boolean isBrowser = false;
+        for (SupportedBrowserConfig config : supportedBrowsers) {
+            if (packageName.equals(config.packageName)) {
+                isBrowser = true;
+                break;
+            }
+        }
+
         if (extractiveApps.contains(packageName)) {
             if (activeStickyPackage != null && activeStickyPackage.equals(packageName)) {
                 updateForbiddenTimer(true);
@@ -153,7 +244,8 @@ public class AttentionFirewallService extends AccessibilityService {
             } else {
                 performGlobalAction(GLOBAL_ACTION_HOME);
             }
-        } else {
+        } else if (!isBrowser) {
+            // Not a forbidden app, nor a browser. Pause timer if it was our sticky app.
             if (activeStickyPackage != null && packageName.equals(activeStickyPackage)) {
                 updateForbiddenTimer(false);
             }
@@ -167,9 +259,9 @@ public class AttentionFirewallService extends AccessibilityService {
                 return;
             }
         }
-        if (activeStickyPackage != null && packageName.equals(activeStickyPackage)) {
-            updateForbiddenTimer(false);
-        }
+        // If we are in the sticky session but switch to a non-browser system window, 
+        // DO NOT pause the timer immediately. Only pause if it's definitely not the sticky app.
+        // The checkBrowserUrl handles the pause if the URL is not forbidden.
     }
 
     private void checkBrowserUrl(SupportedBrowserConfig config) {
@@ -190,10 +282,11 @@ public class AttentionFirewallService extends AccessibilityService {
         }
 
         if (bar != null && bar.getText() != null) {
-            String currentUrl = bar.getText().toString().toLowerCase();
+            String currentUrl = bar.getText().toString().toLowerCase().trim();
             String matchedPattern = null;
             for (String pattern : appPreferencesManager.getForbiddenUrls()) {
-                if (currentUrl.contains(pattern.toLowerCase())) {
+                String cleanPattern = pattern.toLowerCase().trim();
+                if (!cleanPattern.isEmpty() && currentUrl.contains(cleanPattern)) {
                     matchedPattern = pattern;
                     break;
                 }
@@ -213,9 +306,18 @@ public class AttentionFirewallService extends AccessibilityService {
                     triggerDecisionGate();
                 }
             } else {
-                updateForbiddenTimer(false);
+                // IMPORTANT: Only pause if we successfully read a URL and it's allowed.
+                // If currentUrl is empty or we couldn't read the bar correctly, we don't want to pause 
+                // what might be a forbidden session in transition.
+                if (!currentUrl.isEmpty()) {
+                    updateForbiddenTimer(false);
+                }
             }
             bar.recycle();
+        } else {
+            // If we are in a browser package but CANNOT find the URL bar (e.g. during link click transition),
+            // we should NOT pause the timer. Stay in the last known state.
+            Log.d(TAG, "Browser active but URL bar not found. Maintaining timer state.");
         }
         root.recycle();
     }
@@ -225,11 +327,13 @@ public class AttentionFirewallService extends AccessibilityService {
         if (isForbidden) {
             if (lastForbiddenStartTime == 0) {
                 lastForbiddenStartTime = now;
+                notificationHandler.post(notificationTicker);
             }
         } else {
             if (lastForbiddenStartTime != 0) {
                 accumulatedForbiddenTimeMs += (now - lastForbiddenStartTime);
                 lastForbiddenStartTime = 0;
+                notificationHandler.removeCallbacks(notificationTicker);
             }
         }
     }
@@ -265,6 +369,7 @@ public class AttentionFirewallService extends AccessibilityService {
         
         accumulatedForbiddenTimeMs = 0;
         lastForbiddenStartTime = System.currentTimeMillis();
+        notificationHandler.post(notificationTicker);
         dopamineBudgetEngine.incrementSessionCount();
     }
 
@@ -277,6 +382,8 @@ public class AttentionFirewallService extends AccessibilityService {
         sessionApprovedPatterns.clear();
         accumulatedForbiddenTimeMs = 0;
         lastForbiddenStartTime = 0;
+        notificationHandler.removeCallbacks(notificationTicker);
+        updateStatsNotification();
     }
 
     private boolean isApprovedPackage(String packageName) {
