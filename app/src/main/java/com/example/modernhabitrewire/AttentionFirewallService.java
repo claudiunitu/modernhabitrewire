@@ -2,15 +2,20 @@ package com.example.modernhabitrewire;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
+import android.content.Context;
 import android.content.Intent;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.inputmethod.InputMethodInfo;
+import android.view.inputmethod.InputMethodManager;
 
 import androidx.annotation.NonNull;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class AttentionFirewallService extends AccessibilityService {
 
@@ -30,6 +35,9 @@ public class AttentionFirewallService extends AccessibilityService {
     private String activeStickyPackage = null;
     private long sessionStartTime = 0;
     
+    // Dynamic list of IMEs to avoid fragility across devices (e.g., FlorisBoard)
+    private final Set<String> installedImePackages = new HashSet<>();
+    
     private List<SupportedBrowserConfig> supportedBrowsers;
 
     @Override
@@ -38,12 +46,28 @@ public class AttentionFirewallService extends AccessibilityService {
         appPreferencesManager = AppPreferencesManagerSingleton.getInstance(this);
         dopamineBudgetEngine = new DopamineBudgetEngine(this);
         this.supportedBrowsers = getSupportedBrowsers();
+        
+        refreshImeList();
 
         AccessibilityServiceInfo info = new AccessibilityServiceInfo();
         info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED | AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED;
         info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC;
         info.flags = AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS | AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
         setServiceInfo(info);
+    }
+
+    private void refreshImeList() {
+        try {
+            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                List<InputMethodInfo> imis = imm.getInputMethodList();
+                for (InputMethodInfo imi : imis) {
+                    installedImePackages.add(imi.getPackageName());
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to refresh IME list", e);
+        }
     }
 
     @Override
@@ -72,31 +96,43 @@ public class AttentionFirewallService extends AccessibilityService {
                 Log.d(TAG, "Sticky session START for approved package: " + packageName);
                 appPreferencesManager.setTempAllowAppLaunch(false);
                 startStickySession(packageName);
-                return; // PAUSE INTERCEPTION IMMEDIATELY
+                return; // LOCK SESSION IMMEDIATELY
             }
             
-            if (!event.isFullScreen() || isTransientSystemOverlay(packageName) || isLauncherPackage(packageName)) {
+            // Allow transient system UI, keyboards, and launchers to pass during transition
+            if (isTransientSystemOverlay(packageName) || isLauncherPackage(packageName)) {
                 return; 
             }
             
-            if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            // If switch to another full-screen app, discard approval
+            if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && event.isFullScreen()) {
                 Log.d(TAG, "Approval discarded. User switched to: " + packageName);
                 appPreferencesManager.setTempAllowAppLaunch(false);
             }
         }
 
         // 5. STICKY SESSION GUARD
+        // While in a sticky session, stop ALL checks for that package.
         if (activeStickyPackage != null && packageName.equals(activeStickyPackage)) {
             return; 
         }
 
-        // 6. SESSION TERMINATION
+        // 6. SESSION TERMINATION (Robust Logic)
         if (activeStickyPackage != null && eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            if (packageName.equals(activeStickyPackage) || !event.isFullScreen() || isTransientSystemOverlay(packageName)) {
+            // Stay in session if it's a keyboard or system component
+            if (packageName.equals(activeStickyPackage) || isTransientSystemOverlay(packageName)) {
                 return; 
             }
-            Log.d(TAG, "Ending sticky session for " + activeStickyPackage + " due to switch to " + packageName);
-            endStickySession();
+
+            // End session if user went to Launcher (Minimized) or switched to another App
+            if (isLauncherPackage(packageName)) {
+                Log.d(TAG, "Ending sticky session for " + activeStickyPackage + " (Home/Minimized)");
+                endStickySession();
+            } else if (event.isFullScreen()) {
+                // Only end if it's a confirmed switch to another app window
+                Log.d(TAG, "Ending sticky session for " + activeStickyPackage + " due to app switch to " + packageName);
+                endStickySession();
+            }
         }
 
         // 7. INTERCEPTION LOGIC
@@ -211,9 +247,13 @@ public class AttentionFirewallService extends AccessibilityService {
     }
 
     private boolean isTransientSystemOverlay(String packageName) {
+        // Dynamically identified keyboards (IMEs)
+        if (installedImePackages.contains(packageName)) return true;
+        
         String p = packageName.toLowerCase();
         return p.equals("android") || p.contains("systemui") || p.contains("permissioncontroller") ||
-               p.contains("inputmethod") || p.contains("latin");
+               p.contains("inputmethod") || p.contains("latin") || p.contains("keyboard") || 
+               p.contains("board") || p.contains("ime");
     }
 
     private boolean isLauncherPackage(String packageName) {
