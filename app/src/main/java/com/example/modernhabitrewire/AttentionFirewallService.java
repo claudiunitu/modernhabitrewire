@@ -106,18 +106,22 @@ public class AttentionFirewallService extends AccessibilityService {
     private void updateStatsNotification() {
         boolean active = appPreferencesManager.getIsBlockerActive();
         long remainingUnits = dopamineBudgetEngine.getRemainingBudget();
-        double multiplier = dopamineBudgetEngine.calculateCurrentMultiplier();
         
         long sessionForbiddenUnits = 0;
+        double currentInstantMultiplier = dopamineBudgetEngine.calculateCurrentMultiplier();
+        
         if (activeStickyPackage != null) {
             long currentSegmentMs = (lastForbiddenStartTime == 0) ? 0 : (System.currentTimeMillis() - lastForbiddenStartTime);
             long totalMs = accumulatedForbiddenTimeMs + currentSegmentMs;
-            sessionForbiddenUnits = Math.round((totalMs / 1000.0) * multiplier);
+            
+            // Realtime cost and instantaneous multiplier
+            sessionForbiddenUnits = dopamineBudgetEngine.calculateEscalatedCost(totalMs);
+            currentInstantMultiplier = dopamineBudgetEngine.calculateInstantaneousMultiplier(totalMs);
         }
 
         String status = active ? getString(R.string.blocker_active) : getString(R.string.blocker_inactive);
         String stats = getString(R.string.notification_stats_template, 
-                remainingUnits, sessionForbiddenUnits, multiplier);
+                remainingUnits, sessionForbiddenUnits, currentInstantMultiplier);
 
         Intent intent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, 
@@ -350,14 +354,20 @@ public class AttentionFirewallService extends AccessibilityService {
                 }
             } else {
                 // Explicit safety evidence: navigated away from forbidden content
-                if (isForbiddenConfirmed) {
-                    isBudgetLockedOut = false;
-                    updateForbiddenTimer(false);
-                }
+                isBudgetLockedOut = false;
+                confirmSafeState();
             }
             bar.recycle();
         }
         root.recycle();
+    }
+
+    private void confirmSafeState() {
+        if (!isForbiddenConfirmed) return;
+
+        Log.d(TAG, "SAFE CONFIRMED → Pausing forbidden timer");
+        isForbiddenConfirmed = false;
+        updateForbiddenTimer(false);
     }
 
     private void updateForbiddenTimer(boolean isForbidden) {
@@ -365,8 +375,6 @@ public class AttentionFirewallService extends AccessibilityService {
 
         if (isForbidden) {
             isForbiddenConfirmed = true;
-        } else if (isForbiddenConfirmed) {
-            return;
         }
 
         long now = System.currentTimeMillis();
@@ -391,8 +399,8 @@ public class AttentionFirewallService extends AccessibilityService {
         long currentForbiddenSegmentMs = (lastForbiddenStartTime == 0) ? 0 : (System.currentTimeMillis() - lastForbiddenStartTime);
         long totalForbiddenTimeMs = accumulatedForbiddenTimeMs + currentForbiddenSegmentMs;
         
-        double multiplier = dopamineBudgetEngine.calculateCurrentMultiplier();
-        long unitCost = Math.round((totalForbiddenTimeMs / 1000.0) * multiplier);
+        // Use the centralized escalation formula for live enforcement
+        long unitCost = dopamineBudgetEngine.calculateEscalatedCost(totalForbiddenTimeMs);
 
         if (remainingUnits <= 0 || unitCost >= remainingUnits) {
             Log.d(TAG, "LIVE BUDGET EXHAUSTED. Forcing lockout and cleanup.");

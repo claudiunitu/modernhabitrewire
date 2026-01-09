@@ -31,6 +31,11 @@ public class AppPreferencesManagerSingleton {
     private static final String BYPASS_SWITCH_VALUE = "bypass_switch_value";
     private static final String FORBID_SETTINGS_SWITCH_VALUE = "forbid_settings_switch_value";
 
+    private static final String KEY_DAILY_FORBIDDEN_TIME_MS = "daily_forbidden_time_ms";
+    private static final String KEY_DAILY_SESSION_TIME_SUM_MS = "daily_session_time_sum_ms";
+    private static final String KEY_COMPULSION_INDEX_C = "compulsion_index_c";
+    private static final String KEY_LAST_FORBIDDEN_TIMESTAMP = "last_forbidden_timestamp";
+
     private SharedPreferences prefs;
 
     public AppPreferencesManagerSingleton(Context context) {
@@ -201,5 +206,37 @@ public class AppPreferencesManagerSingleton {
 
     public void setLaunchFrictionEnabled(boolean enabled) {
         prefs.edit().putBoolean(KEY_LAUNCH_FRICTION_ENABLED, enabled).apply();
+    }
+
+    public long getDailyForbiddenTimeMs() {
+        return prefs.getLong(KEY_DAILY_FORBIDDEN_TIME_MS, 0);
+    }
+
+    public void setDailyForbiddenTimeMs(long timeMs) {
+        prefs.edit().putLong(KEY_DAILY_FORBIDDEN_TIME_MS, timeMs).apply();
+    }
+
+    public long getDailySessionTimeSumMs() {
+        return prefs.getLong(KEY_DAILY_SESSION_TIME_SUM_MS, 0);
+    }
+
+    public void setDailySessionTimeSumMs(long timeMs) {
+        prefs.edit().putLong(KEY_DAILY_SESSION_TIME_SUM_MS, timeMs).apply();
+    }
+
+    public float getCompulsionIndexC() {
+        return prefs.getFloat(KEY_COMPULSION_INDEX_C, 0.0f);
+    }
+
+    public void setCompulsionIndexC(float c) {
+        prefs.edit().putFloat(KEY_COMPULSION_INDEX_C, c).apply();
+    }
+
+    public long getLastForbiddenTimestamp() {
+        return prefs.getLong(KEY_LAST_FORBIDDEN_TIMESTAMP, 0);
+    }
+
+    public void setLastForbiddenTimestamp(long timestamp) {
+        prefs.edit().putLong(KEY_LAST_FORBIDDEN_TIMESTAMP, timestamp).apply();
     }
 }
