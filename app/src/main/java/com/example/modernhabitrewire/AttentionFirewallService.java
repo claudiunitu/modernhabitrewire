@@ -53,6 +53,9 @@ public class AttentionFirewallService extends AccessibilityService {
     private long lastForbiddenStartTime = 0;
     private boolean isForbiddenConfirmed = false;
     
+    // Forced Cleanup Logic
+    private boolean suppressForbiddenInterception = false;
+    
     private final Set<String> installedImePackages = new HashSet<>();
     private final Set<String> launcherPackages = new HashSet<>();
     private List<SupportedBrowserConfig> supportedBrowsers;
@@ -90,9 +93,9 @@ public class AttentionFirewallService extends AccessibilityService {
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID, "Firewall Live Stats", 
+                    CHANNEL_ID, getString(R.string.notification_channel_name), 
                     NotificationManager.IMPORTANCE_LOW);
-            channel.setDescription("Shows real-time budget and session statistics");
+            channel.setDescription(getString(R.string.notification_channel_description));
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager != null) {
                 manager.createNotificationChannel(channel);
@@ -112,9 +115,8 @@ public class AttentionFirewallService extends AccessibilityService {
             sessionForbiddenUnits = Math.round((totalMs / 1000.0) * multiplier);
         }
 
-        String status = active ? "Blocker: ACTIVE" : "Blocker: INACTIVE";
-        String stats = String.format(Locale.getDefault(), 
-                "Potential: %d DU | Session: %d DU | Cost: %.1fx",
+        String status = active ? getString(R.string.blocker_active) : getString(R.string.blocker_inactive);
+        String stats = getString(R.string.notification_stats_template, 
                 remainingUnits, sessionForbiddenUnits, multiplier);
 
         Intent intent = new Intent(this, MainActivity.class);
@@ -170,8 +172,6 @@ public class AttentionFirewallService extends AccessibilityService {
 
         // 1. SELF-EXCLUSION DETOUR
         if (packageName.equals(APP_PACKAGE)) {
-            // Ignore our own UI entirely. Do NOT pause, stop, or reset forbidden timing.
-            // This ensures that detours to our app (e.g. via notification) don't break the timer state.
             updateStatsNotification();
             return;
         }
@@ -209,12 +209,15 @@ public class AttentionFirewallService extends AccessibilityService {
         }
 
         // 5. SESSION WATCHDOG & TERMINATION
-        // End session ONLY if the user switches to a DIFFERENT full-screen app or Home
         if (activeStickyPackage != null && eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             if (event.isFullScreen() && !packageName.equals(activeStickyPackage) && !isTransientSystemOverlay(packageName)) {
                 Log.d(TAG, "Watchdog: Ending session for " + activeStickyPackage + " due to switch to " + packageName);
                 endStickySession();
+                suppressForbiddenInterception = false; 
             }
+        } else if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && !isTransientSystemOverlay(packageName) && !isLauncherPackage(packageName)) {
+             // Safe context: user switched to a non-restricted app that isn't the current sticky app
+             suppressForbiddenInterception = false;
         }
 
         // 6. INTERCEPTION & MONITORING
@@ -244,6 +247,11 @@ public class AttentionFirewallService extends AccessibilityService {
         }
 
         if (extractiveApps.contains(packageName)) {
+            if (suppressForbiddenInterception) {
+                performGlobalAction(GLOBAL_ACTION_HOME);
+                return;
+            }
+
             if (activeStickyPackage != null && activeStickyPackage.equals(packageName)) {
                 updateForbiddenTimer(true);
                 return;
@@ -255,11 +263,9 @@ public class AttentionFirewallService extends AccessibilityService {
                 appPreferencesManager.setLastInterceptedUrl(""); 
                 triggerDecisionGate();
             } else {
+                suppressForbiddenInterception = true;
                 performGlobalAction(GLOBAL_ACTION_HOME);
             }
-        } else if (!isBrowser) {
-            // DO NOTHING - App-level events are not safety evidence.
-            // This prevents force-resetting forbidden state during transient UI noise (like notification shade).
         }
     }
 
@@ -273,10 +279,14 @@ public class AttentionFirewallService extends AccessibilityService {
     }
 
     private void checkBrowserUrl(SupportedBrowserConfig config) {
+        if (suppressForbiddenInterception && activeStickyPackage == null) {
+            // Residual forbidden state, no agency, ignore browser completely
+            return;
+        }
+
         AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return;
         
-        // Guard: If the active window is SystemUI or another overlay, don't process it as browser safety evidence.
         CharSequence rootPackage = root.getPackageName();
         if (rootPackage == null || !rootPackage.toString().equals(config.packageName)) {
             root.recycle();
@@ -308,6 +318,13 @@ public class AttentionFirewallService extends AccessibilityService {
             }
 
             if (matchedPattern != null) {
+                if (suppressForbiddenInterception) {
+                    performGlobalAction(GLOBAL_ACTION_HOME);
+                    bar.recycle();
+                    root.recycle();
+                    return;
+                }
+
                 if (activeStickyPackage != null && config.packageName.equals(activeStickyPackage)) {
                     updateForbiddenTimer(true);
                     if (!sessionApprovedPatterns.contains(matchedPattern)) {
@@ -316,24 +333,20 @@ public class AttentionFirewallService extends AccessibilityService {
                         triggerDecisionGate();
                     }
                 } else if (activeStickyPackage == null) {
-                    appPreferencesManager.setLastInterceptedApp(config.packageName);
-                    appPreferencesManager.setLastInterceptedUrl(matchedPattern);
-                    triggerDecisionGate();
-                }
-            } else {
-                // POSITIVE SAFETY EVIDENCE: Only clear forbidden state if we have a definitive safe URL.
-                // We use explicit allow-by-exclusion here: if no forbidden pattern is found in the current URL,
-                // and we were previously in a forbidden state, we transition to safe.
-                boolean explicitlySafe = true;
-                for (String pattern : appPreferencesManager.getForbiddenUrls()) {
-                    if (currentUrl.contains(pattern.toLowerCase().trim())) {
-                        explicitlySafe = false;
-                        break;
+                    dopamineBudgetEngine.resetBudgetIfNeeded();
+                    if (dopamineBudgetEngine.hasBudget()) {
+                        appPreferencesManager.setLastInterceptedApp(config.packageName);
+                        appPreferencesManager.setLastInterceptedUrl(matchedPattern);
+                        triggerDecisionGate();
+                    } else {
+                        suppressForbiddenInterception = true;
+                        performGlobalAction(GLOBAL_ACTION_HOME);
                     }
                 }
-
-                if (explicitlySafe && isForbiddenConfirmed) {
-                    isForbiddenConfirmed = false;
+            } else {
+                // Explicitly safe URL (user navigated away from forbidden content)
+                if (isForbiddenConfirmed) {
+                    suppressForbiddenInterception = false;
                     updateForbiddenTimer(false);
                 }
             }
@@ -348,7 +361,6 @@ public class AttentionFirewallService extends AccessibilityService {
         if (isForbidden) {
             isForbiddenConfirmed = true;
         } else if (isForbiddenConfirmed) {
-            // Once forbidden is confirmed, only positive evidence of safety (explicit safe URL) resets it.
             return;
         }
 
@@ -365,8 +377,6 @@ public class AttentionFirewallService extends AccessibilityService {
                 notificationHandler.removeCallbacks(notificationTicker);
             }
         }
-        
-        Log.d(TAG, "FORBIDDEN=" + isForbiddenConfirmed + " lastStart=" + lastForbiddenStartTime + " isForbiddenParam=" + isForbidden);
     }
 
     private void checkLiveBudgetExhaustion() {
@@ -381,13 +391,14 @@ public class AttentionFirewallService extends AccessibilityService {
 
         if (remainingUnits <= 0 || unitCost >= remainingUnits) {
             Log.d(TAG, "POTENTIAL EXHAUSTED. Forcing cleanup and redirect.");
-            // Stop everything FIRST to prevent ghost units
+            suppressForbiddenInterception = true;
             endStickySession();
             performGlobalAction(GLOBAL_ACTION_HOME);
         }
     }
 
     private void startStickySession(String packageName) {
+        suppressForbiddenInterception = false;
         String interceptedUrl = appPreferencesManager.getLastInterceptedUrl();
         
         if (activeStickyPackage != null && activeStickyPackage.equals(packageName)) {

@@ -21,4 +21,22 @@
     <string name="AddForbiddenAppPackageButtonLabel">Add Forbidden App Package</string>
     <string name="EditPackagesListButtonLabel">Edit Forbidden App Packages</string>
 
+    <!-- New strings for internationalization -->
+    <string name="attention_firewall">Attention Firewall</string>
+    <string name="system_state_initial">System State:\n---\nSessions today: 0\nCurrent cost: 1.0x\nRemaining budget: 00:00:00</string>
+    <string name="proceed">Proceed</string>
+    <string name="cancel">Cancel</string>
+    <string name="enter_key_to_deactivate">Enter Key to Deactivate</string>
+    <string name="interaction_physics">Interaction Physics</string>
+    <string name="daily_budget">Daily Budget (DUR):</string>
+    <string name="base_wait_time">Base Wait Time (Secs):</string>
+    <string name="cost_factor">Cost Factor (>= 1.0):</string>
+    <string name="reset_daily_stats_debug">Reset Daily Stats (Debug)</string>
+
+    <!-- Notification strings -->
+    <string name="notification_channel_name">Firewall Live Stats</string>
+    <string name="notification_channel_description">Shows real-time budget and session statistics</string>
+    <string name="blocker_active">Blocker: ACTIVE</string>
+    <string name="blocker_inactive">Blocker: INACTIVE</string>
+    <string name="notification_stats_template">Potential: %1$d DU | Session: %2$d DU | Cost: %3$.1fx</string>
 </resources>
