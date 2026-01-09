@@ -65,6 +65,12 @@ public class DecisionGateActivity extends AppCompatActivity {
                 sessions, multiplier, remainingUnits);
 
         statsTextView.setText(stats);
+
+        // Enforce potential limits: disable proceed if no credits left
+        if (remainingUnits <= 0) {
+            proceedButton.setEnabled(false);
+            proceedButton.setText("POTENTIAL DEPLETED");
+        }
     }
 
     private void startFrictionDelay() {
