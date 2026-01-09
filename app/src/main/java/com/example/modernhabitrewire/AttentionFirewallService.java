@@ -10,7 +10,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
-import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -25,7 +24,6 @@ import androidx.core.app.NotificationCompat;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 
 public class AttentionFirewallService extends AccessibilityService {
@@ -91,15 +89,13 @@ public class AttentionFirewallService extends AccessibilityService {
     }
 
     private void createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID, getString(R.string.notification_channel_name), 
-                    NotificationManager.IMPORTANCE_LOW);
-            channel.setDescription(getString(R.string.notification_channel_description));
-            NotificationManager manager = getSystemService(NotificationManager.class);
-            if (manager != null) {
-                manager.createNotificationChannel(channel);
-            }
+        NotificationChannel channel = new NotificationChannel(
+                CHANNEL_ID, getString(R.string.notification_channel_name), 
+                NotificationManager.IMPORTANCE_LOW);
+        channel.setDescription(getString(R.string.notification_channel_description));
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager != null) {
+            manager.createNotificationChannel(channel);
         }
     }
 
@@ -223,7 +219,7 @@ public class AttentionFirewallService extends AccessibilityService {
                     Log.d(TAG, "Watchdog: Ending session for " + activeStickyPackage + " due to switch to " + packageName);
                     endStickySession();
                     // Move to safe context clears lockout
-                    if (!isExtractive && !isTransient && !isLauncher) {
+                    if (!isExtractive && !isLauncher) {
                         isBudgetLockedOut = false;
                     }
                 }
@@ -296,7 +292,6 @@ public class AttentionFirewallService extends AccessibilityService {
         
         CharSequence rootPackage = root.getPackageName();
         if (rootPackage == null || !rootPackage.toString().equals(config.packageName)) {
-            root.recycle();
             return;
         }
 
@@ -328,8 +323,6 @@ public class AttentionFirewallService extends AccessibilityService {
                 // If we are already locked out, do NOT trigger redirects again
                 if (isBudgetLockedOut) {
                     performGlobalAction(GLOBAL_ACTION_HOME);
-                    bar.recycle();
-                    root.recycle();
                     return;
                 }
 
@@ -357,9 +350,7 @@ public class AttentionFirewallService extends AccessibilityService {
                 isBudgetLockedOut = false;
                 confirmSafeState();
             }
-            bar.recycle();
         }
-        root.recycle();
     }
 
     private void confirmSafeState() {
@@ -489,9 +480,8 @@ public class AttentionFirewallService extends AccessibilityService {
             boolean isDestructive = findTextRecursive(root, "info") || findTextRecursive(root, "details") || 
                                     findTextRecursive(root, "storage") || findTextRecursive(root, "admin") || 
                                     findTextRecursive(root, "service") || findTextRecursive(root, "off");
-            if (isDestructive) { root.recycle(); return true; }
+            if (isDestructive) { return true; }
         }
-        root.recycle();
         return false;
     }
 
@@ -501,8 +491,7 @@ public class AttentionFirewallService extends AccessibilityService {
         if (node.getContentDescription() != null && node.getContentDescription().toString().toLowerCase().contains(text.toLowerCase())) return true;
         for (int i = 0; i < node.getChildCount(); i++) {
             AccessibilityNodeInfo child = node.getChild(i);
-            if (findTextRecursive(child, text)) { if (child != null) child.recycle(); return true; }
-            if (child != null) child.recycle();
+            if (findTextRecursive(child, text)) { return true; }
         }
         return false;
     }
@@ -524,7 +513,6 @@ public class AttentionFirewallService extends AccessibilityService {
             AccessibilityNodeInfo child = node.getChild(i);
             AccessibilityNodeInfo result = findNodeByContentDescription(child, hints);
             if (result != null) return result;
-            if (child != null) child.recycle();
         }
         return null;
     }
