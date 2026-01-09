@@ -74,9 +74,10 @@ public class DecisionGateActivity extends AppCompatActivity {
 
     private void startFrictionDelay() {
         proceedButton.setEnabled(false);
-        int baseWait = appPreferencesManager.getBaseWaitTimeSeconds();
-        double multiplier = budgetEngine.calculateCurrentMultiplier();
-        countdownSeconds = (int) (baseWait * multiplier);
+        
+        // Delegate calculation to budgetEngine
+        countdownSeconds = budgetEngine.calculateWaitSeconds();
+        
         frictionTextView.setVisibility(View.VISIBLE);
         runCountdown();
     }

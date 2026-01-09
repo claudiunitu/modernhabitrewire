@@ -83,6 +83,21 @@ public class DopamineBudgetEngine {
     }
 
     /**
+     * Calculates the interaction latency (wait time) required before access.
+     * Uses a logarithmic scaling to interrupt impulsive behavior without emotional overload.
+     */
+    public int calculateWaitSeconds() {
+        double baseWaitSeconds = appPreferencesManager.getBaseWaitTimeSeconds();
+        double factor = calculateCurrentMultiplier();
+
+        // Target formula (exact): Logarithmic scaling based on factor
+        // Rationale: Provides strong impulse brake early, then flattens to preserve user agency.
+        double waitSeconds = baseWaitSeconds * (1.0 + Math.log(factor) / Math.log(2.0));
+
+        return (int) Math.round(waitSeconds);
+    }
+
+    /**
      * Calculates the instantaneous multiplier at a specific point in the session.
      * M(t) = F_entry + alpha * seconds
      */

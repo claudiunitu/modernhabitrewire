@@ -38,6 +38,9 @@ The **Decision Gate** creates a "Gap" in the habit loop (Cue -> Craving -> Respo
 ### The Awareness Mirror
 By showing the **Compulsion Index** and **Current Multiplier** before launch, the app provides real-time bio-feedback. The user is forced to acknowledge their current state of compulsion before they can proceed.
 
+### Logarithmic Impulse Braking
+The wait time at the Decision Gate uses a logarithmic growth model. This provides a strong impulse brake for early violations without escalating into a punitive experience that triggers rage-quitting. By flattening the delay curve, we keep the user within the "Zone of Deliberation" rather than triggering a "Bypass Instinct."
+
 ---
 
 ## 4. Technical Architecture
@@ -85,7 +88,12 @@ The total DU consumed for a session of duration $T$ seconds:
 $$UnitCost = \sum_{i=0}^{T} (F_{entry} + \alpha \times i) \approx T \times F_{entry} + \alpha \frac{T(T-1)}{2}$$
 *   **Logic:** This quadratic growth ensures that a 20-minute session isn't just twice as expensive as 10 minutes—it is exponentially more taxing on your budget.
 
-#### 4. Recovery (Decay): The "Healing Mechanism"
+#### 4. Logarithmic Interaction Latency (Wait Time)
+The wait time $W$ before allowing access:
+$$W = W_{base} \times (1.0 + \log_2(F_{entry}))$$
+*   **Logic:** We use a logarithmic scaling based on the current Entry Multiplier ($F_{entry}$). This ensures that while the "Economic Cost" (DU) can grow significantly to prevent long-term depletion, the "Psychological Friction" (wait time) grows sub-linearly. This provides a strong "Impulse Brake" early on but flattens out to prevent triggering frustration-driven bypass behavior or emotional overload.
+
+#### 5. Recovery (Decay): The "Healing Mechanism"
 $$H_{threshold} = 24 - 18C$$
 *   **Logic:** If the user stays "clean" for $H$ hours where $H > H_{threshold}$, the base factor $f_0$ decreases by the `decayStep`. 
     *   Users with high $C$ ($1.0$) only need 6 hours to start recovery, providing a "shorter loop" for positive reinforcement.
