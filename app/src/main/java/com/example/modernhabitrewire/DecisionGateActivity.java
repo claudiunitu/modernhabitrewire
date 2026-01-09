@@ -60,8 +60,7 @@ public class DecisionGateActivity extends AppCompatActivity {
         double multiplier = budgetEngine.calculateCurrentMultiplier();
         long remainingUnits = budgetEngine.getRemainingBudget();
 
-        String stats = String.format(Locale.getDefault(),
-                "System State:\n---\nSessions today: %d\nCurrent cost: %.1fx\nRemaining potential: %d DU",
+        String stats = getString(R.string.system_state_template,
                 sessions, multiplier, remainingUnits);
 
         statsTextView.setText(stats);
@@ -69,7 +68,7 @@ public class DecisionGateActivity extends AppCompatActivity {
         // Enforce potential limits: disable proceed if no credits left
         if (remainingUnits <= 0) {
             proceedButton.setEnabled(false);
-            proceedButton.setText("POTENTIAL DEPLETED");
+            proceedButton.setText(R.string.potential_depleted);
         }
     }
 
@@ -84,7 +83,7 @@ public class DecisionGateActivity extends AppCompatActivity {
 
     private void runCountdown() {
         if (countdownSeconds > 0) {
-            frictionTextView.setText(String.format(Locale.getDefault(), "Interaction Latency: %ds remaining...", countdownSeconds));
+            frictionTextView.setText(getString(R.string.interaction_latency_template, countdownSeconds));
             countdownSeconds--;
             handler.postDelayed(this::runCountdown, 1000);
         } else {

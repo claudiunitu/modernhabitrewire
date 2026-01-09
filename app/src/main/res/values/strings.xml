@@ -39,4 +39,13 @@
     <string name="blocker_active">Blocker: ACTIVE</string>
     <string name="blocker_inactive">Blocker: INACTIVE</string>
     <string name="notification_stats_template">Potential: %1$d DU | Session: %2$d DU | Cost: %3$.1fx</string>
+
+    <!-- Decision Gate strings -->
+    <string name="system_state_template">System State:\n---\nSessions today: %1$d\nCurrent cost: %2$.1fx\nRemaining potential: %3$d DU</string>
+    <string name="potential_depleted">POTENTIAL DEPLETED</string>
+    <string name="interaction_latency_template">Interaction Latency: %1$ds remaining...</string>
+    <string name="incorrect_key">Incorrect Key</string>
+    <string name="set_key_first">Set key first</string>
+    <string name="cannot_be_empty">Cannot be empty</string>
+    <string name="all_stats_reset">All stats reset</string>
 </resources>
