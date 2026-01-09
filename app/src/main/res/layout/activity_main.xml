@@ -125,8 +125,7 @@
                     android:id="@+id/dailyBudgetInput"
                     android:layout_width="100dp"
                     android:layout_height="wrap_content"
-                    android:inputType="number"
-                    android:text="30" />
+                    android:inputType="number" />
             </LinearLayout>
 
             <LinearLayout
@@ -142,8 +141,7 @@
                     android:id="@+id/baseWaitInput"
                     android:layout_width="100dp"
                     android:layout_height="wrap_content"
-                    android:inputType="number"
-                    android:text="30" />
+                    android:inputType="number" />
             </LinearLayout>
 
             <LinearLayout
@@ -154,14 +152,43 @@
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
-                    android:text="Cost Factor (>= 1.0):" />
+                    android:text="Base Multiplier (>= 1.0):" />
                 <EditText
                     android:id="@+id/costFactorInput"
                     android:layout_width="100dp"
                     android:layout_height="wrap_content"
-                    android:inputType="numberDecimal"
-                    android:text="1.0" />
+                    android:inputType="numberDecimal" />
             </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Recovery Speed" />
+            <RadioGroup
+                android:id="@+id/recoverySpeedGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <RadioButton android:id="@+id/recoverySlow" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Slow" />
+                <RadioButton android:id="@+id/recoveryNormal" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Normal" />
+                <RadioButton android:id="@+id/recoveryFast" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Fast" />
+            </RadioGroup>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Grace Window" />
+            <RadioGroup
+                android:id="@+id/graceWindowGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <RadioButton android:id="@+id/graceShort" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Short" />
+                <RadioButton android:id="@+id/graceNormal" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Normal" />
+                <RadioButton android:id="@+id/graceLong" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Long" />
+            </RadioGroup>
 
             <Button
                 android:id="@+id/button_reset_stats"

@@ -36,6 +36,9 @@ public class AppPreferencesManagerSingleton {
     private static final String KEY_COMPULSION_INDEX_C = "compulsion_index_c";
     private static final String KEY_LAST_FORBIDDEN_TIMESTAMP = "last_forbidden_timestamp";
 
+    private static final String KEY_DECAY_STEP = "decay_step";
+    private static final String KEY_GRACE_MULTIPLIER = "grace_multiplier";
+
     private SharedPreferences prefs;
 
     public AppPreferencesManagerSingleton(Context context) {
@@ -238,5 +241,21 @@ public class AppPreferencesManagerSingleton {
 
     public void setLastForbiddenTimestamp(long timestamp) {
         prefs.edit().putLong(KEY_LAST_FORBIDDEN_TIMESTAMP, timestamp).apply();
+    }
+
+    public float getDecayStep() {
+        return prefs.getFloat(KEY_DECAY_STEP, 1.0f);
+    }
+
+    public void setDecayStep(float step) {
+        prefs.edit().putFloat(KEY_DECAY_STEP, step).apply();
+    }
+
+    public float getGraceMultiplier() {
+        return prefs.getFloat(KEY_GRACE_MULTIPLIER, 1.0f);
+    }
+
+    public void setGraceMultiplier(float multiplier) {
+        prefs.edit().putFloat(KEY_GRACE_MULTIPLIER, multiplier).apply();
     }
 }

@@ -94,7 +94,8 @@ public class DopamineBudgetEngine {
         }
 
         double fEntry = calculateCurrentMultiplier();
-        double alpha = 0.001 + 0.005 * c;
+        // alpha = (0.001 + 0.005 * C) * graceMultiplier
+        double alpha = (0.001 + 0.005 * c) * appPreferencesManager.getGraceMultiplier();
         double seconds = timeSpentMillis / 1000.0;
 
         return fEntry + (alpha * seconds);
@@ -112,7 +113,8 @@ public class DopamineBudgetEngine {
         }
 
         double fEntry = calculateCurrentMultiplier();
-        double alpha = 0.001 + 0.005 * c;
+        // alpha = (0.001 + 0.005 * C) * graceMultiplier
+        double alpha = (0.001 + 0.005 * c) * appPreferencesManager.getGraceMultiplier();
         double seconds = timeSpentMillis / 1000.0;
 
         // Sum of arithmetic progression: seconds * fEntry + alpha * [seconds * (seconds - 1) / 2]
@@ -155,7 +157,7 @@ public class DopamineBudgetEngine {
         float cNew = (float) Math.max(0.0, Math.min(1.0, (R - 0.05) / 0.45));
         
         float c = 0.8f * cPrev + 0.2f * cNew;
-        // Logic for Day 1 protection is encapsulated in getters but persisted as raw C
+        // Persist raw C
         appPreferencesManager.setCompulsionIndexC(c);
 
         // 3. Compute Cost with In-Session Escalation
@@ -195,8 +197,9 @@ public class DopamineBudgetEngine {
         
         if (hoursSinceLastForbidden >= thresholdH) {
             float currentFactor = appPreferencesManager.getCostIncrementFactor();
-            appPreferencesManager.setCostIncrementFactor(Math.max(1.0f, currentFactor - 1.0f));
-            Log.d(TAG, "Recovery: Clean for " + hoursSinceLastForbidden + "h. Factor decayed to " + appPreferencesManager.getCostIncrementFactor());
+            float decayStep = appPreferencesManager.getDecayStep();
+            appPreferencesManager.setCostIncrementFactor(Math.max(1.0f, currentFactor - decayStep));
+            Log.d(TAG, "Recovery: Clean for " + hoursSinceLastForbidden + "h. Factor decayed by " + decayStep + " to " + appPreferencesManager.getCostIncrementFactor());
         }
     }
 }

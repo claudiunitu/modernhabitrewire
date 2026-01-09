@@ -16,10 +16,12 @@ import android.text.TextWatcher;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.RadioGroup;
 import android.widget.Toast;
 
 import androidx.appcompat.widget.SwitchCompat;
 import androidx.core.app.ActivityCompat;
+import androidx.core.app.NotificationManagerCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 
@@ -60,10 +62,22 @@ public class MainActivity extends AppCompatActivity {
         ((SwitchCompat) findViewById(R.id.bypassSwitch)).setChecked(appPreferencesManager.getBypassSwitchValue());
         ((SwitchCompat) findViewById(R.id.forbidSettingsSwitch)).setChecked(appPreferencesManager.getForbidSettingsSwitchValue());
 
-        // Sync restored physics settings to UI
+        // Sync physics settings
         ((EditText) findViewById(R.id.dailyBudgetInput)).setText(String.valueOf(appPreferencesManager.getDailyAllowanceUnits()));
         ((EditText) findViewById(R.id.baseWaitInput)).setText(String.valueOf(appPreferencesManager.getBaseWaitTimeSeconds()));
         ((EditText) findViewById(R.id.costFactorInput)).setText(String.format(Locale.getDefault(), "%.1f", appPreferencesManager.getCostIncrementFactor()));
+
+        // Sync Recovery Speed
+        float decay = appPreferencesManager.getDecayStep();
+        if (decay == 0.5f) ((RadioGroup) findViewById(R.id.recoverySpeedGroup)).check(R.id.recoverySlow);
+        else if (decay == 1.5f) ((RadioGroup) findViewById(R.id.recoverySpeedGroup)).check(R.id.recoveryFast);
+        else ((RadioGroup) findViewById(R.id.recoverySpeedGroup)).check(R.id.recoveryNormal);
+
+        // Sync Grace Window
+        float grace = appPreferencesManager.getGraceMultiplier();
+        if (grace == 1.3f) ((RadioGroup) findViewById(R.id.graceWindowGroup)).check(R.id.graceShort);
+        else if (grace == 0.7f) ((RadioGroup) findViewById(R.id.graceWindowGroup)).check(R.id.graceLong);
+        else ((RadioGroup) findViewById(R.id.graceWindowGroup)).check(R.id.graceNormal);
     }
 
     private void setWatchers() {
@@ -84,6 +98,18 @@ public class MainActivity extends AppCompatActivity {
             try { appPreferencesManager.setCostIncrementFactor(Float.parseFloat(s)); } catch (Exception ignored) {}
         }));
 
+        ((RadioGroup) findViewById(R.id.recoverySpeedGroup)).setOnCheckedChangeListener((group, checkedId) -> {
+            if (checkedId == R.id.recoverySlow) appPreferencesManager.setDecayStep(0.5f);
+            else if (checkedId == R.id.recoveryFast) appPreferencesManager.setDecayStep(1.5f);
+            else appPreferencesManager.setDecayStep(1.0f);
+        });
+
+        ((RadioGroup) findViewById(R.id.graceWindowGroup)).setOnCheckedChangeListener((group, checkedId) -> {
+            if (checkedId == R.id.graceShort) appPreferencesManager.setGraceMultiplier(1.3f);
+            else if (checkedId == R.id.graceLong) appPreferencesManager.setGraceMultiplier(0.7f);
+            else appPreferencesManager.setGraceMultiplier(1.0f);
+        });
+
         ((EditText) findViewById(R.id.deactivationKeySetterInputText)).addTextChangedListener(new SimpleWatcher(s -> refreshKeyButton()));
     }
 
@@ -94,6 +120,15 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.dailyBudgetInput).setEnabled(!active);
         findViewById(R.id.baseWaitInput).setEnabled(!active);
         findViewById(R.id.costFactorInput).setEnabled(!active);
+        findViewById(R.id.recoverySpeedGroup).setEnabled(!active);
+        findViewById(R.id.graceWindowGroup).setEnabled(!active);
+        
+        // Disable children of radio groups manually as RadioGroup.setEnabled(false) doesn't propagate
+        RadioGroup rg1 = findViewById(R.id.recoverySpeedGroup);
+        for (int i = 0; i < rg1.getChildCount(); i++) rg1.getChildAt(i).setEnabled(!active);
+        RadioGroup rg2 = findViewById(R.id.graceWindowGroup);
+        for (int i = 0; i < rg2.getChildCount(); i++) rg2.getChildAt(i).setEnabled(!active);
+
         findViewById(R.id.deactivationKeySetterInputText).setEnabled(!active);
         findViewById(R.id.deactivationKeyButton).setEnabled(!active);
         findViewById(R.id.button_reset_stats).setEnabled(!active);
