@@ -27,6 +27,7 @@ import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
     private AppPreferencesManagerSingleton appPreferencesManager;
+    private DopamineBudgetEngine budgetEngine;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,6 +35,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         appPreferencesManager = AppPreferencesManagerSingleton.getInstance(this);
+        budgetEngine = new DopamineBudgetEngine(this);
 
         this.backButtonPressedDispatcher();
         this.requestDeviceAdminPermission();
@@ -69,7 +71,11 @@ public class MainActivity extends AppCompatActivity {
         ((SwitchCompat) findViewById(R.id.forbidSettingsSwitch)).setOnCheckedChangeListener((v, checked) -> appPreferencesManager.setForbidSettingsSwitchValue(checked));
 
         ((EditText) findViewById(R.id.dailyBudgetInput)).addTextChangedListener(new SimpleWatcher(s -> {
-            try { appPreferencesManager.setDailyBudgetMinutes(Integer.parseInt(s)); } catch (Exception ignored) {}
+            try { 
+                int mins = Integer.parseInt(s);
+                appPreferencesManager.setDailyBudgetMinutes(mins);
+                budgetEngine.updateRemainingBudgetOnly();
+            } catch (Exception ignored) {}
         }));
         ((EditText) findViewById(R.id.baseWaitInput)).addTextChangedListener(new SimpleWatcher(s -> {
             try { appPreferencesManager.setBaseWaitTimeSeconds(Integer.parseInt(s)); } catch (Exception ignored) {}
@@ -90,6 +96,7 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.costFactorInput).setEnabled(!active);
         findViewById(R.id.deactivationKeySetterInputText).setEnabled(!active);
         findViewById(R.id.deactivationKeyButton).setEnabled(!active);
+        findViewById(R.id.button_reset_stats).setEnabled(!active);
     }
 
     public void onEditUrlListClick(View v) { startActivity(new Intent(this, UrlListEditorActivity.class)); }
@@ -130,6 +137,12 @@ public class MainActivity extends AppCompatActivity {
         }
         input.setText("");
         initializeUI();
+    }
+
+    public void onResetStatsClick(View v) {
+        budgetEngine.resetAllStats();
+        initializeUI();
+        Toast.makeText(this, "All stats reset", Toast.LENGTH_SHORT).show();
     }
 
     private void refreshBlockerButton() {

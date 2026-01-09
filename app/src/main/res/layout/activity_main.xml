@@ -163,6 +163,15 @@
                     android:text="1.0" />
             </LinearLayout>
 
+            <Button
+                android:id="@+id/button_reset_stats"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:onClick="onResetStatsClick"
+                android:text="Reset Daily Stats (Debug)"
+                style="@style/Widget.AppCompat.Button.Colored" />
+
         </LinearLayout>
     </ScrollView>
 
