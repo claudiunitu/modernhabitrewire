@@ -8,6 +8,8 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -49,8 +51,10 @@ public class AttentionFirewallService extends AccessibilityService {
     private final Set<String> sessionApprovedPatterns = new HashSet<>();
     private long accumulatedForbiddenTimeMs = 0;
     private long lastForbiddenStartTime = 0;
+    private boolean isForbiddenConfirmed = false;
     
     private final Set<String> installedImePackages = new HashSet<>();
+    private final Set<String> launcherPackages = new HashSet<>();
     private List<SupportedBrowserConfig> supportedBrowsers;
 
     private final Handler notificationHandler = new Handler(Looper.getMainLooper());
@@ -72,6 +76,7 @@ public class AttentionFirewallService extends AccessibilityService {
         this.supportedBrowsers = getSupportedBrowsers();
         
         refreshImeList();
+        refreshLauncherList();
         createNotificationChannel();
         updateStatsNotification();
 
@@ -97,17 +102,20 @@ public class AttentionFirewallService extends AccessibilityService {
 
     private void updateStatsNotification() {
         boolean active = appPreferencesManager.getIsBlockerActive();
-        long remainingUnits = appPreferencesManager.getRemainingPotentialUnits();
-        double cost = dopamineBudgetEngine.calculateCurrentMultiplier();
+        long remainingUnits = dopamineBudgetEngine.getRemainingBudget();
+        double multiplier = dopamineBudgetEngine.calculateCurrentMultiplier();
         
-        long currentSegmentMs = (lastForbiddenStartTime == 0) ? 0 : (System.currentTimeMillis() - lastForbiddenStartTime);
-        long sessionForbiddenTotalMs = accumulatedForbiddenTimeMs + currentSegmentMs;
-        long sessionForbiddenUnits = Math.round((sessionForbiddenTotalMs / 1000.0) * cost);
+        long sessionForbiddenUnits = 0;
+        if (activeStickyPackage != null) {
+            long currentSegmentMs = (lastForbiddenStartTime == 0) ? 0 : (System.currentTimeMillis() - lastForbiddenStartTime);
+            long totalMs = accumulatedForbiddenTimeMs + currentSegmentMs;
+            sessionForbiddenUnits = Math.round((totalMs / 1000.0) * multiplier);
+        }
 
         String status = active ? "Blocker: ACTIVE" : "Blocker: INACTIVE";
         String stats = String.format(Locale.getDefault(), 
                 "Potential: %d DU | Session: %d DU | Cost: %.1fx",
-                remainingUnits, sessionForbiddenUnits, cost);
+                remainingUnits, sessionForbiddenUnits, multiplier);
 
         Intent intent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, 
@@ -142,14 +150,29 @@ public class AttentionFirewallService extends AccessibilityService {
         }
     }
 
+    private void refreshLauncherList() {
+        launcherPackages.clear();
+        Intent intent = new Intent(Intent.ACTION_MAIN);
+        intent.addCategory(Intent.CATEGORY_HOME);
+        List<ResolveInfo> resolveInfos = getPackageManager().queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
+        for (ResolveInfo info : resolveInfos) {
+            if (info.activityInfo != null) {
+                launcherPackages.add(info.activityInfo.packageName);
+            }
+        }
+    }
+
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
         if (event.getPackageName() == null) return;
         String packageName = event.getPackageName().toString();
         int eventType = event.getEventType();
 
-        // 1. SYSTEM & SELF EXCLUSION
+        // 1. SYSTEM & SELF EXCLUSION (Decision Gate / Settings)
         if (packageName.equals(APP_PACKAGE)) {
+            // Pause timer while in our app, but DON'T kill the sticky session yet.
+            // Forbidden state survives UI detours.
+            updateForbiddenTimer(false);
             updateStatsNotification();
             return;
         }
@@ -186,13 +209,12 @@ public class AttentionFirewallService extends AccessibilityService {
             }
         }
 
-        // 5. SESSION TERMINATION
+        // 5. SESSION WATCHDOG & TERMINATION
+        // End session ONLY if the user switches to a DIFFERENT full-screen app or Home
         if (activeStickyPackage != null && eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            if (!packageName.equals(activeStickyPackage) && !isTransientSystemOverlay(packageName)) {
-                if (isLauncherPackage(packageName) || event.isFullScreen()) {
-                    Log.d(TAG, "Ending session for " + activeStickyPackage + " due to switch to " + packageName);
-                    endStickySession();
-                }
+            if (event.isFullScreen() && !packageName.equals(activeStickyPackage) && !isTransientSystemOverlay(packageName)) {
+                Log.d(TAG, "Watchdog: Ending session for " + activeStickyPackage + " due to switch to " + packageName);
+                endStickySession();
             }
         }
 
@@ -237,9 +259,8 @@ public class AttentionFirewallService extends AccessibilityService {
                 performGlobalAction(GLOBAL_ACTION_HOME);
             }
         } else if (!isBrowser) {
-            if (activeStickyPackage != null && packageName.equals(activeStickyPackage)) {
-                updateForbiddenTimer(false);
-            }
+            // DO NOTHING - App-level events are not safety evidence.
+            // This prevents force-resetting forbidden state during transient UI noise (like notification shade).
         }
     }
 
@@ -256,6 +277,13 @@ public class AttentionFirewallService extends AccessibilityService {
         AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return;
         
+        // Guard: If the active window is SystemUI or another overlay, don't process it as browser safety evidence.
+        CharSequence rootPackage = root.getPackageName();
+        if (rootPackage == null || !rootPackage.toString().equals(config.packageName)) {
+            root.recycle();
+            return;
+        }
+
         AccessibilityNodeInfo bar = null;
         for (String id : config.addressBarIds) {
             List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByViewId(id);
@@ -281,20 +309,32 @@ public class AttentionFirewallService extends AccessibilityService {
             }
 
             if (matchedPattern != null) {
-                updateForbiddenTimer(true);
                 if (activeStickyPackage != null && config.packageName.equals(activeStickyPackage)) {
+                    updateForbiddenTimer(true);
                     if (!sessionApprovedPatterns.contains(matchedPattern)) {
                         appPreferencesManager.setLastInterceptedApp(config.packageName);
                         appPreferencesManager.setLastInterceptedUrl(matchedPattern);
                         triggerDecisionGate();
                     }
-                } else {
+                } else if (activeStickyPackage == null) {
                     appPreferencesManager.setLastInterceptedApp(config.packageName);
                     appPreferencesManager.setLastInterceptedUrl(matchedPattern);
                     triggerDecisionGate();
                 }
             } else {
-                if (!currentUrl.isEmpty()) {
+                // POSITIVE SAFETY EVIDENCE: Only clear forbidden state if we have a definitive safe URL.
+                // We use explicit allow-by-exclusion here: if no forbidden pattern is found in the current URL,
+                // and we were previously in a forbidden state, we transition to safe.
+                boolean explicitlySafe = true;
+                for (String pattern : appPreferencesManager.getForbiddenUrls()) {
+                    if (currentUrl.contains(pattern.toLowerCase().trim())) {
+                        explicitlySafe = false;
+                        break;
+                    }
+                }
+
+                if (explicitlySafe && isForbiddenConfirmed) {
+                    isForbiddenConfirmed = false;
                     updateForbiddenTimer(false);
                 }
             }
@@ -304,6 +344,15 @@ public class AttentionFirewallService extends AccessibilityService {
     }
 
     private void updateForbiddenTimer(boolean isForbidden) {
+        if (activeStickyPackage == null) isForbidden = false;
+
+        if (isForbidden) {
+            isForbiddenConfirmed = true;
+        } else if (isForbiddenConfirmed) {
+            // Once forbidden is confirmed, only positive evidence of safety (explicit safe URL) resets it.
+            return;
+        }
+
         long now = System.currentTimeMillis();
         if (isForbidden) {
             if (lastForbiddenStartTime == 0) {
@@ -320,19 +369,20 @@ public class AttentionFirewallService extends AccessibilityService {
     }
 
     private void checkLiveBudgetExhaustion() {
-        if (lastForbiddenStartTime == 0 && accumulatedForbiddenTimeMs == 0) return;
-
-        long currentSegmentMs = (lastForbiddenStartTime == 0) ? 0 : (System.currentTimeMillis() - lastForbiddenStartTime);
-        long totalForbiddenTimeMs = accumulatedForbiddenTimeMs + currentSegmentMs;
+        if (activeStickyPackage == null) return;
+        
+        long remainingUnits = dopamineBudgetEngine.getRemainingBudget();
+        long currentForbiddenSegmentMs = (lastForbiddenStartTime == 0) ? 0 : (System.currentTimeMillis() - lastForbiddenStartTime);
+        long totalForbiddenTimeMs = accumulatedForbiddenTimeMs + currentForbiddenSegmentMs;
         
         double multiplier = dopamineBudgetEngine.calculateCurrentMultiplier();
         long unitCost = Math.round((totalForbiddenTimeMs / 1000.0) * multiplier);
-        long remainingUnits = appPreferencesManager.getRemainingPotentialUnits();
 
-        if (unitCost >= remainingUnits) {
-            Log.d(TAG, "LIVE BUDGET EXHAUSTED. Kicking user out.");
-            performGlobalAction(GLOBAL_ACTION_HOME);
+        if (remainingUnits <= 0 || unitCost >= remainingUnits) {
+            Log.d(TAG, "POTENTIAL EXHAUSTED. Forcing cleanup and redirect.");
+            // Stop everything FIRST to prevent ghost units
             endStickySession();
+            performGlobalAction(GLOBAL_ACTION_HOME);
         }
     }
 
@@ -349,12 +399,14 @@ public class AttentionFirewallService extends AccessibilityService {
         if (!interceptedUrl.isEmpty()) sessionApprovedPatterns.add(interceptedUrl);
         
         accumulatedForbiddenTimeMs = 0;
+        isForbiddenConfirmed = false;
         lastForbiddenStartTime = System.currentTimeMillis();
         notificationHandler.post(notificationTicker);
         dopamineBudgetEngine.incrementSessionCount();
     }
 
     private void endStickySession() {
+        isForbiddenConfirmed = false;
         updateForbiddenTimer(false);
         if (accumulatedForbiddenTimeMs > 0) {
             dopamineBudgetEngine.depleteBudget(accumulatedForbiddenTimeMs);
@@ -373,17 +425,29 @@ public class AttentionFirewallService extends AccessibilityService {
     }
 
     private boolean isTransientSystemOverlay(String packageName) {
+        if (packageName == null) return false;
         if (installedImePackages.contains(packageName)) return true;
+        return isSystemUiOverlay(packageName) || 
+               packageName.contains("permissioncontroller") || packageName.contains("inputmethod") || 
+               packageName.contains("latin") || packageName.contains("keyboard") || 
+               packageName.contains("board") || packageName.contains("ime") || packageName.equals("com.android.settings");
+    }
+
+    private boolean isSystemUiOverlay(String packageName) {
+        if (packageName == null) return false;
         String p = packageName.toLowerCase();
-        return p.equals("android") || p.contains("systemui") || p.contains("permissioncontroller") ||
-               p.contains("inputmethod") || p.contains("latin") || p.contains("keyboard") || 
-               p.contains("board") || p.contains("ime") || p.equals("com.android.settings");
+        return p.equals("android") || p.contains("systemui") || p.contains("statusbar") || 
+               p.contains("notification") || p.contains("quicksettings");
     }
 
     private boolean isLauncherPackage(String packageName) {
+        if (packageName == null) return false;
+        if (launcherPackages.contains(packageName)) return true;
+        
         String p = packageName.toLowerCase();
         return p.contains("launcher") || p.contains("trebuchet") || p.contains("home") || 
-               p.contains("nexuslauncher") || p.contains("miui.home");
+               p.contains("nexuslauncher") || p.contains("miui.home") || p.contains("pixel") ||
+               p.contains("launcher3") || p.contains("launcher2");
     }
 
     private void triggerDecisionGate() {
