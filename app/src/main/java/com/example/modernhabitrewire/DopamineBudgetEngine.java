@@ -57,7 +57,7 @@ public class DopamineBudgetEngine {
     public double calculateCurrentMultiplier() {
         int sessionCount = appPreferencesManager.getDailySessionCount();
         float factor = appPreferencesManager.getCostIncrementFactor();
-        return 1.0 + (sessionCount * factor);
+        return sessionCount * factor;
     }
 
     public void depleteBudget(long timeSpentMillis) {

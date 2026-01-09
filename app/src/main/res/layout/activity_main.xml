@@ -120,7 +120,7 @@
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
-                    android:text="Daily Budget (Mins):" />
+                    android:text="Daily Budget (DU):" />
                 <EditText
                     android:id="@+id/dailyBudgetInput"
                     android:layout_width="100dp"

@@ -168,11 +168,10 @@ public class AttentionFirewallService extends AccessibilityService {
         String packageName = event.getPackageName().toString();
         int eventType = event.getEventType();
 
-        // 1. SYSTEM & SELF EXCLUSION (Decision Gate / Settings)
+        // 1. SELF-EXCLUSION DETOUR
         if (packageName.equals(APP_PACKAGE)) {
-            // Pause timer while in our app, but DON'T kill the sticky session yet.
-            // Forbidden state survives UI detours.
-            updateForbiddenTimer(false);
+            // Ignore our own UI entirely. Do NOT pause, stop, or reset forbidden timing.
+            // This ensures that detours to our app (e.g. via notification) don't break the timer state.
             updateStatsNotification();
             return;
         }
@@ -366,6 +365,8 @@ public class AttentionFirewallService extends AccessibilityService {
                 notificationHandler.removeCallbacks(notificationTicker);
             }
         }
+        
+        Log.d(TAG, "FORBIDDEN=" + isForbiddenConfirmed + " lastStart=" + lastForbiddenStartTime + " isForbiddenParam=" + isForbidden);
     }
 
     private void checkLiveBudgetExhaustion() {
