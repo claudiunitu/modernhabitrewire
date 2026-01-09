@@ -58,15 +58,11 @@ public class DecisionGateActivity extends AppCompatActivity {
     private void updateAwarenessMirror() {
         int sessions = appPreferencesManager.getDailySessionCount();
         double multiplier = budgetEngine.calculateCurrentMultiplier();
-        long remainingMillis = budgetEngine.getRemainingBudget();
-
-        long seconds = (remainingMillis / 1000) % 60;
-        long minutes = (remainingMillis / (1000 * 60)) % 60;
-        long hours = (remainingMillis / (1000 * 60 * 60)) % 24;
+        long remainingUnits = budgetEngine.getRemainingBudget();
 
         String stats = String.format(Locale.getDefault(),
-                "System State:\n---\nSessions today: %d\nCurrent cost: %.1fx\nRemaining budget: %02d:%02d:%02d",
-                sessions, multiplier, hours, minutes, seconds);
+                "System State:\n---\nSessions today: %d\nCurrent cost: %.1fx\nRemaining potential: %d DU",
+                sessions, multiplier, remainingUnits);
 
         statsTextView.setText(stats);
     }

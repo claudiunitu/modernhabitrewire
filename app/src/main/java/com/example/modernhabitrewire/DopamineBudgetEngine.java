@@ -7,6 +7,10 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
+/**
+ * The Engine handles the "Dopamine Units" (DU) system.
+ * 1 DU = 1 second of physical time at a 1.0x multiplier.
+ */
 public class DopamineBudgetEngine {
 
     private static final String TAG = "DopamineBudgetEngine";
@@ -16,10 +20,6 @@ public class DopamineBudgetEngine {
         this.appPreferencesManager = AppPreferencesManagerSingleton.getInstance(context);
     }
 
-    /**
-     * Resets the budget for the day. 
-     * IMPORTANT: This should be called before checking hasBudget() or getting remaining budget.
-     */
     public void resetBudgetIfNeeded() {
         String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
         String lastResetDate = appPreferencesManager.getLastBudgetResetDate();
@@ -30,27 +30,19 @@ public class DopamineBudgetEngine {
     }
     
     public void forceResetBudget(String dateString) {
-        long totalBudgetMs = appPreferencesManager.getDailyBudgetMinutes() * 60 * 1000L;
-        appPreferencesManager.setRemainingDopamineBudgetMs(totalBudgetMs);
+        long totalUnits = appPreferencesManager.getDailyAllowanceUnits();
+        appPreferencesManager.setRemainingPotentialUnits(totalUnits);
         appPreferencesManager.setDailySessionCount(0);
         appPreferencesManager.setLastBudgetResetDate(dateString);
-        Log.d(TAG, "Full budget reset for: " + dateString);
+        Log.d(TAG, "Full budget reset. Potential restored to: " + totalUnits + " DU");
     }
 
-    /**
-     * Specifically used when the user edits the Daily Budget in settings.
-     * Only updates the remaining time without resetting session counts or dates.
-     */
     public void updateRemainingBudgetOnly() {
-        long totalBudgetMs = appPreferencesManager.getDailyBudgetMinutes() * 60 * 1000L;
-        appPreferencesManager.setRemainingDopamineBudgetMs(totalBudgetMs);
-        Log.d(TAG, "Remaining budget updated to: " + appPreferencesManager.getDailyBudgetMinutes() + " minutes.");
+        long totalUnits = appPreferencesManager.getDailyAllowanceUnits();
+        appPreferencesManager.setRemainingPotentialUnits(totalUnits);
+        Log.d(TAG, "Potential updated to: " + totalUnits + " DU");
     }
 
-    /**
-     * Completely resets all session stats and budget for the current day.
-     * Useful for debugging.
-     */
     public void resetAllStats() {
         String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
         forceResetBudget(today);
@@ -59,7 +51,7 @@ public class DopamineBudgetEngine {
 
     public boolean hasBudget() {
         resetBudgetIfNeeded();
-        return appPreferencesManager.getRemainingDopamineBudgetMs() > 0;
+        return getRemainingBudget() > 0;
     }
 
     public double calculateCurrentMultiplier() {
@@ -71,17 +63,18 @@ public class DopamineBudgetEngine {
     public void depleteBudget(long timeSpentMillis) {
         resetBudgetIfNeeded();
         double multiplier = calculateCurrentMultiplier();
-        long actualCost = (long) (timeSpentMillis * multiplier);
+        double secondsSpent = timeSpentMillis / 1000.0;
+        long unitCost = Math.round(secondsSpent * multiplier);
         
-        long remainingBudget = appPreferencesManager.getRemainingDopamineBudgetMs();
-        appPreferencesManager.setRemainingDopamineBudgetMs(Math.max(0, remainingBudget - actualCost));
+        long remainingUnits = getRemainingBudget();
+        appPreferencesManager.setRemainingPotentialUnits(Math.max(0, remainingUnits - unitCost));
         
-        Log.d(TAG, "Depleted: " + (timeSpentMillis/1000) + "s x " + multiplier + " = " + (actualCost/1000) + "s. Remaining: " + (appPreferencesManager.getRemainingDopamineBudgetMs()/1000) + "s");
+        Log.d(TAG, "Spent: " + String.format("%.1fs", secondsSpent) + " x " + multiplier + "x = " + unitCost + " DU. Remaining: " + getRemainingBudget() + " DU");
     }
 
     public long getRemainingBudget() {
         resetBudgetIfNeeded();
-        return appPreferencesManager.getRemainingDopamineBudgetMs();
+        return appPreferencesManager.getRemainingPotentialUnits();
     }
     
     public void incrementSessionCount() {

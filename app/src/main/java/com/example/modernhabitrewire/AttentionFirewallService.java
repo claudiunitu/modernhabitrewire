@@ -97,16 +97,17 @@ public class AttentionFirewallService extends AccessibilityService {
 
     private void updateStatsNotification() {
         boolean active = appPreferencesManager.getIsBlockerActive();
-        long remaining = appPreferencesManager.getRemainingDopamineBudgetMs();
+        long remainingUnits = appPreferencesManager.getRemainingPotentialUnits();
         double cost = dopamineBudgetEngine.calculateCurrentMultiplier();
         
-        long currentSegment = (lastForbiddenStartTime == 0) ? 0 : (System.currentTimeMillis() - lastForbiddenStartTime);
-        long sessionForbiddenTotal = accumulatedForbiddenTimeMs + currentSegment;
+        long currentSegmentMs = (lastForbiddenStartTime == 0) ? 0 : (System.currentTimeMillis() - lastForbiddenStartTime);
+        long sessionForbiddenTotalMs = accumulatedForbiddenTimeMs + currentSegmentMs;
+        long sessionForbiddenUnits = Math.round((sessionForbiddenTotalMs / 1000.0) * cost);
 
         String status = active ? "Blocker: ACTIVE" : "Blocker: INACTIVE";
         String stats = String.format(Locale.getDefault(), 
-                "Budget: %s | Session: %s | Cost: %.1fx",
-                formatMillis(remaining), formatMillis(sessionForbiddenTotal), cost);
+                "Potential: %d DU | Session: %d DU | Cost: %.1fx",
+                remainingUnits, sessionForbiddenUnits, cost);
 
         Intent intent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, 
@@ -125,13 +126,6 @@ public class AttentionFirewallService extends AccessibilityService {
         if (manager != null) {
             manager.notify(NOTIFICATION_ID, notification);
         }
-    }
-
-    private String formatMillis(long ms) {
-        long seconds = (ms / 1000) % 60;
-        long minutes = (ms / (1000 * 60)) % 60;
-        long hours = (ms / (1000 * 60 * 60));
-        return String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds);
     }
 
     private void refreshImeList() {
@@ -156,8 +150,6 @@ public class AttentionFirewallService extends AccessibilityService {
 
         // 1. SYSTEM & SELF EXCLUSION
         if (packageName.equals(APP_PACKAGE)) {
-            // Keep timer running if it was already running (Decision Gate/Settings shouldn't pause it)
-            // But we don't start it here.
             updateStatsNotification();
             return;
         }
@@ -245,7 +237,6 @@ public class AttentionFirewallService extends AccessibilityService {
                 performGlobalAction(GLOBAL_ACTION_HOME);
             }
         } else if (!isBrowser) {
-            // Not a forbidden app, nor a browser. Pause timer if it was our sticky app.
             if (activeStickyPackage != null && packageName.equals(activeStickyPackage)) {
                 updateForbiddenTimer(false);
             }
@@ -259,9 +250,6 @@ public class AttentionFirewallService extends AccessibilityService {
                 return;
             }
         }
-        // If we are in the sticky session but switch to a non-browser system window, 
-        // DO NOT pause the timer immediately. Only pause if it's definitely not the sticky app.
-        // The checkBrowserUrl handles the pause if the URL is not forbidden.
     }
 
     private void checkBrowserUrl(SupportedBrowserConfig config) {
@@ -306,18 +294,11 @@ public class AttentionFirewallService extends AccessibilityService {
                     triggerDecisionGate();
                 }
             } else {
-                // IMPORTANT: Only pause if we successfully read a URL and it's allowed.
-                // If currentUrl is empty or we couldn't read the bar correctly, we don't want to pause 
-                // what might be a forbidden session in transition.
                 if (!currentUrl.isEmpty()) {
                     updateForbiddenTimer(false);
                 }
             }
             bar.recycle();
-        } else {
-            // If we are in a browser package but CANNOT find the URL bar (e.g. during link click transition),
-            // we should NOT pause the timer. Stay in the last known state.
-            Log.d(TAG, "Browser active but URL bar not found. Maintaining timer state.");
         }
         root.recycle();
     }
@@ -341,14 +322,14 @@ public class AttentionFirewallService extends AccessibilityService {
     private void checkLiveBudgetExhaustion() {
         if (lastForbiddenStartTime == 0 && accumulatedForbiddenTimeMs == 0) return;
 
-        long currentForbiddenSegment = (lastForbiddenStartTime == 0) ? 0 : (System.currentTimeMillis() - lastForbiddenStartTime);
-        long totalForbiddenTime = accumulatedForbiddenTimeMs + currentForbiddenSegment;
+        long currentSegmentMs = (lastForbiddenStartTime == 0) ? 0 : (System.currentTimeMillis() - lastForbiddenStartTime);
+        long totalForbiddenTimeMs = accumulatedForbiddenTimeMs + currentSegmentMs;
         
         double multiplier = dopamineBudgetEngine.calculateCurrentMultiplier();
-        long virtualCostMs = (long) (totalForbiddenTime * multiplier);
-        long remainingBudgetMs = appPreferencesManager.getRemainingDopamineBudgetMs();
+        long unitCost = Math.round((totalForbiddenTimeMs / 1000.0) * multiplier);
+        long remainingUnits = appPreferencesManager.getRemainingPotentialUnits();
 
-        if (virtualCostMs >= remainingBudgetMs) {
+        if (unitCost >= remainingUnits) {
             Log.d(TAG, "LIVE BUDGET EXHAUSTED. Kicking user out.");
             performGlobalAction(GLOBAL_ACTION_HOME);
             endStickySession();

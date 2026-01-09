@@ -16,8 +16,8 @@ public class AppPreferencesManagerSingleton {
     private static final String KEY_NEUTRAL_APP_LIST = "neutral_app_list";
     private static final String KEY_IS_BLOCKER_ACTIVE = "is_blocker_active";
     
-    private static final String KEY_DAILY_BUDGET_MINS = "daily_budget_mins";
-    private static final String KEY_REMAINING_BUDGET_MS = "remaining_budget_ms";
+    private static final String KEY_DAILY_ALLOWANCE_UNITS = "daily_allowance_units";
+    private static final String KEY_REMAINING_POTENTIAL_UNITS = "remaining_potential_units";
     private static final String KEY_LAST_BUDGET_RESET_DATE = "last_budget_reset_date";
     private static final String KEY_TEMP_ALLOW_APP_LAUNCH = "temp_allow_app_launch";
     private static final String KEY_LAST_INTERCEPTED_APP = "last_intercepted_app";
@@ -123,20 +123,20 @@ public class AppPreferencesManagerSingleton {
         setExtractiveApps(apps);
     }
 
-    public int getDailyBudgetMinutes() {
-        return prefs.getInt(KEY_DAILY_BUDGET_MINS, 30);
+    public int getDailyAllowanceUnits() {
+        return prefs.getInt(KEY_DAILY_ALLOWANCE_UNITS, 1800);
     }
 
-    public void setDailyBudgetMinutes(int minutes) {
-        prefs.edit().putInt(KEY_DAILY_BUDGET_MINS, minutes).apply();
+    public void setDailyAllowanceUnits(int units) {
+        prefs.edit().putInt(KEY_DAILY_ALLOWANCE_UNITS, units).apply();
     }
 
-    public long getRemainingDopamineBudgetMs() {
-        return prefs.getLong(KEY_REMAINING_BUDGET_MS, 0);
+    public long getRemainingPotentialUnits() {
+        return prefs.getLong(KEY_REMAINING_POTENTIAL_UNITS, 0);
     }
 
-    public void setRemainingDopamineBudgetMs(long ms) {
-        prefs.edit().putLong(KEY_REMAINING_BUDGET_MS, ms).apply();
+    public void setRemainingPotentialUnits(long units) {
+        prefs.edit().putLong(KEY_REMAINING_POTENTIAL_UNITS, units).apply();
     }
 
     public String getLastBudgetResetDate() {

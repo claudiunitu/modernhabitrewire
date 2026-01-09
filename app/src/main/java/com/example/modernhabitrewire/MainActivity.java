@@ -61,7 +61,7 @@ public class MainActivity extends AppCompatActivity {
         ((SwitchCompat) findViewById(R.id.forbidSettingsSwitch)).setChecked(appPreferencesManager.getForbidSettingsSwitchValue());
 
         // Sync restored physics settings to UI
-        ((EditText) findViewById(R.id.dailyBudgetInput)).setText(String.valueOf(appPreferencesManager.getDailyBudgetMinutes()));
+        ((EditText) findViewById(R.id.dailyBudgetInput)).setText(String.valueOf(appPreferencesManager.getDailyAllowanceUnits()));
         ((EditText) findViewById(R.id.baseWaitInput)).setText(String.valueOf(appPreferencesManager.getBaseWaitTimeSeconds()));
         ((EditText) findViewById(R.id.costFactorInput)).setText(String.format(Locale.getDefault(), "%.1f", appPreferencesManager.getCostIncrementFactor()));
     }
@@ -72,8 +72,8 @@ public class MainActivity extends AppCompatActivity {
 
         ((EditText) findViewById(R.id.dailyBudgetInput)).addTextChangedListener(new SimpleWatcher(s -> {
             try { 
-                int mins = Integer.parseInt(s);
-                appPreferencesManager.setDailyBudgetMinutes(mins);
+                int units = Integer.parseInt(s);
+                appPreferencesManager.setDailyAllowanceUnits(units);
                 budgetEngine.updateRemainingBudgetOnly();
             } catch (Exception ignored) {}
         }));
