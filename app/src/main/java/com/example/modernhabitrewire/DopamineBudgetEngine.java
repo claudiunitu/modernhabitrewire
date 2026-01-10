@@ -60,7 +60,11 @@ public class DopamineBudgetEngine {
         forceResetBudget(today);
     }
 
-    public boolean hasBudget() {
+    /**
+     * Checks if the user currently has a positive unit balance.
+     * Note: Negative balance is allowed, but triggers enforcement friction.
+     */
+    public boolean hasPositiveBudget() {
         resetBudgetIfNeeded();
         return appPreferencesManager.getRemainingPotentialUnits() > 0;
     }

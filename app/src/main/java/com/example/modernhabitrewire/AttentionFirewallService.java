@@ -88,20 +88,28 @@ public class AttentionFirewallService extends AccessibilityService {
 
     // Friction Handler for Overdraw
     private boolean isFrictionRunning = false;
+    private long frictionSessionToken = 0;
     private final Handler frictionHandler = new Handler(Looper.getMainLooper());
-    private final Runnable frictionTicker = new Runnable() {
-        @Override
-        public void run() {
-            // Apply friction if the budget is <= 0 AND we are confirmed in forbidden zone
-            if (activeStickyPackage != null && dopamineBudgetEngine.getRemainingBudget() <= 0 && isForbiddenConfirmed) {
-                Log.d(TAG, "Applying overdraw friction (hiccup)");
-                performGlobalAction(GLOBAL_ACTION_BACK);
-                frictionHandler.postDelayed(this, 15000); 
-            } else {
-                isFrictionRunning = false;
+
+    private void postFrictionTicker(final long token) {
+        frictionHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (token != frictionSessionToken) {
+                    Log.d(TAG, "Friction token mismatch. Aborting old ticker.");
+                    return;
+                }
+                
+                if (activeStickyPackage != null && dopamineBudgetEngine.getRemainingBudget() <= 0 && isForbiddenConfirmed) {
+                    Log.d(TAG, "Applying overdraw friction (hiccup)");
+                    performGlobalAction(GLOBAL_ACTION_BACK);
+                    postFrictionTicker(token);
+                } else {
+                    isFrictionRunning = false;
+                }
             }
-        }
-    };
+        }, 15000);
+    }
 
     public static void notifyGateClosed() {
         lastDecisionGateTime = System.currentTimeMillis();
@@ -391,21 +399,23 @@ public class AttentionFirewallService extends AccessibilityService {
                 lastForbiddenStartTime = now;
                 notificationHandler.post(notificationTicker);
             }
-            // Logic Fixed: Only post if friction is not already running
+            
             if (dopamineBudgetEngine.getRemainingBudget() <= 0 && !isFrictionRunning) {
                 isFrictionRunning = true;
-                frictionHandler.removeCallbacks(frictionTicker);
-                frictionHandler.postDelayed(frictionTicker, 15000);
+                frictionSessionToken++;
+                postFrictionTicker(frictionSessionToken);
             }
         } else {
             if (lastForbiddenStartTime != 0) {
                 accumulatedForbiddenTimeMs += (now - lastForbiddenStartTime);
                 lastForbiddenStartTime = 0;
                 notificationHandler.removeCallbacks(notificationTicker);
-                
-                isFrictionRunning = false;
-                frictionHandler.removeCallbacks(frictionTicker);
             }
+            
+            // Invalidate friction when exiting forbidden state
+            isFrictionRunning = false;
+            frictionSessionToken++;
+            frictionHandler.removeCallbacksAndMessages(null);
         }
     }
 
@@ -439,7 +449,8 @@ public class AttentionFirewallService extends AccessibilityService {
         isForbiddenConfirmed = false;
         lastForbiddenStartTime = 0; 
         
-        updateForbiddenTimer(true);
+        // Removed: updateForbiddenTimer(true); 
+        // Forbidden time starts only when content is confirmed.
         
         dopamineBudgetEngine.incrementSessionCount();
     }
@@ -454,8 +465,11 @@ public class AttentionFirewallService extends AccessibilityService {
         accumulatedForbiddenTimeMs = 0;
         lastForbiddenStartTime = 0;
         wasNegativeAtSessionStart = false; 
+        
+        // Final invalidation
         isFrictionRunning = false;
-        frictionHandler.removeCallbacks(frictionTicker);
+        frictionSessionToken++;
+        frictionHandler.removeCallbacksAndMessages(null);
         notificationHandler.removeCallbacks(notificationTicker);
         updateStatsNotification();
     }
