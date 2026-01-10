@@ -48,9 +48,6 @@ public class AppPreferencesManagerSingleton {
     private static final String KEY_METRIC_RETRY_LATENCY_SUM = "metric_retry_latency_sum";
     private static final String KEY_METRIC_RETRY_COUNT = "metric_retry_count";
 
-    // Mercy Channel
-    private static final String KEY_MERCY_UNTIL_TIMESTAMP = "mercy_until_timestamp";
-
     private SharedPreferences prefs;
 
     public AppPreferencesManagerSingleton(Context context) {
@@ -306,13 +303,5 @@ public class AppPreferencesManagerSingleton {
         prefs.edit().putLong(KEY_METRIC_RETRY_LATENCY_SUM, sum + ms)
                    .putInt(KEY_METRIC_RETRY_COUNT, count + 1)
                    .apply();
-    }
-
-    // Mercy Logic
-    public void setMercyUntil(long timestamp) {
-        prefs.edit().putLong(KEY_MERCY_UNTIL_TIMESTAMP, timestamp).apply();
-    }
-    public long getMercyUntil() {
-        return prefs.getLong(KEY_MERCY_UNTIL_TIMESTAMP, 0);
     }
 }

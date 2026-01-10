@@ -140,9 +140,6 @@ public class AttentionFirewallService extends AccessibilityService {
     private void applyOverlayFriction() {
         long now = System.currentTimeMillis();
         
-        // Mercy Channel Check: If user is in mercy period, restore smoothness.
-        if (now < appPreferencesManager.getMercyUntil()) return;
-
         // Hard minimum inter-attempt guard to prevent stack/storming
         if (now - lastOverlayTime < FRICTION_MIN_INTERVAL_MS) return;
         if (now < overlayCooldownUntil) return;
@@ -189,18 +186,14 @@ public class AttentionFirewallService extends AccessibilityService {
             TextView msg = frictionOverlay.findViewById(R.id.friction_message);
             View root = frictionOverlay;
 
-            // HOSTILITY MODES
+            // HOSTILITY MODES - Simplified to always be full-screen
             if (intensity > 0.75 && modeRand < 0.3) {
                 // MODE: DEAD TIME
                 root.setBackgroundColor(0xFF000000); 
                 if (msg != null) msg.setVisibility(View.GONE);
             } else if (intensity > 0.4 && modeRand < 0.6) {
-                // MODE: PARTIAL OCCLUSION
-                width = (int) (getResources().getDisplayMetrics().widthPixels * (0.4 + Math.random() * 0.4));
-                height = (int) (getResources().getDisplayMetrics().heightPixels * (0.3 + Math.random() * 0.4));
+                // MODE: OCCLUSION (Force Fullscreen)
                 root.setBackgroundColor(0xEE000000); 
-                gravity = (Math.random() > 0.5 ? Gravity.TOP : Gravity.BOTTOM) | 
-                          (Math.random() > 0.5 ? Gravity.LEFT : Gravity.RIGHT);
                 if (msg != null) msg.setVisibility(View.GONE);
             } else if (intensity > 0.6 && modeRand < 0.8) {
                 // MODE: MICRO-STUTTER
@@ -228,14 +221,7 @@ public class AttentionFirewallService extends AccessibilityService {
                 long startTime = System.currentTimeMillis();
                 
                 // Randomize duration
-                long duration;
-                if (width != WindowManager.LayoutParams.MATCH_PARENT || height != WindowManager.LayoutParams.MATCH_PARENT) {
-                    duration = 2000 + (long)(Math.random() * 4000);
-                } else if (root.getSolidColor() == 0x00000000) {
-                    duration = 300 + (long)(Math.random() * 1000);
-                } else {
-                    duration = 1500 + (long) (Math.random() * intensity * 10000);
-                }
+                long duration = 500 + (long) (Math.random() * intensity * 10000);
                 
                 frictionOverlayHandler.postDelayed(() -> {
                     long actualDuration = System.currentTimeMillis() - startTime;
@@ -446,13 +432,8 @@ public class AttentionFirewallService extends AccessibilityService {
             
             if (activeStickyPackage != null) {
                 if (!packageName.equals(activeStickyPackage) && !isTransient) {
-                    // Mercy Channel: Voluntary Exit
-                    // Logic updated to prevent oscillation exploitation (requires 1.5s exposure)
                     if (isFrictionRunning) {
                         appPreferencesManager.incrementFrictionAborted();
-                        // 15 minutes mercy
-                        appPreferencesManager.setMercyUntil(now + 15 * 60000);
-                        Log.d(TAG, "Mercy Channel: Voluntary exit during friction. Restoring smoothness.");
                     }
                     
                     endStickySession();

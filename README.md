@@ -16,7 +16,7 @@
 ### Daily Interaction
 *   **The Decision Gate:** When you open a forbidden app, you'll see the **Awareness Mirror**. It shows your current session count and how "expensive" your time has become. You must wait for the countdown before you can proceed.
 *   **Exhaustion Mode:** If your budget is depleted, you enter "Overdraw" mode. You can still proceed, but the wait times are significantly higher, and units are deducted from tomorrow's balance.
-*   **Stochastic Friction:** During a session in a forbidden app, the system may occasionally display "Friction Overlays"—brief messages or visual breaks—to interrupt the flow. In extreme cases, it may forcibly "kick" you to the Home screen.
+*   **Stochastic Friction:** During a session in a forbidden app, the system may occasionally display fullscreen "Friction Overlays"—brief messages or visual breaks—to interrupt the flow. In extreme cases, it may forcibly "kick" you to the Home screen.
 
 ### Advanced Concepts
 *   **Charging Bypass:** If enabled, you can deactivate the blocker without a key if the phone is plugged into a charger. This allows for "safe" maintenance while physically tethered.
@@ -33,14 +33,14 @@ The app treats digital consumption as a transaction. By assigning a cost to "ext
 The system avoids instant punishment. Early interaction remains affordable, allowing the user to notice, reflect, and disengage without panic. This preserves a sense of control, which is essential for users with compulsive or ADHD-driven behavior.
 
 ### Stochastic Interruption
-By using probabilistic overlays ("Pause", "Enough", "Breathe"), the app mimics the internal voice of mindfulness that is often drowned out during "zombie scrolling." The unpredictability of these interruptions prevents the brain from habituating to them.
+By using probabilistic fullscreen overlays ("Pause", "Enough", "Breathe"), the app mimics the internal voice of mindfulness that is often drowned out during "zombie scrolling." The unpredictability of these interruptions prevents the brain from habituating to them.
 
 ---
 
 ## 4. Technical Architecture
 
 ### Core Components
-*   **`AttentionFirewallService` (Accessibility):** The central nervous system. It monitors window state changes and URLs. It also manages the **Stochastic Friction** system, which applies visual overlays and "Kick to Home" actions based on session intensity.
+*   **`AttentionFirewallService` (Accessibility):** The central nervous system. It monitors window state changes and URLs. It also manages the **Stochastic Friction** system, which applies fullscreen visual overlays and "Kick to Home" actions based on session intensity.
 *   **`UninstallerForbidderAccessibilityService`:** A dedicated security layer that monitors system settings to prevent the uninstallation or forced stopping of the app while the blocker is active.
 *   **`DopamineBudgetEngine`:** The mathematical core. It calculates costs, multipliers, and remaining "Dopamine Units" (DU) using adaptive depletion and carry-over logic.
 *   **`DecisionGateActivity`:** The friction UI. Intercepts app launches, displays the Awareness Mirror, and enforces the Interaction Latency countdown.
@@ -78,7 +78,7 @@ $$\alpha = (0.001 + 0.005C) \times \text{GraceMultiplier}$$
 
 #### 4. Stochastic Friction Intensity
 $$P(friction) = \min(1.0, \text{SessionSeconds} / 60.0)$$
-*   **Logic:** As a session exceeds 60 seconds, the probability and intensity of "Friction Overlays" and "Kick to Home" actions increase linearly.
+*   **Logic:** As a session exceeds 60 seconds, the probability and intensity of fullscreen "Friction Overlays" and "Kick to Home" actions increase linearly.
 
 ---
 
