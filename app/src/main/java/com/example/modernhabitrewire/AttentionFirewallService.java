@@ -10,13 +10,19 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.graphics.PixelFormat;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.view.Gravity;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
@@ -52,6 +58,7 @@ public class AttentionFirewallService extends AccessibilityService {
     private long accumulatedForbiddenTimeMs = 0;
     private long lastForbiddenStartTime = 0;
     private boolean isForbiddenConfirmed = false;
+    private long forbiddenConfirmedAt = 0;
     
     // Forced Cleanup / Lockout Logic
     private boolean isBudgetLockedOut = false;
@@ -86,29 +93,104 @@ public class AttentionFirewallService extends AccessibilityService {
         }
     };
 
-    // Friction Handler for Overdraw
+    // Overlay Friction State
     private boolean isFrictionRunning = false;
-    private long frictionSessionToken = 0;
-    private final Handler frictionHandler = new Handler(Looper.getMainLooper());
+    private View frictionOverlay = null;
+    private WindowManager windowManager;
+    private final Handler frictionOverlayHandler = new Handler(Looper.getMainLooper());
+    private static final long FRICTION_MIN_INTERVAL_MS = 5000;
+    private long lastOverlayTime = 0;
 
-    private void postFrictionTicker(final long token) {
-        frictionHandler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (token != frictionSessionToken) {
-                    Log.d(TAG, "Friction token mismatch. Aborting old ticker.");
-                    return;
+    private void applyOverlayFriction() {
+        long now = System.currentTimeMillis();
+        if (now - lastOverlayTime < FRICTION_MIN_INTERVAL_MS) return;
+
+        // Intensity ramps over 60 seconds of consumption
+        long forbiddenSeconds = (now - forbiddenConfirmedAt) / 1000;
+        double intensity = Math.min(1.0, (double) forbiddenSeconds / 60.0);
+
+        // Probability increases with intensity
+        if (Math.random() > (0.1 + intensity * 0.4)) return;
+
+        lastOverlayTime = now;
+        showFrictionOverlay(intensity);
+    }
+
+    private void showFrictionOverlay(double intensity) {
+        frictionOverlayHandler.post(() -> {
+            if (frictionOverlay != null) return;
+
+            windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+            LayoutInflater inflater = (LayoutInflater) getSystemService(LAYOUT_INFLATER_SERVICE);
+            frictionOverlay = inflater.inflate(R.layout.friction_overlay, null);
+
+            // Always use hard occlusion (intercept touches) for reliability
+            int flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+
+            WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                    flags,
+                    PixelFormat.TRANSLUCENT
+            );
+            params.gravity = Gravity.CENTER;
+
+            // Determine if we should perform a HOME action after this overlay
+            // Probability scales with intensity, up to 25% at max intensity.
+            final boolean shouldKickHome = Math.random() < (intensity * 0.25);
+            TextView msg = frictionOverlay.findViewById(R.id.friction_message);
+
+            if (shouldKickHome) {
+                if (msg != null) {
+                    msg.setText(getString(R.string.friction_kick_home_message));
+                    msg.setVisibility(View.VISIBLE);
                 }
-                
-                if (activeStickyPackage != null && dopamineBudgetEngine.getRemainingBudget() <= 0 && isForbiddenConfirmed) {
-                    Log.d(TAG, "Applying overdraw friction (hiccup)");
-                    performGlobalAction(GLOBAL_ACTION_BACK);
-                    postFrictionTicker(token);
-                } else {
-                    isFrictionRunning = false;
+            } else {
+                // Occasionally show a generic message
+                if (Math.random() < 0.5) {
+                    if (msg != null) {
+                        int[] hintResIds = {
+                                R.string.friction_hint_pause,
+                                R.string.friction_hint_enough,
+                                R.string.friction_hint_tired,
+                                R.string.friction_hint_breathe
+                        };
+                        msg.setText(getString(hintResIds[(int)(Math.random() * hintResIds.length)]));
+                        msg.setVisibility(View.VISIBLE);
+                    }
                 }
             }
-        }, 15000);
+
+            try {
+                windowManager.addView(frictionOverlay, params);
+                
+                // Randomize duration between 1s and 10s based on intensity
+                long duration = 1000 + (long) (Math.random() * intensity * 9000);
+                
+                frictionOverlayHandler.postDelayed(() -> {
+                    hideFrictionOverlay();
+                    if (shouldKickHome && activeStickyPackage != null) {
+                        Log.d(TAG, "Friction: Kicking to HOME");
+                        performGlobalAction(GLOBAL_ACTION_HOME);
+                    }
+                }, duration);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to add friction overlay", e);
+                frictionOverlay = null;
+            }
+        });
+    }
+
+    private void hideFrictionOverlay() {
+        if (frictionOverlay != null) {
+            try {
+                windowManager.removeView(frictionOverlay);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to remove friction overlay", e);
+            }
+            frictionOverlay = null;
+        }
     }
 
     public static void notifyGateClosed() {
@@ -129,7 +211,9 @@ public class AttentionFirewallService extends AccessibilityService {
         updateStatsNotification();
 
         AccessibilityServiceInfo info = new AccessibilityServiceInfo();
-        info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED | AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED;
+        info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED | 
+                         AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED | 
+                         AccessibilityEvent.TYPE_VIEW_SCROLLED;
         info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC;
         info.flags = AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS | AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
         setServiceInfo(info);
@@ -270,6 +354,14 @@ public class AttentionFirewallService extends AccessibilityService {
         if (eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED || eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             handleUrlInterception(packageName, eventType);
         }
+
+        // Apply stochastic occlusion friction
+        if (isFrictionRunning && isForbiddenConfirmed) {
+            if (eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED || 
+                eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
+                applyOverlayFriction();
+            }
+        }
         
         if (activeStickyPackage != null) {
             checkLiveBudgetExhaustion();
@@ -291,7 +383,6 @@ public class AttentionFirewallService extends AccessibilityService {
                 return;
             }
             if (dopamineBudgetEngine.getRemainingBudget() <= 0 && !isApprovedPackage(packageName)) {
-                performGlobalAction(GLOBAL_ACTION_BACK);
                 triggerDecisionGate();
                 return;
             }
@@ -355,7 +446,6 @@ public class AttentionFirewallService extends AccessibilityService {
                 if (System.currentTimeMillis() - lastDecisionGateTime < DECISION_COOLDOWN_MS) return;
 
                 if (dopamineBudgetEngine.getRemainingBudget() <= 0 && activeStickyPackage == null) {
-                    performGlobalAction(GLOBAL_ACTION_BACK);
                     triggerDecisionGate();
                     return;
                 }
@@ -394,7 +484,10 @@ public class AttentionFirewallService extends AccessibilityService {
         long now = System.currentTimeMillis();
 
         if (isForbidden) {
-            isForbiddenConfirmed = true;
+            if (!isForbiddenConfirmed) {
+                isForbiddenConfirmed = true;
+                forbiddenConfirmedAt = now;
+            }
             if (lastForbiddenStartTime == 0) {
                 lastForbiddenStartTime = now;
                 notificationHandler.post(notificationTicker);
@@ -402,8 +495,6 @@ public class AttentionFirewallService extends AccessibilityService {
             
             if (dopamineBudgetEngine.getRemainingBudget() <= 0 && !isFrictionRunning) {
                 isFrictionRunning = true;
-                frictionSessionToken++;
-                postFrictionTicker(frictionSessionToken);
             }
         } else {
             if (lastForbiddenStartTime != 0) {
@@ -414,8 +505,9 @@ public class AttentionFirewallService extends AccessibilityService {
             
             // Invalidate friction when exiting forbidden state
             isFrictionRunning = false;
-            frictionSessionToken++;
-            frictionHandler.removeCallbacksAndMessages(null);
+            isForbiddenConfirmed = false;
+            forbiddenConfirmedAt = 0;
+            hideFrictionOverlay();
         }
     }
 
@@ -447,10 +539,8 @@ public class AttentionFirewallService extends AccessibilityService {
         
         accumulatedForbiddenTimeMs = 0;
         isForbiddenConfirmed = false;
+        forbiddenConfirmedAt = 0;
         lastForbiddenStartTime = 0; 
-        
-        // Removed: updateForbiddenTimer(true); 
-        // Forbidden time starts only when content is confirmed.
         
         dopamineBudgetEngine.incrementSessionCount();
     }
@@ -468,8 +558,9 @@ public class AttentionFirewallService extends AccessibilityService {
         
         // Final invalidation
         isFrictionRunning = false;
-        frictionSessionToken++;
-        frictionHandler.removeCallbacksAndMessages(null);
+        isForbiddenConfirmed = false;
+        forbiddenConfirmedAt = 0;
+        hideFrictionOverlay();
         notificationHandler.removeCallbacks(notificationTicker);
         updateStatsNotification();
     }
@@ -506,6 +597,13 @@ public class AttentionFirewallService extends AccessibilityService {
 
     private void triggerDecisionGate() {
         lastDecisionGateTime = System.currentTimeMillis();
+        
+        // Safety: If we are in a sticky session, we MUST end it now so the Gate
+        // foreground state doesn't inherit any friction or sticky tracking.
+        if (activeStickyPackage != null) {
+            endStickySession();
+        }
+
         Intent intent = new Intent(this, DecisionGateActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         startActivity(intent);
@@ -556,7 +654,14 @@ public class AttentionFirewallService extends AccessibilityService {
         return null;
     }
 
-    @Override public void onInterrupt() {}
+    @Override public void onInterrupt() {
+        hideFrictionOverlay();
+    }
+
+    @Override public void onDestroy() {
+        super.onDestroy();
+        hideFrictionOverlay();
+    }
 
     private static class SupportedBrowserConfig {
         public String packageName;

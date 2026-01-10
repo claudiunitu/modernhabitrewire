@@ -64,4 +64,11 @@
     
     <string name="help_security_title">Security &amp; Friction</string>
     <string name="help_security_content">The Deactivation Key prevents you from changing settings or deactivating the blocker in moments of low impulse control. The Decision Gate introduces a mandatory wait time before accessing restricted apps.</string>
+
+    <!-- Friction Overlay Strings -->
+    <string name="friction_kick_home_message">I will get you out of here</string>
+    <string name="friction_hint_pause">Pause.</string>
+    <string name="friction_hint_enough">Enough.</string>
+    <string name="friction_hint_tired">You\'re tired.</string>
+    <string name="friction_hint_breathe">Breathe.</string>
 </resources>
