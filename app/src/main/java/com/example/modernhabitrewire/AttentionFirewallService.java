@@ -22,8 +22,10 @@ import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class AttentionFirewallService extends AccessibilityService {
@@ -53,7 +55,22 @@ public class AttentionFirewallService extends AccessibilityService {
     
     // Forced Cleanup / Lockout Logic
     private boolean isBudgetLockedOut = false;
+    private boolean wasNegativeAtSessionStart = false; 
     
+    // Foreground Ownership Tracking
+    private String lastForegroundPackage = null;
+    private long lastForegroundChangeTime = 0;
+    private static final long FOREGROUND_DEBOUNCE_MS = 300;
+
+    // URL Stability & Cooldown Logic
+    private final Map<String, String> lastObservedUrls = new HashMap<>();
+    private final Map<String, Long> lastUrlChangeTimes = new HashMap<>();
+    private static final long URL_STABLE_MS = 800;
+    
+    // Shared cooldown to prevent browser loops
+    private static long lastDecisionGateTime = 0;
+    private static final long DECISION_COOLDOWN_MS = 5000;
+
     private final Set<String> installedImePackages = new HashSet<>();
     private final Set<String> launcherPackages = new HashSet<>();
     private List<SupportedBrowserConfig> supportedBrowsers;
@@ -68,6 +85,28 @@ public class AttentionFirewallService extends AccessibilityService {
             }
         }
     };
+
+    // Friction Handler for Overdraw
+    private boolean isFrictionRunning = false;
+    private final Handler frictionHandler = new Handler(Looper.getMainLooper());
+    private final Runnable frictionTicker = new Runnable() {
+        @Override
+        public void run() {
+            // Apply friction if the budget is <= 0 AND we are confirmed in forbidden zone
+            if (activeStickyPackage != null && dopamineBudgetEngine.getRemainingBudget() <= 0 && isForbiddenConfirmed) {
+                Log.d(TAG, "Applying overdraw friction (hiccup)");
+                performGlobalAction(GLOBAL_ACTION_BACK);
+                frictionHandler.postDelayed(this, 15000); 
+            } else {
+                isFrictionRunning = false;
+            }
+        }
+    };
+
+    public static void notifyGateClosed() {
+        lastDecisionGateTime = System.currentTimeMillis();
+        Log.d(TAG, "Gate closure notified. Cooldown reset.");
+    }
 
     @Override
     protected void onServiceConnected() {
@@ -110,7 +149,6 @@ public class AttentionFirewallService extends AccessibilityService {
             long currentSegmentMs = (lastForbiddenStartTime == 0) ? 0 : (System.currentTimeMillis() - lastForbiddenStartTime);
             long totalMs = accumulatedForbiddenTimeMs + currentSegmentMs;
             
-            // Realtime cost and instantaneous multiplier
             sessionForbiddenUnits = dopamineBudgetEngine.calculateEscalatedCost(totalMs);
             currentInstantMultiplier = dopamineBudgetEngine.calculateInstantaneousMultiplier(totalMs);
         }
@@ -170,13 +208,11 @@ public class AttentionFirewallService extends AccessibilityService {
         String packageName = event.getPackageName().toString();
         int eventType = event.getEventType();
 
-        // 1. SELF-EXCLUSION DETOUR
         if (packageName.equals(APP_PACKAGE)) {
             updateStatsNotification();
             return;
         }
 
-        // 2. HARD LOCK (Uninstall/Admin Protection)
         if (appPreferencesManager.getForbidSettingsSwitchValue() && DANGER_PACKAGES.contains(packageName)) {
             if (isDangerZoneActive()) {
                 performGlobalAction(GLOBAL_ACTION_HOME);
@@ -184,59 +220,49 @@ public class AttentionFirewallService extends AccessibilityService {
             }
         }
 
-        // 3. FIREWALL MASTER TOGGLE
         if (!appPreferencesManager.getIsBlockerActive()) {
             updateStatsNotification();
             return;
         }
 
-        // 4. APPROVAL HANDLING (Transition from Decision Gate)
+        long now = System.currentTimeMillis();
+        boolean isNewForeground = lastForegroundPackage == null || !packageName.equals(lastForegroundPackage);
+
+        if (isNewForeground && (now - lastForegroundChangeTime > FOREGROUND_DEBOUNCE_MS)) {
+            lastForegroundPackage = packageName;
+            lastForegroundChangeTime = now;
+            onForegroundAppChanged(packageName);
+        }
+
         if (appPreferencesManager.getTempAllowAppLaunch()) {
             if (isApprovedPackage(packageName)) {
-                Log.d(TAG, "Sticky session START for approved package: " + packageName);
                 appPreferencesManager.setTempAllowAppLaunch(false);
                 startStickySession(packageName);
                 return; 
             }
-            
-            if (!event.isFullScreen() || isTransientSystemOverlay(packageName) || isLauncherPackage(packageName)) {
-                return; 
-            }
-            
-            if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-                appPreferencesManager.setTempAllowAppLaunch(false);
-            }
+            if (isTransientSystemOverlay(packageName) || isLauncherPackage(packageName)) return; 
+            if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) appPreferencesManager.setTempAllowAppLaunch(false);
         }
 
-        // 5. SESSION WATCHDOG & TERMINATION
         if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             boolean isTransient = isTransientSystemOverlay(packageName);
             boolean isLauncher = isLauncherPackage(packageName);
             boolean isExtractive = appPreferencesManager.getExtractiveAppsPackages().contains(packageName);
             
             if (activeStickyPackage != null) {
-                if (event.isFullScreen() && !packageName.equals(activeStickyPackage) && !isTransient) {
-                    Log.d(TAG, "Watchdog: Ending session for " + activeStickyPackage + " due to switch to " + packageName);
+                if (!packageName.equals(activeStickyPackage) && !isTransient) {
                     endStickySession();
-                    // Move to safe context clears lockout
-                    if (!isExtractive && !isLauncher) {
-                        isBudgetLockedOut = false;
-                    }
+                    if (!isExtractive && !isLauncher) isBudgetLockedOut = false;
                 }
             } else if (!isTransient && !isLauncher && !isExtractive) {
-                // Moving to a truly safe app clears the lockout
                 isBudgetLockedOut = false;
             }
         }
 
-        // 6. INTERCEPTION & MONITORING
-        if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            handleAppInterception(packageName);
-        } else if (eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
-            handleUrlInterception(packageName);
+        if (eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED || eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            handleUrlInterception(packageName, eventType);
         }
         
-        // 7. LIVE BUDGET ENFORCEMENT
         if (activeStickyPackage != null) {
             checkLiveBudgetExhaustion();
         }
@@ -244,56 +270,43 @@ public class AttentionFirewallService extends AccessibilityService {
         updateStatsNotification();
     }
 
+    private void onForegroundAppChanged(String packageName) {
+        if (isTransientSystemOverlay(packageName) || isLauncherPackage(packageName)) return;
+        handleAppInterception(packageName);
+    }
+
     private void handleAppInterception(String packageName) {
         List<String> extractiveApps = appPreferencesManager.getExtractiveAppsPackages();
-        
-        // Guard: If we are locked out, allow extractive apps to open passively (no blocking, no timer)
-        if (isBudgetLockedOut && activeStickyPackage == null) {
-            Log.d(TAG, "Passive state: letting extractive app launch without intercepting.");
-            return;
-        }
-
         if (extractiveApps.contains(packageName)) {
-            if (activeStickyPackage != null && activeStickyPackage.equals(packageName)) {
+            if (activeStickyPackage != null && packageName.equals(activeStickyPackage)) {
                 updateForbiddenTimer(true);
                 return;
             }
-
-            dopamineBudgetEngine.resetBudgetIfNeeded();
-            if (dopamineBudgetEngine.hasBudget()) {
-                appPreferencesManager.setLastInterceptedApp(packageName);
-                appPreferencesManager.setLastInterceptedUrl(""); 
+            if (dopamineBudgetEngine.getRemainingBudget() <= 0 && !isApprovedPackage(packageName)) {
+                performGlobalAction(GLOBAL_ACTION_BACK);
                 triggerDecisionGate();
-            } else {
-                Log.d(TAG, "No budget for app launch. Forcing lockout.");
-                isBudgetLockedOut = true;
-                performGlobalAction(GLOBAL_ACTION_HOME);
+                return;
             }
+            dopamineBudgetEngine.resetBudgetIfNeeded();
+            appPreferencesManager.setLastInterceptedApp(packageName);
+            appPreferencesManager.setLastInterceptedUrl(""); 
+            triggerDecisionGate();
         }
     }
 
-    private void handleUrlInterception(String packageName) {
+    private void handleUrlInterception(String packageName, int eventType) {
         for (SupportedBrowserConfig config : supportedBrowsers) {
             if (packageName.equals(config.packageName)) {
-                checkBrowserUrl(config);
+                checkBrowserUrl(config, eventType);
                 return;
             }
         }
     }
 
-    private void checkBrowserUrl(SupportedBrowserConfig config) {
-        // Guard: If locked out and not in a session, ignore browser completely
-        if (isBudgetLockedOut && activeStickyPackage == null) {
-            return;
-        }
-
+    private void checkBrowserUrl(SupportedBrowserConfig config, int eventType) {
         AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return;
-        
-        CharSequence rootPackage = root.getPackageName();
-        if (rootPackage == null || !rootPackage.toString().equals(config.packageName)) {
-            return;
-        }
+        if (root.getPackageName() == null || !root.getPackageName().toString().equals(config.packageName)) return;
 
         AccessibilityNodeInfo bar = null;
         for (String id : config.addressBarIds) {
@@ -303,13 +316,22 @@ public class AttentionFirewallService extends AccessibilityService {
                 break;
             }
         }
-        
-        if (bar == null) {
-            bar = findUrlBarByContentDescription(root);
-        }
+        if (bar == null) bar = findUrlBarByContentDescription(root);
 
         if (bar != null && bar.getText() != null) {
             String currentUrl = bar.getText().toString().toLowerCase().trim();
+            long now = System.currentTimeMillis();
+
+            String prev = lastObservedUrls.get(config.packageName);
+            if (!currentUrl.equals(prev)) {
+                lastObservedUrls.put(config.packageName, currentUrl);
+                lastUrlChangeTimes.put(config.packageName, now);
+                return; 
+            }
+
+            long lastChange = lastUrlChangeTimes.getOrDefault(config.packageName, 0L);
+            if (now - lastChange < URL_STABLE_MS) return; 
+
             String matchedPattern = null;
             for (String pattern : appPreferencesManager.getForbiddenUrls()) {
                 String cleanPattern = pattern.toLowerCase().trim();
@@ -319,10 +341,14 @@ public class AttentionFirewallService extends AccessibilityService {
                 }
             }
 
-            if (matchedPattern != null) {
-                // If we are already locked out, do NOT trigger redirects again
-                if (isBudgetLockedOut) {
-                    performGlobalAction(GLOBAL_ACTION_HOME);
+            boolean committed = !bar.isFocused() || eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED;
+
+            if (matchedPattern != null && committed) {
+                if (System.currentTimeMillis() - lastDecisionGateTime < DECISION_COOLDOWN_MS) return;
+
+                if (dopamineBudgetEngine.getRemainingBudget() <= 0 && activeStickyPackage == null) {
+                    performGlobalAction(GLOBAL_ACTION_BACK);
+                    triggerDecisionGate();
                     return;
                 }
 
@@ -335,94 +361,90 @@ public class AttentionFirewallService extends AccessibilityService {
                     }
                 } else if (activeStickyPackage == null) {
                     dopamineBudgetEngine.resetBudgetIfNeeded();
-                    if (dopamineBudgetEngine.hasBudget()) {
-                        appPreferencesManager.setLastInterceptedApp(config.packageName);
-                        appPreferencesManager.setLastInterceptedUrl(matchedPattern);
-                        triggerDecisionGate();
-                    } else {
-                        Log.d(TAG, "No budget for URL launch. Forcing lockout.");
-                        isBudgetLockedOut = true;
-                        performGlobalAction(GLOBAL_ACTION_HOME);
-                    }
+                    appPreferencesManager.setLastInterceptedApp(config.packageName);
+                    appPreferencesManager.setLastInterceptedUrl(matchedPattern);
+                    triggerDecisionGate();
                 }
             } else {
-                // Explicit safety evidence: navigated away from forbidden content
-                isBudgetLockedOut = false;
-                confirmSafeState();
+                if (matchedPattern == null && activeStickyPackage != null && !bar.isFocused()) {
+                    isBudgetLockedOut = false;
+                    confirmSafeState(config.packageName);
+                }
             }
         }
     }
 
-    private void confirmSafeState() {
+    private void confirmSafeState(String packageName) {
         if (!isForbiddenConfirmed) return;
-
-        Log.d(TAG, "SAFE CONFIRMED → Pausing forbidden timer");
         isForbiddenConfirmed = false;
+        lastObservedUrls.remove(packageName);
         updateForbiddenTimer(false);
     }
 
     private void updateForbiddenTimer(boolean isForbidden) {
         if (activeStickyPackage == null) isForbidden = false;
+        long now = System.currentTimeMillis();
 
         if (isForbidden) {
             isForbiddenConfirmed = true;
-        }
-
-        long now = System.currentTimeMillis();
-        if (isForbidden) {
             if (lastForbiddenStartTime == 0) {
                 lastForbiddenStartTime = now;
                 notificationHandler.post(notificationTicker);
+            }
+            // Logic Fixed: Only post if friction is not already running
+            if (dopamineBudgetEngine.getRemainingBudget() <= 0 && !isFrictionRunning) {
+                isFrictionRunning = true;
+                frictionHandler.removeCallbacks(frictionTicker);
+                frictionHandler.postDelayed(frictionTicker, 15000);
             }
         } else {
             if (lastForbiddenStartTime != 0) {
                 accumulatedForbiddenTimeMs += (now - lastForbiddenStartTime);
                 lastForbiddenStartTime = 0;
                 notificationHandler.removeCallbacks(notificationTicker);
+                
+                isFrictionRunning = false;
+                frictionHandler.removeCallbacks(frictionTicker);
             }
         }
     }
 
     private void checkLiveBudgetExhaustion() {
-        if (activeStickyPackage == null) return;
+        if (activeStickyPackage == null || isBudgetLockedOut || wasNegativeAtSessionStart) return;
         
         long remainingUnits = dopamineBudgetEngine.getRemainingBudget();
         long currentForbiddenSegmentMs = (lastForbiddenStartTime == 0) ? 0 : (System.currentTimeMillis() - lastForbiddenStartTime);
         long totalForbiddenTimeMs = accumulatedForbiddenTimeMs + currentForbiddenSegmentMs;
         
-        // Use the centralized escalation formula for live enforcement
         long unitCost = dopamineBudgetEngine.calculateEscalatedCost(totalForbiddenTimeMs);
 
         if (remainingUnits <= 0 || unitCost >= remainingUnits) {
-            Log.d(TAG, "LIVE BUDGET EXHAUSTED. Forcing lockout and cleanup.");
             isBudgetLockedOut = true;
+            appPreferencesManager.setLastInterceptedApp(activeStickyPackage);
             endStickySession();
-            performGlobalAction(GLOBAL_ACTION_HOME);
+            triggerDecisionGate();
         }
     }
 
     private void startStickySession(String packageName) {
-        isBudgetLockedOut = false; // Fresh session clears lockout
-        String interceptedUrl = appPreferencesManager.getLastInterceptedUrl();
-        
-        if (activeStickyPackage != null && activeStickyPackage.equals(packageName)) {
-            if (!interceptedUrl.isEmpty()) sessionApprovedPatterns.add(interceptedUrl);
-            return;
-        }
+        isBudgetLockedOut = false; 
+        wasNegativeAtSessionStart = (dopamineBudgetEngine.getRemainingBudget() <= 0);
 
         activeStickyPackage = packageName;
         sessionApprovedPatterns.clear();
+        String interceptedUrl = appPreferencesManager.getLastInterceptedUrl();
         if (!interceptedUrl.isEmpty()) sessionApprovedPatterns.add(interceptedUrl);
         
         accumulatedForbiddenTimeMs = 0;
         isForbiddenConfirmed = false;
-        lastForbiddenStartTime = System.currentTimeMillis();
-        notificationHandler.post(notificationTicker);
+        lastForbiddenStartTime = 0; 
+        
+        updateForbiddenTimer(true);
+        
         dopamineBudgetEngine.incrementSessionCount();
     }
 
     private void endStickySession() {
-        isForbiddenConfirmed = false;
         updateForbiddenTimer(false);
         if (accumulatedForbiddenTimeMs > 0) {
             dopamineBudgetEngine.depleteBudget(accumulatedForbiddenTimeMs);
@@ -431,6 +453,9 @@ public class AttentionFirewallService extends AccessibilityService {
         sessionApprovedPatterns.clear();
         accumulatedForbiddenTimeMs = 0;
         lastForbiddenStartTime = 0;
+        wasNegativeAtSessionStart = false; 
+        isFrictionRunning = false;
+        frictionHandler.removeCallbacks(frictionTicker);
         notificationHandler.removeCallbacks(notificationTicker);
         updateStatsNotification();
     }
@@ -446,7 +471,7 @@ public class AttentionFirewallService extends AccessibilityService {
         return isSystemUiOverlay(packageName) || 
                packageName.contains("permissioncontroller") || packageName.contains("inputmethod") || 
                packageName.contains("latin") || packageName.contains("keyboard") || 
-               packageName.contains("board") || packageName.contains("ime") || packageName.equals("com.android.settings");
+               packageName.contains("board") || packageName.contains("ime");
     }
 
     private boolean isSystemUiOverlay(String packageName) {
@@ -459,7 +484,6 @@ public class AttentionFirewallService extends AccessibilityService {
     private boolean isLauncherPackage(String packageName) {
         if (packageName == null) return false;
         if (launcherPackages.contains(packageName)) return true;
-        
         String p = packageName.toLowerCase();
         return p.contains("launcher") || p.contains("trebuchet") || p.contains("home") || 
                p.contains("nexuslauncher") || p.contains("miui.home") || p.contains("pixel") ||
@@ -467,6 +491,7 @@ public class AttentionFirewallService extends AccessibilityService {
     }
 
     private void triggerDecisionGate() {
+        lastDecisionGateTime = System.currentTimeMillis();
         Intent intent = new Intent(this, DecisionGateActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         startActivity(intent);
@@ -480,7 +505,7 @@ public class AttentionFirewallService extends AccessibilityService {
             boolean isDestructive = findTextRecursive(root, "info") || findTextRecursive(root, "details") || 
                                     findTextRecursive(root, "storage") || findTextRecursive(root, "admin") || 
                                     findTextRecursive(root, "service") || findTextRecursive(root, "off");
-            if (isDestructive) { return true; }
+            if (isDestructive) return true;
         }
         return false;
     }
@@ -491,7 +516,7 @@ public class AttentionFirewallService extends AccessibilityService {
         if (node.getContentDescription() != null && node.getContentDescription().toString().toLowerCase().contains(text.toLowerCase())) return true;
         for (int i = 0; i < node.getChildCount(); i++) {
             AccessibilityNodeInfo child = node.getChild(i);
-            if (findTextRecursive(child, text)) { return true; }
+            if (findTextRecursive(child, text)) return true;
         }
         return false;
     }

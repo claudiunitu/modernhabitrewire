@@ -48,6 +48,8 @@
     <string name="set_key_first">Set key first</string>
     <string name="cannot_be_empty">Cannot be empty</string>
     <string name="all_stats_reset">All stats reset</string>
+    <string name="budget_exhausted_overdraw">WITHDRAW FROM TOMORROW</string>
+    <string name="gate_action_go_back">Go Back</string>
 
     <!-- Help Page Strings -->
     <string name="help_title">Help &amp; Guide</string>

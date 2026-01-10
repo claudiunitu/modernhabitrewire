@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -19,8 +20,10 @@ public class DecisionGateActivity extends AppCompatActivity {
     private TextView statsTextView;
     private TextView frictionTextView;
     private Button proceedButton;
+    private Button cancelButton;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private int countdownSeconds = 0;
+    private boolean isExhaustedMode = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,12 +36,12 @@ public class DecisionGateActivity extends AppCompatActivity {
         statsTextView = findViewById(R.id.awareness_mirror_stats);
         frictionTextView = findViewById(R.id.friction_status);
         proceedButton = findViewById(R.id.proceed_button);
-        Button cancelButton = findViewById(R.id.cancel_button);
+        cancelButton = findViewById(R.id.cancel_button);
 
         updateAwarenessMirror();
 
         proceedButton.setOnClickListener(v -> {
-            if (appPreferencesManager.getLaunchFrictionEnabled()) {
+            if (appPreferencesManager.getLaunchFrictionEnabled() || isExhaustedMode) {
                 startFrictionDelay();
             } else {
                 launchTargetApp();
@@ -47,11 +50,7 @@ public class DecisionGateActivity extends AppCompatActivity {
 
         cancelButton.setOnClickListener(v -> {
             handler.removeCallbacksAndMessages(null);
-            Intent homeIntent = new Intent(Intent.ACTION_MAIN);
-            homeIntent.addCategory(Intent.CATEGORY_HOME);
-            homeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(homeIntent);
-            finish();
+            goHome();
         });
     }
 
@@ -65,17 +64,17 @@ public class DecisionGateActivity extends AppCompatActivity {
 
         statsTextView.setText(stats);
 
-        // Enforce potential limits: disable proceed if no credits left
         if (remainingUnits <= 0) {
-            proceedButton.setEnabled(false);
-            proceedButton.setText(R.string.potential_depleted);
+            isExhaustedMode = true;
+            proceedButton.setText(R.string.budget_exhausted_overdraw);
         }
     }
 
     private void startFrictionDelay() {
-        proceedButton.setEnabled(false);
+        proceedButton.setVisibility(View.GONE);
+        cancelButton.setText(R.string.gate_action_go_back);
         
-        // Delegate calculation to budgetEngine
+        // Use budget engine to calculate latency (higher multiplier in overdraw still applies)
         countdownSeconds = budgetEngine.calculateWaitSeconds();
         
         frictionTextView.setVisibility(View.VISIBLE);
@@ -95,7 +94,6 @@ public class DecisionGateActivity extends AppCompatActivity {
     private void launchTargetApp() {
         appPreferencesManager.setTempAllowAppLaunch(true);
         
-        // Explicitly re-launch the target package (Browser or App) to force task switching
         String targetPackage = appPreferencesManager.getLastInterceptedApp();
         if (targetPackage != null && !targetPackage.isEmpty()) {
             Intent intent = getPackageManager().getLaunchIntentForPackage(targetPackage);
@@ -104,6 +102,17 @@ public class DecisionGateActivity extends AppCompatActivity {
                 startActivity(intent);
             }
         }
+        
+        finish();
+    }
+
+    private void goHome() {
+        AttentionFirewallService.notifyGateClosed();
+        
+        Intent homeIntent = new Intent(Intent.ACTION_MAIN);
+        homeIntent.addCategory(Intent.CATEGORY_HOME);
+        homeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(homeIntent);
         
         finish();
     }

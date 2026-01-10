@@ -10,7 +10,8 @@ import java.util.Locale;
 /**
  * The Engine handles the "Dopamine Units" (DU) system.
  * 1 DU = 1 second of physical time at a variable multiplier.
- * Modified to use Adaptive Depletion based on session duration statistics.
+ * Modified to support Cumulative Daily Resets. Mathematical overdraw penalties removed
+ * in favor of structural friction in the Firewall.
  */
 public class DopamineBudgetEngine {
 
@@ -21,10 +22,6 @@ public class DopamineBudgetEngine {
         this.appPreferencesManager = AppPreferencesManagerSingleton.getInstance(context);
     }
 
-    /**
-     * Checks if a new day has started and resets stats if necessary.
-     * Called at the start of major engine operations.
-     */
     public void resetBudgetIfNeeded() {
         String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
         String lastResetDate = appPreferencesManager.getLastBudgetResetDate();
@@ -35,29 +32,32 @@ public class DopamineBudgetEngine {
     }
     
     public void forceResetBudget(String dateString) {
-        long totalUnits = appPreferencesManager.getDailyAllowanceUnits();
-        appPreferencesManager.setRemainingPotentialUnits(totalUnits);
+        long dailyAllowance = appPreferencesManager.getDailyAllowanceUnits();
+        long currentRemaining = appPreferencesManager.getRemainingPotentialUnits();
+        
+        // Cumulative reset: Allowance is added to the current balance (carry-over debt)
+        long newTotal = currentRemaining + dailyAllowance;
+        
+        appPreferencesManager.setRemainingPotentialUnits(newTotal);
         appPreferencesManager.setDailySessionCount(0);
         appPreferencesManager.setLastBudgetResetDate(dateString);
         
-        // Reset adaptive tracked stats daily
         appPreferencesManager.setDailyForbiddenTimeMs(0);
         appPreferencesManager.setDailySessionTimeSumMs(0);
         appPreferencesManager.setCompulsionIndexC(0.0f);
         
-        Log.d(TAG, "Full budget reset. Adaptive stats cleared. Potential restored to: " + totalUnits + " DU");
+        Log.d(TAG, "Cumulative budget reset. New Potential: " + newTotal + " DU");
     }
 
     public void updateRemainingBudgetOnly() {
         long totalUnits = appPreferencesManager.getDailyAllowanceUnits();
         appPreferencesManager.setRemainingPotentialUnits(totalUnits);
-        Log.d(TAG, "Potential updated to: " + totalUnits + " DU");
     }
 
     public void resetAllStats() {
         String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+        appPreferencesManager.setRemainingPotentialUnits(0);
         forceResetBudget(today);
-        Log.d(TAG, "All stats reset manually.");
     }
 
     public boolean hasBudget() {
@@ -65,42 +65,29 @@ public class DopamineBudgetEngine {
         return appPreferencesManager.getRemainingPotentialUnits() > 0;
     }
 
-    /**
-     * Calculates the entry multiplier (F_entry) for the current session.
-     */
     public double calculateCurrentMultiplier() {
         int sessionCount = appPreferencesManager.getDailySessionCount();
         float f0 = appPreferencesManager.getCostIncrementFactor();
         float c = appPreferencesManager.getCompulsionIndexC();
         
-        // Match Day 1 protection logic used in depleteBudget
         if (sessionCount < 3) {
             c = Math.min(c, 0.3f);
         }
 
-        // F_entry formula
+        // Default behavior (no overdraw math penalties)
         return f0 + (0.5 + 0.5 * c) * sessionCount;
     }
 
-    /**
-     * Calculates the interaction latency (wait time) required before access.
-     * Uses a logarithmic scaling to interrupt impulsive behavior without emotional overload.
-     */
     public int calculateWaitSeconds() {
         double baseWaitSeconds = appPreferencesManager.getBaseWaitTimeSeconds();
         double factor = calculateCurrentMultiplier();
 
-        // Target formula (exact): Logarithmic scaling based on factor
-        // Rationale: Provides strong impulse brake early, then flattens to preserve user agency.
+        // Default behavior: Logarithmic scaling based on factor
         double waitSeconds = baseWaitSeconds * (1.0 + Math.log(factor) / Math.log(2.0));
 
         return (int) Math.round(waitSeconds);
     }
 
-    /**
-     * Calculates the instantaneous multiplier at a specific point in the session.
-     * M(t) = F_entry + alpha * seconds
-     */
     public double calculateInstantaneousMultiplier(long timeSpentMillis) {
         int sessionCount = appPreferencesManager.getDailySessionCount();
         float c = appPreferencesManager.getCompulsionIndexC();
@@ -109,17 +96,12 @@ public class DopamineBudgetEngine {
         }
 
         double fEntry = calculateCurrentMultiplier();
-        // alpha = (0.001 + 0.005 * C) * graceMultiplier
         double alpha = (0.001 + 0.005 * c) * appPreferencesManager.getGraceMultiplier();
+        
         double seconds = timeSpentMillis / 1000.0;
-
         return fEntry + (alpha * seconds);
     }
 
-    /**
-     * Calculates the total escalated cost for a given duration without updating state.
-     * Used for realtime notification and live enforcement.
-     */
     public long calculateEscalatedCost(long timeSpentMillis) {
         int sessionCount = appPreferencesManager.getDailySessionCount();
         float c = appPreferencesManager.getCompulsionIndexC();
@@ -128,60 +110,39 @@ public class DopamineBudgetEngine {
         }
 
         double fEntry = calculateCurrentMultiplier();
-        // alpha = (0.001 + 0.005 * C) * graceMultiplier
         double alpha = (0.001 + 0.005 * c) * appPreferencesManager.getGraceMultiplier();
+        
         double seconds = timeSpentMillis / 1000.0;
-
-        // Sum of arithmetic progression: seconds * fEntry + alpha * [seconds * (seconds - 1) / 2]
         long unitCost = Math.round(seconds * fEntry + alpha * (seconds * (seconds - 1) / 2.0));
         return Math.max(1, unitCost);
     }
 
-    /**
-     * Depletes budget using adaptive logic and in-session escalation.
-     * Assumes it is called ONCE at the end of a forbidden session.
-     * @param timeSpentMillis The duration spent on forbidden content in the current session.
-     */
     public void depleteBudget(long timeSpentMillis) {
-        // 0. Initial state check and reset
         resetBudgetIfNeeded();
-        long remainingUnits = appPreferencesManager.getRemainingPotentialUnits();
-
-        // Budget exhaustion rule: Stop further depletion if already at 0
-        if (remainingUnits <= 0) {
-            Log.d(TAG, "Budget exhausted, engine is now passive.");
-            return;
-        }
-
-        // 1. Update Tracked Stats
+        
         long dailyForbidden = appPreferencesManager.getDailyForbiddenTimeMs() + timeSpentMillis;
         long dailySessionSum = appPreferencesManager.getDailySessionTimeSumMs() + timeSpentMillis;
         appPreferencesManager.setDailyForbiddenTimeMs(dailyForbidden);
         appPreferencesManager.setDailySessionTimeSumMs(dailySessionSum);
 
         int sessionCount = appPreferencesManager.getDailySessionCount();
-        // Safety: If somehow deplete is called without increment, treat as 1st session
         if (sessionCount <= 0) sessionCount = 1; 
 
-        // 2. Compute Adaptive Compulsion Index (C)
         double mu = (double) dailySessionSum / sessionCount;
         double T = (double) dailyForbidden;
         double R = (T == 0) ? 0 : (mu / T);
 
         float cPrev = appPreferencesManager.getCompulsionIndexC();
         float cNew = (float) Math.max(0.0, Math.min(1.0, (R - 0.05) / 0.45));
-        
         float c = 0.8f * cPrev + 0.2f * cNew;
-        // Persist raw C
         appPreferencesManager.setCompulsionIndexC(c);
 
-        // 3. Compute Cost with In-Session Escalation
         long unitCost = calculateEscalatedCost(timeSpentMillis);
 
-        remainingUnits = Math.max(0, remainingUnits - unitCost);
+        long remainingUnits = appPreferencesManager.getRemainingPotentialUnits();
+        remainingUnits -= unitCost;
         appPreferencesManager.setRemainingPotentialUnits(remainingUnits);
 
-        // Persist timestamp for recovery logic
         appPreferencesManager.setLastForbiddenTimestamp(System.currentTimeMillis());
 
         Log.d(TAG, String.format(Locale.US, 
@@ -195,17 +156,10 @@ public class DopamineBudgetEngine {
 
     public void incrementSessionCount() {
         resetBudgetIfNeeded();
-        if (appPreferencesManager.getRemainingPotentialUnits() <= 0) {
-            Log.d(TAG, "No budget remaining, skipping session count increment.");
-            return;
-        }
         int currentCount = appPreferencesManager.getDailySessionCount();
         appPreferencesManager.setDailySessionCount(currentCount + 1);
     }
 
-    /**
-     * Recovery logic: decays the base factor if the user has been "clean".
-     */
     public void decayFactorIfClean(long hoursSinceLastForbidden) {
         float c = appPreferencesManager.getCompulsionIndexC();
         double thresholdH = 24.0 - 18.0 * c;
@@ -214,7 +168,6 @@ public class DopamineBudgetEngine {
             float currentFactor = appPreferencesManager.getCostIncrementFactor();
             float decayStep = appPreferencesManager.getDecayStep();
             appPreferencesManager.setCostIncrementFactor(Math.max(1.0f, currentFactor - decayStep));
-            Log.d(TAG, "Recovery: Clean for " + hoursSinceLastForbidden + "h. Factor decayed by " + decayStep + " to " + appPreferencesManager.getCostIncrementFactor());
         }
     }
 }
