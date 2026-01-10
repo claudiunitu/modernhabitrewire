@@ -27,7 +27,30 @@ public class DopamineBudgetEngine {
         String lastResetDate = appPreferencesManager.getLastBudgetResetDate();
 
         if (!today.equals(lastResetDate)) {
+            checkDecayResponsive();
             forceResetBudget(today);
+        }
+    }
+
+    /**
+     * More responsive temporal decay. 
+     * Called on service connect, app switches, and daily resets.
+     */
+    public void checkDecayResponsive() {
+        long now = System.currentTimeMillis();
+        long lastForbidden = appPreferencesManager.getLastForbiddenTimestamp();
+        long lastDecay = appPreferencesManager.getLastDecayTimestamp();
+        
+        // Effective cleanliness start is either the last violation OR the last time decay was applied.
+        long effectiveSince = Math.max(lastForbidden, lastDecay);
+        
+        if (effectiveSince > 0) {
+            long diffMs = now - effectiveSince;
+            long diffHours = diffMs / (1000 * 60 * 60);
+            
+            if (decayFactorIfClean(diffHours)) {
+                appPreferencesManager.setLastDecayTimestamp(now);
+            }
         }
     }
     
@@ -44,7 +67,6 @@ public class DopamineBudgetEngine {
         
         appPreferencesManager.setDailyForbiddenTimeMs(0);
         appPreferencesManager.setDailySessionTimeSumMs(0);
-        appPreferencesManager.setCompulsionIndexC(0.0f);
         
         Log.d(TAG, "Cumulative budget reset. New Potential: " + newTotal + " DU");
     }
@@ -78,7 +100,6 @@ public class DopamineBudgetEngine {
             c = Math.min(c, 0.3f);
         }
 
-        // Default behavior (no overdraw math penalties)
         return f0 + (0.5 + 0.5 * c) * sessionCount;
     }
 
@@ -140,6 +161,9 @@ public class DopamineBudgetEngine {
         float cNew = (float) Math.max(0.0, Math.min(1.0, (R - 0.05) / 0.45));
         float c = 0.8f * cPrev + 0.2f * cNew;
         appPreferencesManager.setCompulsionIndexC(c);
+        
+        // Lock threshold to C at violation
+        appPreferencesManager.setCAtLastForbidden(c);
 
         long unitCost = calculateEscalatedCost(timeSpentMillis);
 
@@ -164,14 +188,29 @@ public class DopamineBudgetEngine {
         appPreferencesManager.setDailySessionCount(currentCount + 1);
     }
 
-    public void decayFactorIfClean(long hoursSinceLastForbidden) {
-        float c = appPreferencesManager.getCompulsionIndexC();
-        double thresholdH = 24.0 - 18.0 * c;
+    public boolean decayFactorIfClean(long hoursSinceLastForbidden) {
+        // Use the locked C from the last violation to determine threshold
+        float cLocked = appPreferencesManager.getCAtLastForbidden();
+        double thresholdH = 24.0 - 18.0 * cLocked;
         
         if (hoursSinceLastForbidden >= thresholdH) {
             float currentFactor = appPreferencesManager.getCostIncrementFactor();
             float decayStep = appPreferencesManager.getDecayStep();
-            appPreferencesManager.setCostIncrementFactor(Math.max(1.0f, currentFactor - decayStep));
+            float currentC = appPreferencesManager.getCompulsionIndexC();
+            
+            // Reward sustained recovery: more steps if clean for a long time.
+            int steps = (int) ((hoursSinceLastForbidden - thresholdH) / 12) + 1;
+            steps = Math.min(steps, 5); 
+            
+            float newFactor = Math.max(1.0f, currentFactor - (decayStep * steps));
+            float newC = Math.max(0.0f, currentC - (0.1f * steps));
+            
+            appPreferencesManager.setCostIncrementFactor(newFactor);
+            appPreferencesManager.setCompulsionIndexC(newC);
+            
+            Log.d(TAG, "Multi-step decay triggered. Steps: " + steps + " | New Factor: " + newFactor + " | New C: " + newC);
+            return true;
         }
+        return false;
     }
 }

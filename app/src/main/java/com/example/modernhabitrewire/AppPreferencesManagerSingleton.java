@@ -34,10 +34,22 @@ public class AppPreferencesManagerSingleton {
     private static final String KEY_DAILY_FORBIDDEN_TIME_MS = "daily_forbidden_time_ms";
     private static final String KEY_DAILY_SESSION_TIME_SUM_MS = "daily_session_time_sum_ms";
     private static final String KEY_COMPULSION_INDEX_C = "compulsion_index_c";
+    private static final String KEY_C_AT_LAST_FORBIDDEN = "c_at_last_forbidden";
     private static final String KEY_LAST_FORBIDDEN_TIMESTAMP = "last_forbidden_timestamp";
 
     private static final String KEY_DECAY_STEP = "decay_step";
     private static final String KEY_GRACE_MULTIPLIER = "grace_multiplier";
+    private static final String KEY_LAST_DECAY_TIMESTAMP = "last_decay_timestamp";
+
+    // Hostility Metrics
+    private static final String KEY_METRIC_FRICTION_SHOWN = "metric_friction_shown";
+    private static final String KEY_METRIC_FRICTION_ENDURED = "metric_friction_endured";
+    private static final String KEY_METRIC_FRICTION_ABORTED = "metric_friction_aborted";
+    private static final String KEY_METRIC_RETRY_LATENCY_SUM = "metric_retry_latency_sum";
+    private static final String KEY_METRIC_RETRY_COUNT = "metric_retry_count";
+
+    // Mercy Channel
+    private static final String KEY_MERCY_UNTIL_TIMESTAMP = "mercy_until_timestamp";
 
     private SharedPreferences prefs;
 
@@ -235,6 +247,14 @@ public class AppPreferencesManagerSingleton {
         prefs.edit().putFloat(KEY_COMPULSION_INDEX_C, c).apply();
     }
 
+    public float getCAtLastForbidden() {
+        return prefs.getFloat(KEY_C_AT_LAST_FORBIDDEN, 0.0f);
+    }
+
+    public void setCAtLastForbidden(float c) {
+        prefs.edit().putFloat(KEY_C_AT_LAST_FORBIDDEN, c).apply();
+    }
+
     public long getLastForbiddenTimestamp() {
         return prefs.getLong(KEY_LAST_FORBIDDEN_TIMESTAMP, 0);
     }
@@ -257,5 +277,42 @@ public class AppPreferencesManagerSingleton {
 
     public void setGraceMultiplier(float multiplier) {
         prefs.edit().putFloat(KEY_GRACE_MULTIPLIER, multiplier).apply();
+    }
+
+    public long getLastDecayTimestamp() {
+        return prefs.getLong(KEY_LAST_DECAY_TIMESTAMP, 0);
+    }
+
+    public void setLastDecayTimestamp(long timestamp) {
+        prefs.edit().putLong(KEY_LAST_DECAY_TIMESTAMP, timestamp).apply();
+    }
+
+    // Metric Increments
+    public void incrementFrictionShown() {
+        int val = prefs.getInt(KEY_METRIC_FRICTION_SHOWN, 0);
+        prefs.edit().putInt(KEY_METRIC_FRICTION_SHOWN, val + 1).apply();
+    }
+    public void incrementFrictionEndured() {
+        int val = prefs.getInt(KEY_METRIC_FRICTION_ENDURED, 0);
+        prefs.edit().putInt(KEY_METRIC_FRICTION_ENDURED, val + 1).apply();
+    }
+    public void incrementFrictionAborted() {
+        int val = prefs.getInt(KEY_METRIC_FRICTION_ABORTED, 0);
+        prefs.edit().putInt(KEY_METRIC_FRICTION_ABORTED, val + 1).apply();
+    }
+    public void recordRetryLatency(long ms) {
+        long sum = prefs.getLong(KEY_METRIC_RETRY_LATENCY_SUM, 0);
+        int count = prefs.getInt(KEY_METRIC_RETRY_COUNT, 0);
+        prefs.edit().putLong(KEY_METRIC_RETRY_LATENCY_SUM, sum + ms)
+                   .putInt(KEY_METRIC_RETRY_COUNT, count + 1)
+                   .apply();
+    }
+
+    // Mercy Logic
+    public void setMercyUntil(long timestamp) {
+        prefs.edit().putLong(KEY_MERCY_UNTIL_TIMESTAMP, timestamp).apply();
+    }
+    public long getMercyUntil() {
+        return prefs.getLong(KEY_MERCY_UNTIL_TIMESTAMP, 0);
     }
 }

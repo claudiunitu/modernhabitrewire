@@ -30,6 +30,7 @@ import androidx.core.app.NotificationCompat;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -98,22 +99,74 @@ public class AttentionFirewallService extends AccessibilityService {
     private View frictionOverlay = null;
     private WindowManager windowManager;
     private final Handler frictionOverlayHandler = new Handler(Looper.getMainLooper());
-    private static final long FRICTION_MIN_INTERVAL_MS = 5000;
+    private static final long FRICTION_MIN_INTERVAL_MS = 3000;
     private long lastOverlayTime = 0;
     private long overlayCooldownUntil = 0;
+    
+    // Safety Rail: Prevent UI Soft-brick / DoS
+    private static final long MAX_FRICTION_PER_MINUTE_MS = 25000; // 25s max friction per 60s
+    private final LinkedList<FrictionUsageRecord> frictionUsageHistory = new LinkedList<>();
+
+    private static class FrictionUsageRecord {
+        long startTime;
+        long duration;
+        FrictionUsageRecord(long s, long d) { this.startTime = s; this.duration = d; }
+    }
+
+    private boolean isWithinSafetyBounds() {
+        long now = System.currentTimeMillis();
+        long windowStart = now - 60000;
+        long totalDuration = 0;
+        
+        // Clean old records
+        while (!frictionUsageHistory.isEmpty() && frictionUsageHistory.peekFirst().startTime < windowStart) {
+            frictionUsageHistory.removeFirst();
+        }
+        
+        for (FrictionUsageRecord record : frictionUsageHistory) {
+            totalDuration += record.duration;
+        }
+        
+        return totalDuration < MAX_FRICTION_PER_MINUTE_MS;
+    }
+
+    // Micro-stutter / Reward coupling state
+    private int lastNodeCount = 0;
+    private long lastSignificantUiChangeTime = 0;
+    
+    // Retry / Persistence Tracking
+    private long lastHomeKickTime = 0;
 
     private void applyOverlayFriction() {
         long now = System.currentTimeMillis();
-        // Structural fix: Use explicit cooldown state to prevent "flickering jail"
-        if (now < overlayCooldownUntil) return;
+        
+        // Mercy Channel Check: If user is in mercy period, restore smoothness.
+        if (now < appPreferencesManager.getMercyUntil()) return;
+
+        // Hard minimum inter-attempt guard to prevent stack/storming
         if (now - lastOverlayTime < FRICTION_MIN_INTERVAL_MS) return;
+        if (now < overlayCooldownUntil) return;
+        if (frictionOverlay != null) return;
+        
+        if (!isWithinSafetyBounds()) {
+            Log.w(TAG, "Safety Rail: Friction suspended (Max duration reached)");
+            overlayCooldownUntil = now + 5000; // 5s breather
+            return;
+        }
 
-        // Intensity ramps over 60 seconds of consumption
+        // Intensity ramps over 60 seconds of consumption OR if budget is deep in negative
         long forbiddenSeconds = (now - forbiddenConfirmedAt) / 1000;
-        double intensity = Math.min(1.0, (double) forbiddenSeconds / 60.0);
+        long budget = dopamineBudgetEngine.getRemainingBudget();
+        
+        // Hostility increases as debt increases
+        double budgetPenalty = (budget < 0) ? Math.min(0.6, (double)Math.abs(budget) / 3000.0) : 0;
+        double intensity = Math.min(1.0, ((double) forbiddenSeconds / 60.0) + budgetPenalty);
 
-        // Probability increases with intensity
-        if (Math.random() > (0.1 + intensity * 0.4)) return;
+        // Reward Coupling: Detect dopamine spike
+        boolean rewardEvent = (now - lastSignificantUiChangeTime < 1000);
+        double probability = 0.1 + intensity * 0.5 + (rewardEvent ? 0.3 : 0);
+
+        if (Math.random() > probability) return;
 
         lastOverlayTime = now;
         showFrictionOverlay(intensity);
@@ -127,65 +180,77 @@ public class AttentionFirewallService extends AccessibilityService {
             LayoutInflater inflater = (LayoutInflater) getSystemService(LAYOUT_INFLATER_SERVICE);
             frictionOverlay = inflater.inflate(R.layout.friction_overlay, null);
 
-            // Always use hard occlusion (intercept touches) for reliability
+            double modeRand = Math.random();
             int flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+            int width = WindowManager.LayoutParams.MATCH_PARENT;
+            int height = WindowManager.LayoutParams.MATCH_PARENT;
+            int gravity = Gravity.CENTER;
+            
+            TextView msg = frictionOverlay.findViewById(R.id.friction_message);
+            View root = frictionOverlay;
+
+            // HOSTILITY MODES
+            if (intensity > 0.75 && modeRand < 0.3) {
+                // MODE: DEAD TIME
+                root.setBackgroundColor(0xFF000000); 
+                if (msg != null) msg.setVisibility(View.GONE);
+            } else if (intensity > 0.4 && modeRand < 0.6) {
+                // MODE: PARTIAL OCCLUSION
+                width = (int) (getResources().getDisplayMetrics().widthPixels * (0.4 + Math.random() * 0.4));
+                height = (int) (getResources().getDisplayMetrics().heightPixels * (0.3 + Math.random() * 0.4));
+                root.setBackgroundColor(0xEE000000); 
+                gravity = (Math.random() > 0.5 ? Gravity.TOP : Gravity.BOTTOM) | 
+                          (Math.random() > 0.5 ? Gravity.LEFT : Gravity.RIGHT);
+                if (msg != null) msg.setVisibility(View.GONE);
+            } else if (intensity > 0.6 && modeRand < 0.8) {
+                // MODE: MICRO-STUTTER
+                root.setBackgroundColor(0x00000000); 
+                if (msg != null) msg.setVisibility(View.GONE);
+            } else {
+                // MODE: STANDARD GHOSTING
+                root.setBackgroundColor(0x88000000);
+                setupStochasticMessaging(msg, intensity);
+            }
 
             WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    WindowManager.LayoutParams.MATCH_PARENT,
+                    width, height,
                     WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
                     flags,
                     PixelFormat.TRANSLUCENT
             );
-            params.gravity = Gravity.CENTER;
+            params.gravity = gravity;
 
-            // Determine if we should perform a HOME action after this overlay
-            // Probability scales with intensity, up to 25% at max intensity.
-            final boolean shouldKickHome = Math.random() < (intensity * 0.25);
-            TextView msg = frictionOverlay.findViewById(R.id.friction_message);
-
-            if (shouldKickHome) {
-                if (msg != null) {
-                    msg.setText(getString(R.string.friction_kick_home_message));
-                    msg.setVisibility(View.VISIBLE);
-                }
-            } else {
-                // Stochastic messaging: mostly silence, occasionally short text.
-                double msgRand = Math.random();
-                if (msgRand < 0.02 && intensity > 0.7) {
-                    // Very rare high-impact message
-                    if (msg != null) {
-                        msg.setText(getString(R.string.friction_hint_stop_enough));
-                        msg.setVisibility(View.VISIBLE);
-                    }
-                } else if (msgRand < 0.15) {
-                    // Occasional neutral hints (15% frequency)
-                    if (msg != null) {
-                        int[] hintResIds = {
-                                R.string.friction_hint_pause,
-                                R.string.friction_hint_enough,
-                                R.string.friction_hint_tired,
-                                R.string.friction_hint_breathe
-                        };
-                        msg.setText(getString(hintResIds[(int)(Math.random() * hintResIds.length)]));
-                        msg.setVisibility(View.VISIBLE);
-                    }
-                }
-            }
+            final boolean shouldKickHome = (intensity > 0.6) && (Math.random() < (intensity * 0.3));
 
             try {
                 windowManager.addView(frictionOverlay, params);
+                appPreferencesManager.incrementFrictionShown();
+                long startTime = System.currentTimeMillis();
                 
-                // Randomize duration between 1s and 10s based on intensity
-                long duration = 1000 + (long) (Math.random() * intensity * 9000);
+                // Randomize duration
+                long duration;
+                if (width != WindowManager.LayoutParams.MATCH_PARENT || height != WindowManager.LayoutParams.MATCH_PARENT) {
+                    duration = 2000 + (long)(Math.random() * 4000);
+                } else if (root.getSolidColor() == 0x00000000) {
+                    duration = 300 + (long)(Math.random() * 1000);
+                } else {
+                    duration = 1500 + (long) (Math.random() * intensity * 10000);
+                }
                 
                 frictionOverlayHandler.postDelayed(() -> {
+                    long actualDuration = System.currentTimeMillis() - startTime;
+                    if (frictionOverlay != null) {
+                        appPreferencesManager.incrementFrictionEndured();
+                    }
                     hideFrictionOverlay();
-                    // Set cooldown: 2s base + up to 5s based on intensity to prevent re-entry storms
-                    overlayCooldownUntil = System.currentTimeMillis() + 2000 + (long)(intensity * 5000);
+                    frictionUsageHistory.add(new FrictionUsageRecord(startTime, actualDuration));
+
+                    // Perceptual smoothing: Intensity-based buffer
+                    overlayCooldownUntil = System.currentTimeMillis() + (intensity > 0.7 ? 2000 : 500) + (long)(Math.random() * intensity * 5000);
                     
                     if (shouldKickHome) {
-                        Log.d(TAG, "Friction: Kicking to HOME");
+                        Log.d(TAG, "Friction Hostility: Kicking to HOME");
+                        lastHomeKickTime = System.currentTimeMillis();
                         performGlobalAction(GLOBAL_ACTION_HOME);
                     }
                 }, duration);
@@ -194,6 +259,23 @@ public class AttentionFirewallService extends AccessibilityService {
                 frictionOverlay = null;
             }
         });
+    }
+
+    private void setupStochasticMessaging(TextView msg, double intensity) {
+        if (msg == null) return;
+        double msgRand = Math.random();
+        if (msgRand < 0.10) {
+            int[] hintResIds = {
+                    R.string.friction_hint_pause,
+                    R.string.friction_hint_enough,
+                    R.string.friction_hint_tired,
+                    R.string.friction_hint_breathe
+            };
+            msg.setText(getString(hintResIds[(int)(Math.random() * hintResIds.length)]));
+            msg.setVisibility(View.VISIBLE);
+        } else {
+            msg.setVisibility(View.GONE);
+        }
     }
 
     private void hideFrictionOverlay() {
@@ -231,6 +313,8 @@ public class AttentionFirewallService extends AccessibilityService {
         info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC;
         info.flags = AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS | AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
         setServiceInfo(info);
+        
+        dopamineBudgetEngine.checkDecayResponsive();
     }
 
     private void createNotificationChannel() {
@@ -342,6 +426,11 @@ public class AttentionFirewallService extends AccessibilityService {
 
         if (appPreferencesManager.getTempAllowAppLaunch()) {
             if (isApprovedPackage(packageName)) {
+                // Tracking retry latency after HOME kick (Gated to 10s)
+                if (lastHomeKickTime > 0 && now - lastHomeKickTime < 10000) {
+                    appPreferencesManager.recordRetryLatency(now - lastHomeKickTime);
+                    lastHomeKickTime = 0;
+                }
                 appPreferencesManager.setTempAllowAppLaunch(false);
                 startStickySession(packageName);
                 return; 
@@ -357,16 +446,38 @@ public class AttentionFirewallService extends AccessibilityService {
             
             if (activeStickyPackage != null) {
                 if (!packageName.equals(activeStickyPackage) && !isTransient) {
+                    // Mercy Channel: Voluntary Exit
+                    // Logic updated to prevent oscillation exploitation (requires 1.5s exposure)
+                    if (isFrictionRunning) {
+                        appPreferencesManager.incrementFrictionAborted();
+                        // 15 minutes mercy
+                        appPreferencesManager.setMercyUntil(now + 15 * 60000);
+                        Log.d(TAG, "Mercy Channel: Voluntary exit during friction. Restoring smoothness.");
+                    }
+                    
                     endStickySession();
                     if (!isExtractive && !isLauncher) isBudgetLockedOut = false;
                 }
             } else if (!isTransient && !isLauncher && !isExtractive) {
                 isBudgetLockedOut = false;
             }
+            
+            if (!isExtractive) {
+                dopamineBudgetEngine.checkDecayResponsive();
+            }
         }
 
         if (eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED || eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             handleUrlInterception(packageName, eventType);
+            
+            // Reward Coupling: Detect dopamine spike
+            if (eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED && event.getSource() != null) {
+                int count = countNodes(event.getSource());
+                if (Math.abs(count - lastNodeCount) > 20) { 
+                    lastSignificantUiChangeTime = now;
+                }
+                lastNodeCount = count;
+            }
         }
 
         // Apply stochastic occlusion friction
@@ -382,6 +493,15 @@ public class AttentionFirewallService extends AccessibilityService {
         }
 
         updateStatsNotification();
+    }
+
+    private int countNodes(AccessibilityNodeInfo node) {
+        if (node == null) return 0;
+        int count = 1;
+        for (int i = 0; i < node.getChildCount(); i++) {
+            count += countNodes(node.getChild(i));
+        }
+        return count;
     }
 
     private void onForegroundAppChanged(String packageName) {
@@ -507,7 +627,7 @@ public class AttentionFirewallService extends AccessibilityService {
                 notificationHandler.post(notificationTicker);
             }
             
-            if (dopamineBudgetEngine.getRemainingBudget() <= 0 && !isFrictionRunning) {
+            if (!isFrictionRunning) {
                 isFrictionRunning = true;
             }
         } else {
@@ -517,7 +637,6 @@ public class AttentionFirewallService extends AccessibilityService {
                 notificationHandler.removeCallbacks(notificationTicker);
             }
             
-            // Invalidate friction when exiting forbidden state
             isFrictionRunning = false;
             isForbiddenConfirmed = false;
             forbiddenConfirmedAt = 0;
@@ -570,7 +689,6 @@ public class AttentionFirewallService extends AccessibilityService {
         lastForbiddenStartTime = 0;
         wasNegativeAtSessionStart = false; 
         
-        // Final invalidation
         isFrictionRunning = false;
         isForbiddenConfirmed = false;
         forbiddenConfirmedAt = 0;
@@ -612,8 +730,6 @@ public class AttentionFirewallService extends AccessibilityService {
     private void triggerDecisionGate() {
         lastDecisionGateTime = System.currentTimeMillis();
         
-        // Safety: If we are in a sticky session, we MUST end it now so the Gate
-        // foreground state doesn't inherit any friction or sticky tracking.
         if (activeStickyPackage != null) {
             endStickySession();
         }
