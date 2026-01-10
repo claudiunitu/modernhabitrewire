@@ -63,7 +63,6 @@ public class AttentionFirewallService extends AccessibilityService {
     
     // Forced Cleanup / Lockout Logic
     private boolean isBudgetLockedOut = false;
-    private boolean wasNegativeAtSessionStart = false; 
     
     // Foreground Ownership Tracking
     private String lastForegroundPackage = null;
@@ -140,6 +139,9 @@ public class AttentionFirewallService extends AccessibilityService {
     private void applyOverlayFriction() {
         long now = System.currentTimeMillis();
         
+        // Only activate friction if the user budget is at or below 0 (authorized via the Decision Gate).
+        if (dopamineBudgetEngine.getRemainingBudget() > 0) return;
+
         // Hard minimum inter-attempt guard to prevent stack/storming
         if (now - lastOverlayTime < FRICTION_MIN_INTERVAL_MS) return;
         if (now < overlayCooldownUntil) return;
@@ -653,7 +655,7 @@ public class AttentionFirewallService extends AccessibilityService {
     }
 
     private void checkLiveBudgetExhaustion() {
-        if (activeStickyPackage == null || isBudgetLockedOut || wasNegativeAtSessionStart) return;
+        if (activeStickyPackage == null || isBudgetLockedOut || dopamineBudgetEngine.getRemainingBudget() <= 0) return;
         
         long remainingUnits = dopamineBudgetEngine.getRemainingBudget();
         long currentForbiddenSegmentMs = (lastForbiddenStartTime == 0) ? 0 : (System.currentTimeMillis() - lastForbiddenStartTime);
@@ -671,7 +673,6 @@ public class AttentionFirewallService extends AccessibilityService {
 
     private void startStickySession(String packageName) {
         isBudgetLockedOut = false; 
-        wasNegativeAtSessionStart = (dopamineBudgetEngine.getRemainingBudget() <= 0);
 
         activeStickyPackage = packageName;
         sessionApprovedPatterns.clear();
@@ -695,7 +696,6 @@ public class AttentionFirewallService extends AccessibilityService {
         sessionApprovedPatterns.clear();
         accumulatedForbiddenTimeMs = 0;
         lastForbiddenStartTime = 0;
-        wasNegativeAtSessionStart = false; 
         
         isFrictionRunning = false;
         isForbiddenConfirmed = false;
