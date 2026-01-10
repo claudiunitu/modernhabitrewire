@@ -453,11 +453,13 @@ public class AttentionFirewallService extends AccessibilityService {
             
             // Reward Coupling: Detect dopamine spike
             if (eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED && event.getSource() != null) {
-                int count = countNodes(event.getSource());
+                AccessibilityNodeInfo source = event.getSource();
+                int count = countNodes(source);
                 if (Math.abs(count - lastNodeCount) > 20) { 
                     lastSignificantUiChangeTime = now;
                 }
                 lastNodeCount = count;
+                source.recycle();
             }
         }
 
@@ -480,7 +482,11 @@ public class AttentionFirewallService extends AccessibilityService {
         if (node == null) return 0;
         int count = 1;
         for (int i = 0; i < node.getChildCount(); i++) {
-            count += countNodes(node.getChild(i));
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (child != null) {
+                count += countNodes(child);
+                child.recycle();
+            }
         }
         return count;
     }
@@ -520,13 +526,20 @@ public class AttentionFirewallService extends AccessibilityService {
     private void checkBrowserUrl(SupportedBrowserConfig config, int eventType) {
         AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return;
-        if (root.getPackageName() == null || !root.getPackageName().toString().equals(config.packageName)) return;
+        if (root.getPackageName() == null || !root.getPackageName().toString().equals(config.packageName)) {
+            root.recycle();
+            return;
+        }
 
         AccessibilityNodeInfo bar = null;
         for (String id : config.addressBarIds) {
             List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByViewId(id);
             if (nodes != null && !nodes.isEmpty()) {
                 bar = nodes.get(0);
+                // Recycle others
+                for (int i = 1; i < nodes.size(); i++) {
+                    nodes.get(i).recycle();
+                }
                 break;
             }
         }
@@ -540,11 +553,17 @@ public class AttentionFirewallService extends AccessibilityService {
             if (!currentUrl.equals(prev)) {
                 lastObservedUrls.put(config.packageName, currentUrl);
                 lastUrlChangeTimes.put(config.packageName, now);
+                bar.recycle();
+                root.recycle();
                 return; 
             }
 
             long lastChange = lastUrlChangeTimes.getOrDefault(config.packageName, 0L);
-            if (now - lastChange < URL_STABLE_MS) return; 
+            if (now - lastChange < URL_STABLE_MS) {
+                bar.recycle();
+                root.recycle();
+                return; 
+            }
 
             String matchedPattern = null;
             for (String pattern : appPreferencesManager.getForbiddenUrls()) {
@@ -558,10 +577,16 @@ public class AttentionFirewallService extends AccessibilityService {
             boolean committed = !bar.isFocused() || eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED;
 
             if (matchedPattern != null && committed) {
-                if (System.currentTimeMillis() - lastDecisionGateTime < DECISION_COOLDOWN_MS) return;
+                if (System.currentTimeMillis() - lastDecisionGateTime < DECISION_COOLDOWN_MS) {
+                    bar.recycle();
+                    root.recycle();
+                    return;
+                }
 
                 if (dopamineBudgetEngine.getRemainingBudget() <= 0 && activeStickyPackage == null) {
                     triggerDecisionGate();
+                    bar.recycle();
+                    root.recycle();
                     return;
                 }
 
@@ -584,7 +609,9 @@ public class AttentionFirewallService extends AccessibilityService {
                     confirmSafeState(config.packageName);
                 }
             }
+            bar.recycle();
         }
+        root.recycle();
     }
 
     private void confirmSafeState(String packageName) {
@@ -724,13 +751,14 @@ public class AttentionFirewallService extends AccessibilityService {
         AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return false;
         boolean foundOurApp = findTextRecursive(root, APP_PACKAGE) || findTextRecursive(root, APP_NAME);
+        boolean isDestructive = false;
         if (foundOurApp) {
-            boolean isDestructive = findTextRecursive(root, "info") || findTextRecursive(root, "details") || 
+            isDestructive = findTextRecursive(root, "info") || findTextRecursive(root, "details") || 
                                     findTextRecursive(root, "storage") || findTextRecursive(root, "admin") || 
                                     findTextRecursive(root, "service") || findTextRecursive(root, "off");
-            if (isDestructive) return true;
         }
-        return false;
+        root.recycle();
+        return foundOurApp && isDestructive;
     }
 
     private boolean findTextRecursive(AccessibilityNodeInfo node, String text) {
@@ -739,7 +767,11 @@ public class AttentionFirewallService extends AccessibilityService {
         if (node.getContentDescription() != null && node.getContentDescription().toString().toLowerCase().contains(text.toLowerCase())) return true;
         for (int i = 0; i < node.getChildCount(); i++) {
             AccessibilityNodeInfo child = node.getChild(i);
-            if (findTextRecursive(child, text)) return true;
+            if (findTextRecursive(child, text)) {
+                if (child != null) child.recycle();
+                return true;
+            }
+            if (child != null) child.recycle();
         }
         return false;
     }
@@ -754,12 +786,13 @@ public class AttentionFirewallService extends AccessibilityService {
         if (desc != null) {
             String d = desc.toString().toLowerCase();
             for (String hint : hints) {
-                if (d.contains(hint)) return node;
+                if (d.contains(hint)) return AccessibilityNodeInfo.obtain(node);
             }
         }
         for (int i = 0; i < node.getChildCount(); i++) {
             AccessibilityNodeInfo child = node.getChild(i);
             AccessibilityNodeInfo result = findNodeByContentDescription(child, hints);
+            if (child != null) child.recycle();
             if (result != null) return result;
         }
         return null;
