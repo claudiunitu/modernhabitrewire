@@ -100,9 +100,12 @@ public class AttentionFirewallService extends AccessibilityService {
     private final Handler frictionOverlayHandler = new Handler(Looper.getMainLooper());
     private static final long FRICTION_MIN_INTERVAL_MS = 5000;
     private long lastOverlayTime = 0;
+    private long overlayCooldownUntil = 0;
 
     private void applyOverlayFriction() {
         long now = System.currentTimeMillis();
+        // Structural fix: Use explicit cooldown state to prevent "flickering jail"
+        if (now < overlayCooldownUntil) return;
         if (now - lastOverlayTime < FRICTION_MIN_INTERVAL_MS) return;
 
         // Intensity ramps over 60 seconds of consumption
@@ -147,8 +150,16 @@ public class AttentionFirewallService extends AccessibilityService {
                     msg.setVisibility(View.VISIBLE);
                 }
             } else {
-                // Occasionally show a generic message
-                if (Math.random() < 0.5) {
+                // Stochastic messaging: mostly silence, occasionally short text.
+                double msgRand = Math.random();
+                if (msgRand < 0.02 && intensity > 0.7) {
+                    // Very rare high-impact message
+                    if (msg != null) {
+                        msg.setText(getString(R.string.friction_hint_stop_enough));
+                        msg.setVisibility(View.VISIBLE);
+                    }
+                } else if (msgRand < 0.15) {
+                    // Occasional neutral hints (15% frequency)
                     if (msg != null) {
                         int[] hintResIds = {
                                 R.string.friction_hint_pause,
@@ -170,7 +181,10 @@ public class AttentionFirewallService extends AccessibilityService {
                 
                 frictionOverlayHandler.postDelayed(() -> {
                     hideFrictionOverlay();
-                    if (shouldKickHome && activeStickyPackage != null) {
+                    // Set cooldown: 2s base + up to 5s based on intensity to prevent re-entry storms
+                    overlayCooldownUntil = System.currentTimeMillis() + 2000 + (long)(intensity * 5000);
+                    
+                    if (shouldKickHome) {
                         Log.d(TAG, "Friction: Kicking to HOME");
                         performGlobalAction(GLOBAL_ACTION_HOME);
                     }

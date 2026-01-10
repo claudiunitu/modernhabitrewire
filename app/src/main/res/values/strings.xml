@@ -58,10 +58,10 @@
     
     <string name="help_guide_title">How to Rewire Your Habits</string>
     <string name="help_guide_content">1. Permissions: Grant Accessibility, Device Admin, and Notification permissions.\n2. The Lists: Define your \"Extractive Apps\" and \"Forbidden URLs\".\n3. Set Your Budget: Define your Daily Allowance Units (DU).\n4. Set the Key: Create a Deactivation Key as your self-binding contract.</string>
-    
+
     <string name="help_physics_title">The Economic Physics</string>
     <string name="help_physics_content">The app uses a non-linear escalation model. Frequent re-entry and prolonged immersion become increasingly expensive in terms of your daily budget (DU). Staying \"clean\" allows your system to recover over time.</string>
-    
+
     <string name="help_security_title">Security &amp; Friction</string>
     <string name="help_security_content">The Deactivation Key prevents you from changing settings or deactivating the blocker in moments of low impulse control. The Decision Gate introduces a mandatory wait time before accessing restricted apps.</string>
 
@@ -71,4 +71,5 @@
     <string name="friction_hint_enough">Enough.</string>
     <string name="friction_hint_tired">You\'re tired.</string>
     <string name="friction_hint_breathe">Breathe.</string>
+    <string name="friction_hint_stop_enough">Enough. Stop.</string>
 </resources>
