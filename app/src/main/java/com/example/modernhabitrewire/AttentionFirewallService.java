@@ -73,6 +73,11 @@ public class AttentionFirewallService extends AccessibilityService {
     private final Map<String, String> lastObservedUrls = new HashMap<>();
     private final Map<String, Long> lastUrlChangeTimes = new HashMap<>();
     private static final long URL_STABLE_MS = 800;
+
+    // Forbidden / Safe hysteresis
+    private long lastForbiddenSeenAt = 0;
+    private long lastSafeSeenAt = 0;
+    private static final long SAFE_CONFIRM_MS = 1500;
     
     // Shared cooldown to prevent browser loops
     private static long lastDecisionGateTime = 0;
@@ -543,7 +548,9 @@ public class AttentionFirewallService extends AccessibilityService {
     private void checkBrowserUrl(SupportedBrowserConfig config, int eventType) {
         AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return;
-        if (root.getPackageName() == null || !root.getPackageName().toString().equals(config.packageName)) {
+
+        if (root.getPackageName() == null ||
+            !root.getPackageName().toString().equals(config.packageName)) {
             root.recycle();
             return;
         }
@@ -553,93 +560,129 @@ public class AttentionFirewallService extends AccessibilityService {
             List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByViewId(id);
             if (nodes != null && !nodes.isEmpty()) {
                 bar = nodes.get(0);
-                // Recycle others
-                for (int i = 1; i < nodes.size(); i++) {
-                    nodes.get(i).recycle();
-                }
+                for (int i = 1; i < nodes.size(); i++) nodes.get(i).recycle();
                 break;
             }
         }
         if (bar == null) bar = findUrlBarByContentDescription(root);
 
-        if (bar != null && bar.getText() != null) {
-            String currentUrl = bar.getText().toString().toLowerCase().trim();
-            long now = System.currentTimeMillis();
+        long now = System.currentTimeMillis();
 
-            String prev = lastObservedUrls.get(config.packageName);
-            if (!currentUrl.equals(prev)) {
-                lastObservedUrls.put(config.packageName, currentUrl);
-                lastUrlChangeTimes.put(config.packageName, now);
+        // -----------------------------
+        // 1. URL missing → uncertainty
+        // -----------------------------
+        if (bar == null || bar.getText() == null) {
+            root.recycle();
+            return;
+        }
+
+        String currentUrl = bar.getText().toString().toLowerCase().trim();
+
+        // -----------------------------
+        // 2. URL stability filter
+        // -----------------------------
+        String prev = lastObservedUrls.get(config.packageName);
+        if (!currentUrl.equals(prev)) {
+            lastObservedUrls.put(config.packageName, currentUrl);
+            lastUrlChangeTimes.put(config.packageName, now);
+            bar.recycle();
+            root.recycle();
+            return;
+        }
+
+        long lastChange = lastUrlChangeTimes.getOrDefault(config.packageName, 0L);
+        if (now - lastChange < URL_STABLE_MS) {
+            bar.recycle();
+            root.recycle();
+            return;
+        }
+
+        boolean committed = !bar.isFocused() || eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED;
+
+        // -----------------------------
+        // 3. Forbidden match
+        // -----------------------------
+        String matchedPattern = null;
+        for (String pattern : appPreferencesManager.getForbiddenUrls()) {
+            String p = pattern.toLowerCase().trim();
+            if (!p.isEmpty() && currentUrl.contains(p)) {
+                matchedPattern = pattern;
+                break;
+            }
+        }
+
+        if (matchedPattern != null && committed) {
+            lastForbiddenSeenAt = now;
+            lastSafeSeenAt = 0;
+
+            if (System.currentTimeMillis() - lastDecisionGateTime < DECISION_COOLDOWN_MS) {
                 bar.recycle();
                 root.recycle();
-                return; 
+                return;
             }
 
-            long lastChange = lastUrlChangeTimes.getOrDefault(config.packageName, 0L);
-            if (now - lastChange < URL_STABLE_MS) {
+            if (dopamineBudgetEngine.getRemainingBudget() <= 0 && activeStickyPackage == null) {
+                triggerDecisionGate();
                 bar.recycle();
                 root.recycle();
-                return; 
+                return;
             }
 
-            String matchedPattern = null;
-            for (String pattern : appPreferencesManager.getForbiddenUrls()) {
-                String cleanPattern = pattern.toLowerCase().trim();
-                if (!cleanPattern.isEmpty() && currentUrl.contains(cleanPattern)) {
-                    matchedPattern = pattern;
-                    break;
-                }
-            }
-
-            boolean committed = !bar.isFocused() || eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED;
-
-            if (matchedPattern != null && committed) {
-                if (System.currentTimeMillis() - lastDecisionGateTime < DECISION_COOLDOWN_MS) {
-                    bar.recycle();
-                    root.recycle();
-                    return;
-                }
-
-                if (dopamineBudgetEngine.getRemainingBudget() <= 0 && activeStickyPackage == null) {
-                    triggerDecisionGate();
-                    bar.recycle();
-                    root.recycle();
-                    return;
-                }
-
-                if (activeStickyPackage != null && config.packageName.equals(activeStickyPackage)) {
-                    updateForbiddenTimer(true);
-                    if (!sessionApprovedPatterns.contains(matchedPattern)) {
-                        appPreferencesManager.setLastInterceptedApp(config.packageName);
-                        appPreferencesManager.setLastInterceptedUrl(matchedPattern);
-                        triggerDecisionGate();
-                    }
-                } else if (activeStickyPackage == null) {
-                    dopamineBudgetEngine.resetBudgetIfNeeded();
+            if (activeStickyPackage != null && config.packageName.equals(activeStickyPackage)) {
+                updateForbiddenTimer(true);
+                if (!sessionApprovedPatterns.contains(matchedPattern)) {
                     appPreferencesManager.setLastInterceptedApp(config.packageName);
                     appPreferencesManager.setLastInterceptedUrl(matchedPattern);
                     triggerDecisionGate();
                 }
+            } else if (activeStickyPackage == null) {
+                dopamineBudgetEngine.resetBudgetIfNeeded();
+                appPreferencesManager.setLastInterceptedApp(config.packageName);
+                appPreferencesManager.setLastInterceptedUrl(matchedPattern);
+                triggerDecisionGate();
+            }
+
+            bar.recycle();
+            root.recycle();
+            return;
+        }
+
+        // -----------------------------
+        // 4. Explicit SAFE detection
+        // -----------------------------
+        if (committed && activeStickyPackage != null && config.packageName.equals(activeStickyPackage)) {
+            if (isKnownSafeNewTab(currentUrl)) {
+                confirmSafeState(config.packageName);
             } else {
-                if (matchedPattern == null && activeStickyPackage != null && !bar.isFocused()) {
-                    isBudgetLockedOut = false;
+                if (lastSafeSeenAt == 0) lastSafeSeenAt = now;
+
+                if (isForbiddenConfirmed && (now - lastSafeSeenAt > SAFE_CONFIRM_MS)) {
                     confirmSafeState(config.packageName);
                 }
             }
-            bar.recycle();
         } else {
-            // URL bar missing or has no text (e.g. all tabs closed or start page)
-            if (activeStickyPackage != null && config.packageName.equals(activeStickyPackage)) {
-                confirmSafeState(config.packageName);
-            }
+            lastSafeSeenAt = 0;
         }
+
+        bar.recycle();
         root.recycle();
+    }
+
+    private boolean isKnownSafeNewTab(String url) {
+        if (url == null) return true;
+        String u = url.toLowerCase();
+        return u.equals("about:blank") ||
+               u.contains("newtab") ||
+               u.contains("chrome://newtab") ||
+               u.contains("brave://newtab") ||
+               u.contains("about:home");
     }
 
     private void confirmSafeState(String packageName) {
         if (!isForbiddenConfirmed) return;
         isForbiddenConfirmed = false;
-        lastObservedUrls.remove(packageName);
+        lastForbiddenSeenAt = 0;
+        lastSafeSeenAt = 0;
         updateForbiddenTimer(false);
     }
 
