@@ -129,13 +129,6 @@ public class AttentionFirewallService extends AccessibilityService {
         return totalDuration < MAX_FRICTION_PER_MINUTE_MS;
     }
 
-    // Micro-stutter / Reward coupling state
-    private int lastNodeCount = 0;
-    private long lastSignificantUiChangeTime = 0;
-    
-    // Retry / Persistence Tracking
-    private long lastHomeKickTime = 0;
-
     private void applyOverlayFriction() {
         long now = System.currentTimeMillis();
         
@@ -303,6 +296,7 @@ public class AttentionFirewallService extends AccessibilityService {
         setServiceInfo(info);
         
         dopamineBudgetEngine.checkDecayResponsive();
+        updateStatsNotification();
     }
 
     private void createNotificationChannel() {
@@ -317,6 +311,10 @@ public class AttentionFirewallService extends AccessibilityService {
     }
 
     private void updateStatsNotification() {
+        if (dopamineBudgetEngine != null) {
+            dopamineBudgetEngine.resetBudgetIfNeeded();
+        }
+        
         boolean active = appPreferencesManager.getIsBlockerActive();
         long remainingUnits = dopamineBudgetEngine.getRemainingBudget();
         
@@ -379,6 +377,13 @@ public class AttentionFirewallService extends AccessibilityService {
             }
         }
     }
+
+    // Micro-stutter / Reward coupling state
+    private int lastNodeCount = 0;
+    private long lastSignificantUiChangeTime = 0;
+    
+    // Retry / Persistence Tracking
+    private long lastHomeKickTime = 0;
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
@@ -447,6 +452,7 @@ public class AttentionFirewallService extends AccessibilityService {
             
             if (!isExtractive) {
                 dopamineBudgetEngine.checkDecayResponsive();
+                updateStatsNotification();
             }
         }
 

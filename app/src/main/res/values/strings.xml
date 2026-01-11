@@ -38,7 +38,7 @@
     <string name="notification_channel_description">Shows real-time budget and session statistics</string>
     <string name="blocker_active">Blocker: ACTIVE</string>
     <string name="blocker_inactive">Blocker: INACTIVE</string>
-    <string name="notification_stats_template">Potential: %1$d DU | Session: %2$d DU | Cost: %3$.1fx</string>
+    <string name="notification_stats_template">P: %1$d | S: -%2$d | x%3$.1f</string>
 
     <!-- Decision Gate strings -->
     <string name="system_state_template">System State:\n---\nSessions today: %1$d\nCurrent cost: %2$.1fx\nRemaining potential: %3$d DU</string>
