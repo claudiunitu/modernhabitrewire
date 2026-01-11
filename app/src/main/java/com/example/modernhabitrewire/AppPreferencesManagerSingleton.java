@@ -153,7 +153,8 @@ public class AppPreferencesManagerSingleton {
     }
 
     public void setRemainingPotentialUnits(long units) {
-        prefs.edit().putLong(KEY_REMAINING_POTENTIAL_UNITS, units).apply();
+        // Critical for DecisionGate synchronization
+        prefs.edit().putLong(KEY_REMAINING_POTENTIAL_UNITS, units).commit();
     }
 
     public String getLastBudgetResetDate() {
@@ -177,7 +178,8 @@ public class AppPreferencesManagerSingleton {
     }
 
     public void setLastInterceptedApp(String packageName) {
-        prefs.edit().putString(KEY_LAST_INTERCEPTED_APP, packageName).apply();
+        // Critical for DecisionGate synchronization
+        prefs.edit().putString(KEY_LAST_INTERCEPTED_APP, packageName).commit();
     }
 
     public String getLastInterceptedUrl() {
@@ -185,7 +187,8 @@ public class AppPreferencesManagerSingleton {
     }
 
     public void setLastInterceptedUrl(String url) {
-        prefs.edit().putString(KEY_LAST_INTERCEPTED_URL, url).apply();
+        // Critical for DecisionGate synchronization
+        prefs.edit().putString(KEY_LAST_INTERCEPTED_URL, url).commit();
     }
 
     public int getDailySessionCount() {
@@ -193,7 +196,7 @@ public class AppPreferencesManagerSingleton {
     }
 
     public void setDailySessionCount(int count) {
-        prefs.edit().putInt(KEY_DAILY_SESSION_COUNT, count).apply();
+        prefs.edit().putInt(KEY_DAILY_SESSION_COUNT, count).commit();
     }
 
     public int getBaseWaitTimeSeconds() {

@@ -139,7 +139,9 @@ public class DopamineBudgetEngine {
         double alpha = (0.001 + 0.005 * c) * appPreferencesManager.getGraceMultiplier();
         
         double seconds = timeSpentMillis / 1000.0;
-        long unitCost = Math.round(seconds * fEntry + alpha * (seconds * (seconds - 1) / 2.0));
+        // Continuous integral of (fEntry + alpha * t) dt from 0 to seconds
+        // = fEntry * seconds + 0.5 * alpha * seconds^2
+        long unitCost = Math.round(seconds * fEntry + 0.5 * alpha * seconds * seconds);
         return Math.max(1, unitCost);
     }
 
