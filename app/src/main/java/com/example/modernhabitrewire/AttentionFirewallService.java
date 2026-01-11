@@ -627,6 +627,11 @@ public class AttentionFirewallService extends AccessibilityService {
                 }
             }
             bar.recycle();
+        } else {
+            // URL bar missing or has no text (e.g. all tabs closed or start page)
+            if (activeStickyPackage != null && config.packageName.equals(activeStickyPackage)) {
+                confirmSafeState(config.packageName);
+            }
         }
         root.recycle();
     }
