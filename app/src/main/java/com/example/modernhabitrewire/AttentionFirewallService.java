@@ -337,10 +337,19 @@ public class AttentionFirewallService extends AccessibilityService {
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, 
                 PendingIntent.FLAG_IMMUTABLE);
 
+        int iconRes;
+        if (!active) {
+            iconRes = android.R.drawable.ic_lock_power_off;
+        } else if (isForbiddenConfirmed) {
+            iconRes = android.R.drawable.ic_dialog_alert;
+        } else {
+            iconRes = android.R.drawable.ic_dialog_info;
+        }
+
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle(status)
                 .setContentText(stats)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(iconRes)
                 .setOngoing(true)
                 .setContentIntent(pendingIntent)
                 .setOnlyAlertOnce(true)
