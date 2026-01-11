@@ -58,8 +58,9 @@ public class DopamineBudgetEngine {
         long dailyAllowance = appPreferencesManager.getDailyAllowanceUnits();
         long currentRemaining = appPreferencesManager.getRemainingPotentialUnits();
         
-        // Cumulative reset: Allowance is added to the current balance (carry-over debt)
-        long newTotal = currentRemaining + dailyAllowance;
+        // Cumulative reset: Allowance is added to current balance, but capped at dailyAllowance.
+        // This allows carrying over debt (negative balance) while preventing hoarding.
+        long newTotal = Math.min(dailyAllowance, currentRemaining + dailyAllowance);
         
         appPreferencesManager.setRemainingPotentialUnits(newTotal);
         appPreferencesManager.setDailySessionCount(0);
