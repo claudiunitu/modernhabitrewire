@@ -917,10 +917,7 @@ public class AttentionFirewallService extends AccessibilityService {
         boolean isDestructive = false;
         if (foundOurApp) {
             isDestructive = findTextRecursive(root, "uninstall")
-                    || findTextRecursive(root, "force stop")
-                    || findTextRecursive(root, "disable")
-                    || findTextRecursive(root, "deactivate")
-                    || findTextRecursive(root, "remove");
+                    || findTextRecursive(root, "force stop");
         }
         root.recycle();
         return foundOurApp && isDestructive;
