@@ -32,15 +32,15 @@ public class DecisionGateActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         super.onCreate(savedInstanceState);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_decision_gate);
 
-        // Apply system bar insets so the content is not obscured by status/nav bars.
-        // The ConstraintLayout has fitsSystemWindows="true" which handles this via padding.
+        // Apply system bar insets, adding them on top of the XML spacing_lg base padding.
+        int base = getResources().getDimensionPixelSize(R.dimen.spacing_lg);
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.rootLayout), (v, insets) -> {
             Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            v.setPadding(base + bars.left, base + bars.top, base + bars.right, base + bars.bottom);
             return insets;
         });
 
