@@ -59,38 +59,3 @@ public class AppPackagesListEditorActivity extends AppCompatActivity {
         adapter.updateList(appPreferencesManagerSingleton.getExtractiveAppsPackages());
     }
 }
-
-        appPreferencesManagerSingleton = AppPreferencesManagerSingleton.getInstance(this);
-
-        TextInputEditText packageNameEditText = findViewById(R.id.packageNameEditText);
-        Button addButton = findViewById(R.id.addButton);
-        RecyclerView recyclerView = findViewById(R.id.appPackageRecyclerView);
-
-        adapter = new AppPackagesListRecyclerAdapter(appPreferencesManagerSingleton.getExtractiveAppsPackages(), packageName -> {
-            appPreferencesManagerSingleton.removeExtractiveAppPackage(packageName);
-            refreshList();
-        });
-
-        recyclerView.setAdapter(adapter);
-
-        addButton.setOnClickListener(v -> {
-            String newAppPackage = packageNameEditText.getText() != null
-                    ? packageNameEditText.getText().toString().trim() : "";
-            if (!newAppPackage.isEmpty()) {
-                appPreferencesManagerSingleton.addExtractiveAppPackage(newAppPackage);
-                packageNameEditText.setText("");
-                refreshList();
-            }
-        });
-    }
-
-    @Override
-    public boolean onSupportNavigateUp() {
-        finish();
-        return true;
-    }
-
-    private void refreshList() {
-        adapter.updateList(appPreferencesManagerSingleton.getExtractiveAppsPackages());
-    }
-}
