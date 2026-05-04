@@ -91,3 +91,4 @@
 
         <!-- Adapter toast -->
         <string name="blocker_active_cannot_remove">Blocker is active. Cannot remove item.</string>
+    </resources>
