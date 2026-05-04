@@ -157,35 +157,28 @@ public class AttentionFirewallService extends AccessibilityService {
 
     private void applyOverlayFriction() {
         long now = System.currentTimeMillis();
-        
-        // Only activate friction if the user budget is at or below 0 (authorized via the Decision Gate).
+
+        // Only activate friction if the user budget is at or below 0 (overdrawn).
         if (dopamineBudgetEngine.getRemainingBudget() > 0) return;
 
-        // Hard minimum inter-attempt guard to prevent stack/storming
+        // Hard minimum inter-attempt guard
         if (now - lastOverlayTime < FRICTION_MIN_INTERVAL_MS) return;
         if (now < overlayCooldownUntil) return;
         if (frictionOverlay != null) return;
-        
+
         if (!isWithinSafetyBounds()) {
             Log.w(TAG, "Safety Rail: Friction suspended (Max duration reached)");
-            overlayCooldownUntil = now + 5000; // 5s breather
+            overlayCooldownUntil = now + 5000;
             return;
         }
 
-        // Intensity ramps over 60 seconds of consumption OR if budget is deep in negative
-        long forbiddenSeconds = (now - forbiddenConfirmedAt) / 1000;
+        // Intensity ramps over 60 seconds of forbidden time, plus debt penalty
+        long forbiddenSeconds = (forbiddenConfirmedAt > 0) ? (now - forbiddenConfirmedAt) / 1000 : 0;
         long budget = dopamineBudgetEngine.getRemainingBudget();
-        
-        // Hostility increases as debt increases
-        double budgetPenalty = (budget < 0) ? Math.min(0.6, (double)Math.abs(budget) / 3000.0) : 0;
+        double budgetPenalty = (budget < 0) ? Math.min(0.6, (double) Math.abs(budget) / 3000.0) : 0;
         double intensity = Math.min(1.0, ((double) forbiddenSeconds / 60.0) + budgetPenalty);
 
-        // Reward Coupling: Detect dopamine spike
-        boolean rewardEvent = (now - lastSignificantUiChangeTime < 1000);
-        double probability = 0.1 + intensity * 0.5 + (rewardEvent ? 0.3 : 0);
-
-        if (Math.random() > probability) return;
-
+        // No probability gate: the ticker interval IS the pacing mechanism.
         lastOverlayTime = now;
         showFrictionOverlay(intensity);
     }
@@ -217,8 +210,8 @@ public class AttentionFirewallService extends AccessibilityService {
                 root.setBackgroundColor(0xEE000000); 
                 if (msg != null) msg.setVisibility(View.GONE);
             } else if (intensity > 0.6 && modeRand < 0.8) {
-                // MODE: MICRO-STUTTER
-                root.setBackgroundColor(0x00000000); 
+                // MODE: MICRO-STUTTER (semi-transparent flash)
+                root.setBackgroundColor(0xBB000000);
                 if (msg != null) msg.setVisibility(View.GONE);
             } else {
                 // MODE: STANDARD GHOSTING
@@ -538,13 +531,7 @@ public class AttentionFirewallService extends AccessibilityService {
             }
         }
 
-        // Apply stochastic occlusion friction
-        if (isFrictionRunning && isForbiddenConfirmed) {
-            if (eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED || 
-                eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
-                applyOverlayFriction();
-            }
-        }
+        // Friction is driven solely by the proactive ticker; no event-driven trigger here.
         
         if (activeStickyPackage != null) {
             checkLiveBudgetExhaustion();
@@ -823,6 +810,9 @@ public class AttentionFirewallService extends AccessibilityService {
         isForbiddenConfirmed = false;
         forbiddenConfirmedAt = 0;
         lastForbiddenStartTime = 0;
+        // Reset overlay cooldowns so a new session is not blocked by the previous one
+        lastOverlayTime = 0;
+        overlayCooldownUntil = 0;
 
         dopamineBudgetEngine.incrementSessionCount();
 
