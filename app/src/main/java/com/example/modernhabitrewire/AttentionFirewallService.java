@@ -423,6 +423,9 @@ public class AttentionFirewallService extends AccessibilityService {
         }
     }
 
+    // Current window class tracking for danger-zone detection
+    private String lastWindowClassName = "";
+
     // Micro-stutter / Reward coupling state
     private int lastNodeCount = 0;
     private long lastSignificantUiChangeTime = 0;
@@ -446,6 +449,10 @@ public class AttentionFirewallService extends AccessibilityService {
         if (packageName.equals(APP_PACKAGE)) {
             updateStatsNotification();
             return;
+        }
+
+        if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && event.getClassName() != null) {
+            lastWindowClassName = event.getClassName().toString();
         }
 
         if (appPreferencesManager.getForbidSettingsSwitchValue() && DANGER_PACKAGES.contains(packageName)) {
@@ -902,25 +909,39 @@ public class AttentionFirewallService extends AccessibilityService {
         startActivity(intent);
     }
 
+    // Class-name substrings that identify app-info / package-installer screens —
+    // the only screens that show actionable "Uninstall" and "Force Stop" buttons for our app.
+    private static final List<String> APP_INFO_CLASS_FRAGMENTS = Arrays.asList(
+            "AppInfoDashboard", "InstalledAppDetails", "AppInfoBase",
+            "ManageApplications", "AppStorageSettings", "AppNotificationSettings",
+            "UninstallerActivity", "PackageInstallerActivity", "InstallAppProgress",
+            "UninstallAppProgress", "DeletePackage"
+    );
+
     private boolean isDangerZoneActive() {
+        // Use the window class name to determine whether we are on a genuine
+        // app-info or uninstaller screen — NOT an accessibility settings screen.
+        // Accessibility screens have class names containing "accessibility" or "Accessibility".
+        String cls = lastWindowClassName.toLowerCase();
+        if (cls.contains("accessibility")) return false;
+
+        // Must be on a known app-info / package-installer screen.
+        boolean onAppInfoScreen = false;
+        for (String fragment : APP_INFO_CLASS_FRAGMENTS) {
+            if (lastWindowClassName.contains(fragment)) {
+                onAppInfoScreen = true;
+                break;
+            }
+        }
+        if (!onAppInfoScreen) return false;
+
+        // Confirm the screen is actually about our app by scanning text.
         AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return false;
-        // HIGH-02: Include service labels as well as the app name/package so that the
-        // Accessibility settings toggle screen (which shows the label, not the package)
-        // is correctly identified.
-        // MEDIUM-02: Match only action-oriented destruction keywords, not generic words
-        // like "info" or "off" that appear on every settings page.
         boolean foundOurApp = findTextRecursive(root, APP_PACKAGE)
-                || findTextRecursive(root, APP_NAME)
-                || findTextRecursive(root, "Attention Firewall")
-                || findTextRecursive(root, "Uninstaller Guard");
-        boolean isDestructive = false;
-        if (foundOurApp) {
-            isDestructive = findTextRecursive(root, "uninstall")
-                    || findTextRecursive(root, "force stop");
-        }
+                || findTextRecursive(root, APP_NAME);
         root.recycle();
-        return foundOurApp && isDestructive;
+        return foundOurApp;
     }
 
     private boolean findTextRecursive(AccessibilityNodeInfo node, String text) {
