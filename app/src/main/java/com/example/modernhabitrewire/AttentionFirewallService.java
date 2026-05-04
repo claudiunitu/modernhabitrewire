@@ -112,6 +112,19 @@ public class AttentionFirewallService extends AccessibilityService {
     private WindowManager windowManager;
     private final Handler frictionOverlayHandler = new Handler(Looper.getMainLooper());
     private static final long FRICTION_MIN_INTERVAL_MS = 3000;
+
+    // Proactive friction ticker: fires even when the page is static (no scroll events)
+    private static final long FRICTION_TICKER_INTERVAL_MS = 2500;
+    private final Handler frictionTickerHandler = new Handler(Looper.getMainLooper());
+    private final Runnable frictionTicker = new Runnable() {
+        @Override
+        public void run() {
+            if (isFrictionRunning && isForbiddenConfirmed) {
+                applyOverlayFriction();
+                frictionTickerHandler.postDelayed(this, FRICTION_TICKER_INTERVAL_MS);
+            }
+        }
+    };
     private long lastOverlayTime = 0;
     private long overlayCooldownUntil = 0;
     
@@ -753,6 +766,8 @@ public class AttentionFirewallService extends AccessibilityService {
             
             if (!isFrictionRunning) {
                 isFrictionRunning = true;
+                frictionTickerHandler.removeCallbacks(frictionTicker);
+                frictionTickerHandler.postDelayed(frictionTicker, FRICTION_TICKER_INTERVAL_MS);
             }
         } else {
             if (lastForbiddenStartTime != 0) {
@@ -761,6 +776,7 @@ public class AttentionFirewallService extends AccessibilityService {
                 notificationHandler.removeCallbacks(notificationTicker);
             }
             
+            frictionTickerHandler.removeCallbacks(frictionTicker);
             isFrictionRunning = false;
             isForbiddenConfirmed = false;
             forbiddenConfirmedAt = 0;
@@ -829,6 +845,7 @@ public class AttentionFirewallService extends AccessibilityService {
         accumulatedForbiddenTimeMs = 0;
         lastForbiddenStartTime = 0;
         
+        frictionTickerHandler.removeCallbacks(frictionTicker);
         isFrictionRunning = false;
         isForbiddenConfirmed = false;
         forbiddenConfirmedAt = 0;
