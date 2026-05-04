@@ -396,13 +396,18 @@ public class AttentionFirewallService extends AccessibilityService {
         if (!currentUrl.equals(prev)) {
             lastObservedUrls.put(config.packageName, currentUrl);
             lastUrlChangeTimes.put(config.packageName, now);
-            bar.recycle();
-            root.recycle();
-            return;
+            // On window state changes (browser restored/tab switch), the URL is already
+            // committed — don't skip; fall through to the forbidden check below.
+            if (eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+                bar.recycle();
+                root.recycle();
+                return;
+            }
         }
 
         long lastChange = lastUrlChangeTimes.getOrDefault(config.packageName, 0L);
-        if (now - lastChange < URL_STABLE_MS) {
+        if (eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                && now - lastChange < URL_STABLE_MS) {
             bar.recycle();
             root.recycle();
             return;
