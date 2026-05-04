@@ -4,7 +4,9 @@ import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 
@@ -13,6 +15,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -23,6 +27,8 @@ import androidx.appcompat.widget.SwitchCompat;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.WindowCompat;
+import com.google.android.material.appbar.MaterialToolbar;
 
 import java.util.Locale;
 
@@ -33,6 +39,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_main);
 
         appPreferencesManager = AppPreferencesManagerSingleton.getInstance(this);
@@ -44,18 +51,36 @@ public class MainActivity extends AppCompatActivity {
         this.requestNotificationPermission();
         this.requestPostNotificationPermision();
 
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+
         initializeUI();
         setWatchers();
         updateUiStates();
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_main, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == R.id.action_help) {
+            startActivity(new Intent(this, HelpActivity.class));
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     private void initializeUI() {
         refreshBlockerButton();
         refreshKeyButton();
         
-        findViewById(R.id.deactivationKeySetterInputText).setVisibility(
+        findViewById(R.id.deactivationKeySetterInputLayout).setVisibility(
             appPreferencesManager.getDeactivationKey().isEmpty() ? View.VISIBLE : View.INVISIBLE);
-        findViewById(R.id.deactivationKeyUnblockerInputText).setVisibility(
+        findViewById(R.id.deactivationKeyUnblockerInputLayout).setVisibility(
             appPreferencesManager.getIsBlockerActive() ? View.VISIBLE : View.INVISIBLE);
 
         ((SwitchCompat) findViewById(R.id.bypassSwitch)).setChecked(appPreferencesManager.getBypassSwitchValue());
@@ -128,6 +153,10 @@ public class MainActivity extends AppCompatActivity {
         RadioGroup rg2 = findViewById(R.id.graceWindowGroup);
         for (int i = 0; i < rg2.getChildCount(); i++) rg2.getChildAt(i).setEnabled(!active);
 
+        findViewById(R.id.dailyBudgetInputLayout).setEnabled(!active);
+        findViewById(R.id.baseWaitInputLayout).setEnabled(!active);
+        findViewById(R.id.costFactorInputLayout).setEnabled(!active);
+        findViewById(R.id.deactivationKeySetterInputLayout).setEnabled(!active);
         findViewById(R.id.deactivationKeySetterInputText).setEnabled(!active);
         findViewById(R.id.deactivationKeyButton).setEnabled(!active);
         findViewById(R.id.button_reset_stats).setEnabled(!active);
@@ -135,12 +164,11 @@ public class MainActivity extends AppCompatActivity {
 
     public void onEditUrlListClick(View v) { startActivity(new Intent(this, UrlListEditorActivity.class)); }
     public void onEditAppPackagesListClick(View v) { startActivity(new Intent(this, AppPackagesListEditorActivity.class)); }
-    public void onHelpClick(View v) { startActivity(new Intent(this, HelpActivity.class)); }
 
     public void onActivateBlockerListClick(View v) {
         if (appPreferencesManager.getIsBlockerActive()) {
             EditText input = findViewById(R.id.deactivationKeyUnblockerInputText);
-            if (appPreferencesManager.getDeactivationKey().equals(input.getText().toString()) || (appPreferencesManager.getBypassSwitchValue() && ChargingState.isCharging)) {
+            if (appPreferencesManager.verifyDeactivationKey(input.getText().toString()) || (appPreferencesManager.getBypassSwitchValue() && isDeviceCharging())) {
                 input.setText("");
                 appPreferencesManager.setIsBlockerActive(false);
                 initializeUI();
@@ -157,6 +185,14 @@ public class MainActivity extends AppCompatActivity {
             initializeUI();
             updateUiStates();
         }
+    }
+
+    private boolean isDeviceCharging() {
+        Intent status = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        if (status == null) return false;
+        int plugged = status.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+        return plugged == BatteryManager.BATTERY_STATUS_CHARGING
+                || plugged == BatteryManager.BATTERY_STATUS_FULL;
     }
 
     public void onDeactivationKeyButtonClick(View v) {
@@ -190,7 +226,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void backButtonPressedDispatcher() { getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) { @Override public void handleOnBackPressed() { finish(); } }); }
-    private void requestDeviceAdminPermission() { startActivity(new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, new ComponentName(this, MyDeviceAdminReceiver.class)).putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Protect uninstallation.")); }
+    private void requestDeviceAdminPermission() {
+        DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
+        ComponentName admin = new ComponentName(this, MyDeviceAdminReceiver.class);
+        if (dpm != null && !dpm.isAdminActive(admin)) {
+            startActivity(new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
+                    .putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin)
+                    .putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Protect uninstallation."));
+        }
+    }
     private void requestNotificationPermission() { if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) { startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName())); } }
     private void requestPostNotificationPermision() { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) { ActivityCompat.requestPermissions(this, new String[]{ android.Manifest.permission.POST_NOTIFICATIONS }, 1); } }
     private void requestAccessibilityPermission() { if (!isAccessEnabled(this, AttentionFirewallService.class)) { startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)); } }

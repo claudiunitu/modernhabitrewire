@@ -1,16 +1,26 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Theme.ModernHabitRewire" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
-        <!-- Primary brand color. -->
-        <item name="colorPrimary">@color/purple_200</item>
-        <item name="colorPrimaryVariant">@color/purple_700</item>
-        <item name="colorOnPrimary">@color/black</item>
-        <!-- Secondary brand color. -->
-        <item name="colorSecondary">@color/teal_200</item>
-        <item name="colorSecondaryVariant">@color/teal_200</item>
-        <item name="colorOnSecondary">@color/black</item>
-        <!-- Status bar color. -->
-        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
-        <!-- Customize your theme here. -->
+<resources>
+    <!-- Dark theme overrides — Material 3 DayNight picks this automatically at night. -->
+    <style name="Theme.ModernHabitRewire" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/md_dark_primary</item>
+        <item name="colorOnPrimary">@color/md_dark_on_primary</item>
+        <item name="colorPrimaryContainer">@color/md_dark_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/md_dark_on_primary_container</item>
+        <item name="colorSecondary">@color/md_dark_secondary</item>
+        <item name="colorOnSecondary">@color/md_dark_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/md_dark_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/md_dark_on_secondary_container</item>
+        <item name="colorTertiary">@color/md_dark_tertiary</item>
+        <item name="colorOnTertiary">@color/md_dark_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/md_dark_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/md_dark_on_tertiary_container</item>
+        <item name="colorError">@color/md_dark_error</item>
+        <item name="colorOnError">@color/md_dark_on_error</item>
+        <item name="android:colorBackground">@color/md_dark_background</item>
+        <item name="colorOnBackground">@color/md_dark_on_background</item>
+        <item name="colorSurface">@color/md_dark_surface</item>
+        <item name="colorOnSurface">@color/md_dark_on_surface</item>
+        <item name="colorSurfaceVariant">@color/md_dark_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/md_dark_on_surface_variant</item>
+        <item name="colorOutline">@color/md_dark_outline</item>
     </style>
 </resources>

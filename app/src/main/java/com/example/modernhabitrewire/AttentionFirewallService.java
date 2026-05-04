@@ -10,19 +10,13 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
-import android.graphics.PixelFormat;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
-import android.view.Gravity;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
@@ -30,7 +24,6 @@ import androidx.core.app.NotificationCompat;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -59,11 +52,14 @@ public class AttentionFirewallService extends AccessibilityService {
     private long accumulatedForbiddenTimeMs = 0;
     private long lastForbiddenStartTime = 0;
     private boolean isForbiddenConfirmed = false;
-    private long forbiddenConfirmedAt = 0;
-    
+
     // Forced Cleanup / Lockout Logic
     private boolean isBudgetLockedOut = false;
-    
+    // MEDIUM-05: Snapshot of remaining budget at session start so mid-session exhaustion
+    // is measured against the allowance for this specific approved session, not the
+    // cumulative stored value (which may already be negative from prior sessions).
+    private long sessionStartBudget = 0;
+
     // Foreground Ownership Tracking
     private String lastForegroundPackage = null;
     private long lastForegroundChangeTime = 0;
@@ -83,6 +79,10 @@ public class AttentionFirewallService extends AccessibilityService {
     private static long lastDecisionGateTime = 0;
     private static final long DECISION_COOLDOWN_MS = 5000;
 
+    // Grace period to protect an approved launch from being cancelled by transient overlays
+    private static long tempAllowGrantedAt = 0;
+    private static final long TEMP_ALLOW_GRACE_MS = 4000;
+
     private final Set<String> installedImePackages = new HashSet<>();
     private final Set<String> launcherPackages = new HashSet<>();
     private List<SupportedBrowserConfig> supportedBrowsers;
@@ -98,192 +98,22 @@ public class AttentionFirewallService extends AccessibilityService {
         }
     };
 
-    // Overlay Friction State
-    private boolean isFrictionRunning = false;
-    private View frictionOverlay = null;
-    private WindowManager windowManager;
-    private final Handler frictionOverlayHandler = new Handler(Looper.getMainLooper());
-    private static final long FRICTION_MIN_INTERVAL_MS = 3000;
-    private long lastOverlayTime = 0;
-    private long overlayCooldownUntil = 0;
-    
-    // Safety Rail: Prevent UI Soft-brick / DoS
-    private static final long MAX_FRICTION_PER_MINUTE_MS = 25000; // 25s max friction per 60s
-    private final LinkedList<FrictionUsageRecord> frictionUsageHistory = new LinkedList<>();
-
-    private static class FrictionUsageRecord {
-        long startTime;
-        long duration;
-        FrictionUsageRecord(long s, long d) { this.startTime = s; this.duration = d; }
-    }
-
-    private boolean isWithinSafetyBounds() {
-        long now = System.currentTimeMillis();
-        long windowStart = now - 60000;
-        long totalDuration = 0;
-        
-        // Clean old records
-        while (!frictionUsageHistory.isEmpty() && frictionUsageHistory.peekFirst().startTime < windowStart) {
-            frictionUsageHistory.removeFirst();
-        }
-        
-        for (FrictionUsageRecord record : frictionUsageHistory) {
-            totalDuration += record.duration;
-        }
-        
-        return totalDuration < MAX_FRICTION_PER_MINUTE_MS;
-    }
-
-    private void applyOverlayFriction() {
-        long now = System.currentTimeMillis();
-        
-        // Only activate friction if the user budget is at or below 0 (authorized via the Decision Gate).
-        if (dopamineBudgetEngine.getRemainingBudget() > 0) return;
-
-        // Hard minimum inter-attempt guard to prevent stack/storming
-        if (now - lastOverlayTime < FRICTION_MIN_INTERVAL_MS) return;
-        if (now < overlayCooldownUntil) return;
-        if (frictionOverlay != null) return;
-        
-        if (!isWithinSafetyBounds()) {
-            Log.w(TAG, "Safety Rail: Friction suspended (Max duration reached)");
-            overlayCooldownUntil = now + 5000; // 5s breather
-            return;
-        }
-
-        // Intensity ramps over 60 seconds of consumption OR if budget is deep in negative
-        long forbiddenSeconds = (now - forbiddenConfirmedAt) / 1000;
-        long budget = dopamineBudgetEngine.getRemainingBudget();
-        
-        // Hostility increases as debt increases
-        double budgetPenalty = (budget < 0) ? Math.min(0.6, (double)Math.abs(budget) / 3000.0) : 0;
-        double intensity = Math.min(1.0, ((double) forbiddenSeconds / 60.0) + budgetPenalty);
-
-        // Reward Coupling: Detect dopamine spike
-        boolean rewardEvent = (now - lastSignificantUiChangeTime < 1000);
-        double probability = 0.1 + intensity * 0.5 + (rewardEvent ? 0.3 : 0);
-
-        if (Math.random() > probability) return;
-
-        lastOverlayTime = now;
-        showFrictionOverlay(intensity);
-    }
-
-    private void showFrictionOverlay(double intensity) {
-        frictionOverlayHandler.post(() -> {
-            if (frictionOverlay != null) return;
-
-            windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-            LayoutInflater inflater = (LayoutInflater) getSystemService(LAYOUT_INFLATER_SERVICE);
-            frictionOverlay = inflater.inflate(R.layout.friction_overlay, null);
-
-            double modeRand = Math.random();
-            int flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-            int width = WindowManager.LayoutParams.MATCH_PARENT;
-            int height = WindowManager.LayoutParams.MATCH_PARENT;
-            int gravity = Gravity.CENTER;
-            
-            TextView msg = frictionOverlay.findViewById(R.id.friction_message);
-            View root = frictionOverlay;
-
-            // HOSTILITY MODES - Simplified to always be full-screen
-            if (intensity > 0.75 && modeRand < 0.3) {
-                // MODE: DEAD TIME
-                root.setBackgroundColor(0xFF000000); 
-                if (msg != null) msg.setVisibility(View.GONE);
-            } else if (intensity > 0.4 && modeRand < 0.6) {
-                // MODE: OCCLUSION (Force Fullscreen)
-                root.setBackgroundColor(0xEE000000); 
-                if (msg != null) msg.setVisibility(View.GONE);
-            } else if (intensity > 0.6 && modeRand < 0.8) {
-                // MODE: MICRO-STUTTER
-                root.setBackgroundColor(0x00000000); 
-                if (msg != null) msg.setVisibility(View.GONE);
-            } else {
-                // MODE: STANDARD GHOSTING
-                root.setBackgroundColor(0x88000000);
-                setupStochasticMessaging(msg, intensity);
-            }
-
-            WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                    width, height,
-                    WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-                    flags,
-                    PixelFormat.TRANSLUCENT
-            );
-            params.gravity = gravity;
-
-            final boolean shouldKickHome = (intensity > 0.6) && (Math.random() < (intensity * 0.3));
-
-            try {
-                windowManager.addView(frictionOverlay, params);
-                appPreferencesManager.incrementFrictionShown();
-                long startTime = System.currentTimeMillis();
-                
-                // Randomize duration
-                long duration = 500 + (long) (Math.random() * intensity * 10000);
-                
-                frictionOverlayHandler.postDelayed(() -> {
-                    long actualDuration = System.currentTimeMillis() - startTime;
-                    if (frictionOverlay != null) {
-                        appPreferencesManager.incrementFrictionEndured();
-                    }
-                    hideFrictionOverlay();
-                    frictionUsageHistory.add(new FrictionUsageRecord(startTime, actualDuration));
-
-                    // Perceptual smoothing: Intensity-based buffer
-                    overlayCooldownUntil = System.currentTimeMillis() + (intensity > 0.7 ? 2000 : 500) + (long)(Math.random() * intensity * 5000);
-                    
-                    if (shouldKickHome) {
-                        Log.d(TAG, "Friction Hostility: Kicking to HOME");
-                        lastHomeKickTime = System.currentTimeMillis();
-                        performGlobalAction(GLOBAL_ACTION_HOME);
-                    }
-                }, duration);
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to add friction overlay", e);
-                frictionOverlay = null;
-            }
-        });
-    }
-
-    private void setupStochasticMessaging(TextView msg, double intensity) {
-        if (msg == null) return;
-        double msgRand = Math.random();
-        if (msgRand < 0.10) {
-            int[] hintResIds = {
-                    R.string.friction_hint_pause,
-                    R.string.friction_hint_enough,
-                    R.string.friction_hint_tired,
-                    R.string.friction_hint_breathe
-            };
-            msg.setText(getString(hintResIds[(int)(Math.random() * hintResIds.length)]));
-            msg.setVisibility(View.VISIBLE);
-        } else {
-            msg.setVisibility(View.GONE);
-        }
-    }
-
-    private void hideFrictionOverlay() {
-        if (frictionOverlay != null) {
-            try {
-                windowManager.removeView(frictionOverlay);
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to remove friction overlay", e);
-            }
-            frictionOverlay = null;
-        }
-    }
-
     public static void notifyGateClosed() {
         lastDecisionGateTime = System.currentTimeMillis();
         Log.d(TAG, "Gate closure notified. Cooldown reset.");
+    }
+
+    public static void notifyTempAllowGranted() {
+        tempAllowGrantedAt = System.currentTimeMillis();
     }
 
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
         appPreferencesManager = AppPreferencesManagerSingleton.getInstance(this);
+        // CRITICAL-01: Clear any stale temp-allow flag that survived a process death so a
+        // previous gate approval can never silently bypass enforcement after restart.
+        appPreferencesManager.setTempAllowAppLaunch(false);
         dopamineBudgetEngine = new DopamineBudgetEngine(this);
         this.supportedBrowsers = getSupportedBrowsers();
         
@@ -293,9 +123,8 @@ public class AttentionFirewallService extends AccessibilityService {
         updateStatsNotification();
 
         AccessibilityServiceInfo info = new AccessibilityServiceInfo();
-        info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED | 
-                         AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED | 
-                         AccessibilityEvent.TYPE_VIEW_SCROLLED;
+        info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED |
+                         AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED;
         info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC;
         info.flags = AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS | AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
         setServiceInfo(info);
@@ -392,15 +221,18 @@ public class AttentionFirewallService extends AccessibilityService {
         }
     }
 
-    // Micro-stutter / Reward coupling state
-    private int lastNodeCount = 0;
-    private long lastSignificantUiChangeTime = 0;
-    
-    // Retry / Persistence Tracking
-    private long lastHomeKickTime = 0;
+    // Current window class tracking for danger-zone detection
+    private String lastWindowClassName = "";
+
+    // Notification throttle: avoid heavy I/O on every accessibility event
+    private long lastNotificationUpdateTime = 0;
+    private static final long NOTIFICATION_THROTTLE_MS = 1000;
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
+        // Guard: managers are initialised in onServiceConnected; ignore any events
+        // that arrive before that callback completes.
+        if (appPreferencesManager == null || dopamineBudgetEngine == null) return;
         if (event.getPackageName() == null) return;
         String packageName = event.getPackageName().toString();
         int eventType = event.getEventType();
@@ -408,6 +240,10 @@ public class AttentionFirewallService extends AccessibilityService {
         if (packageName.equals(APP_PACKAGE)) {
             updateStatsNotification();
             return;
+        }
+
+        if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && event.getClassName() != null) {
+            lastWindowClassName = event.getClassName().toString();
         }
 
         if (appPreferencesManager.getForbidSettingsSwitchValue() && DANGER_PACKAGES.contains(packageName)) {
@@ -433,17 +269,20 @@ public class AttentionFirewallService extends AccessibilityService {
 
         if (appPreferencesManager.getTempAllowAppLaunch()) {
             if (isApprovedPackage(packageName)) {
-                // Tracking retry latency after HOME kick (Gated to 10s)
-                if (lastHomeKickTime > 0 && now - lastHomeKickTime < 10000) {
-                    appPreferencesManager.recordRetryLatency(now - lastHomeKickTime);
-                    lastHomeKickTime = 0;
-                }
                 appPreferencesManager.setTempAllowAppLaunch(false);
                 startStickySession(packageName);
                 return; 
             }
-            if (isTransientSystemOverlay(packageName) || isLauncherPackage(packageName)) return; 
-            if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) appPreferencesManager.setTempAllowAppLaunch(false);
+            if (isTransientSystemOverlay(packageName) || isLauncherPackage(packageName)) return;
+            if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+                // Grace period: don't cancel an approved launch in the first TEMP_ALLOW_GRACE_MS
+                // after the flag was granted. This prevents brief system overlays (e.g. Google
+                // Play Services dialogs, permission prompts) from killing the launch before
+                // the target app has had a chance to appear in the foreground.
+                if (System.currentTimeMillis() - tempAllowGrantedAt > TEMP_ALLOW_GRACE_MS) {
+                    appPreferencesManager.setTempAllowAppLaunch(false);
+                }
+            }
         }
 
         if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
@@ -453,10 +292,6 @@ public class AttentionFirewallService extends AccessibilityService {
             
             if (activeStickyPackage != null) {
                 if (!packageName.equals(activeStickyPackage) && !isTransient) {
-                    if (isFrictionRunning) {
-                        appPreferencesManager.incrementFrictionAborted();
-                    }
-                    
                     endStickySession();
                     if (!isExtractive && !isLauncher) isBudgetLockedOut = false;
                 }
@@ -472,45 +307,20 @@ public class AttentionFirewallService extends AccessibilityService {
 
         if (eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED || eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             handleUrlInterception(packageName, eventType);
-            
-            // Reward Coupling: Detect dopamine spike
-            if (eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED && event.getSource() != null) {
-                AccessibilityNodeInfo source = event.getSource();
-                int count = countNodes(source);
-                if (Math.abs(count - lastNodeCount) > 20) { 
-                    lastSignificantUiChangeTime = now;
-                }
-                lastNodeCount = count;
-                source.recycle();
-            }
         }
 
-        // Apply stochastic occlusion friction
-        if (isFrictionRunning && isForbiddenConfirmed) {
-            if (eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED || 
-                eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
-                applyOverlayFriction();
-            }
-        }
-        
         if (activeStickyPackage != null) {
             checkLiveBudgetExhaustion();
         }
 
-        updateStatsNotification();
-    }
-
-    private int countNodes(AccessibilityNodeInfo node) {
-        if (node == null) return 0;
-        int count = 1;
-        for (int i = 0; i < node.getChildCount(); i++) {
-            AccessibilityNodeInfo child = node.getChild(i);
-            if (child != null) {
-                count += countNodes(child);
-                child.recycle();
-            }
+        // Throttle notification updates: the 1-second ticker handles updates while
+        // forbidden time is actively running; outside of that, cap at once per second
+        // to avoid SharedPreferences reads + NotificationManager.notify() on every scroll.
+        long now2 = System.currentTimeMillis();
+        if (lastForbiddenStartTime == 0 && now2 - lastNotificationUpdateTime >= NOTIFICATION_THROTTLE_MS) {
+            lastNotificationUpdateTime = now2;
+            updateStatsNotification();
         }
-        return count;
     }
 
     private void onForegroundAppChanged(String packageName) {
@@ -525,13 +335,13 @@ public class AttentionFirewallService extends AccessibilityService {
                 updateForbiddenTimer(true);
                 return;
             }
-            if (dopamineBudgetEngine.getRemainingBudget() <= 0 && !isApprovedPackage(packageName)) {
-                triggerDecisionGate();
+            if (dopamineBudgetEngine.getRemainingBudget() <= 0) {
+                performGlobalAction(GLOBAL_ACTION_HOME);
                 return;
             }
             dopamineBudgetEngine.resetBudgetIfNeeded();
             appPreferencesManager.setLastInterceptedApp(packageName);
-            appPreferencesManager.setLastInterceptedUrl(""); 
+            appPreferencesManager.setLastInterceptedUrl("");
             triggerDecisionGate();
         }
     }
@@ -572,6 +382,7 @@ public class AttentionFirewallService extends AccessibilityService {
         // 1. URL missing → uncertainty
         // -----------------------------
         if (bar == null || bar.getText() == null) {
+            if (bar != null) bar.recycle();
             root.recycle();
             return;
         }
@@ -621,10 +432,10 @@ public class AttentionFirewallService extends AccessibilityService {
                 return;
             }
 
-            if (dopamineBudgetEngine.getRemainingBudget() <= 0 && activeStickyPackage == null) {
-                triggerDecisionGate();
+            if (dopamineBudgetEngine.getRemainingBudget() <= 0) {
                 bar.recycle();
                 root.recycle();
+                performGlobalAction(GLOBAL_ACTION_BACK);
                 return;
             }
 
@@ -693,15 +504,10 @@ public class AttentionFirewallService extends AccessibilityService {
         if (isForbidden) {
             if (!isForbiddenConfirmed) {
                 isForbiddenConfirmed = true;
-                forbiddenConfirmedAt = now;
             }
             if (lastForbiddenStartTime == 0) {
                 lastForbiddenStartTime = now;
                 notificationHandler.post(notificationTicker);
-            }
-            
-            if (!isFrictionRunning) {
-                isFrictionRunning = true;
             }
         } else {
             if (lastForbiddenStartTime != 0) {
@@ -709,45 +515,54 @@ public class AttentionFirewallService extends AccessibilityService {
                 lastForbiddenStartTime = 0;
                 notificationHandler.removeCallbacks(notificationTicker);
             }
-            
-            isFrictionRunning = false;
             isForbiddenConfirmed = false;
-            forbiddenConfirmedAt = 0;
-            hideFrictionOverlay();
         }
     }
 
     private void checkLiveBudgetExhaustion() {
-        if (activeStickyPackage == null || isBudgetLockedOut || dopamineBudgetEngine.getRemainingBudget() <= 0) return;
-        
-        long remainingUnits = dopamineBudgetEngine.getRemainingBudget();
+        if (activeStickyPackage == null || isBudgetLockedOut) return;
+        if (sessionStartBudget <= 0) return;
+
         long currentForbiddenSegmentMs = (lastForbiddenStartTime == 0) ? 0 : (System.currentTimeMillis() - lastForbiddenStartTime);
         long totalForbiddenTimeMs = accumulatedForbiddenTimeMs + currentForbiddenSegmentMs;
-        
         long unitCost = dopamineBudgetEngine.calculateEscalatedCost(totalForbiddenTimeMs);
 
-        if (remainingUnits <= 0 || unitCost >= remainingUnits) {
+        if (unitCost >= sessionStartBudget) {
             isBudgetLockedOut = true;
-            appPreferencesManager.setLastInterceptedApp(activeStickyPackage);
             endStickySession();
-            triggerDecisionGate();
+            performGlobalAction(GLOBAL_ACTION_HOME);
         }
     }
 
     private void startStickySession(String packageName) {
-        isBudgetLockedOut = false; 
+        isBudgetLockedOut = false;
+        sessionStartBudget = dopamineBudgetEngine.getRemainingBudget();
 
         activeStickyPackage = packageName;
         sessionApprovedPatterns.clear();
         String interceptedUrl = appPreferencesManager.getLastInterceptedUrl();
         if (!interceptedUrl.isEmpty()) sessionApprovedPatterns.add(interceptedUrl);
-        
+
         accumulatedForbiddenTimeMs = 0;
         isForbiddenConfirmed = false;
-        forbiddenConfirmedAt = 0;
-        lastForbiddenStartTime = 0; 
-        
+        lastForbiddenStartTime = 0;
+
         dopamineBudgetEngine.incrementSessionCount();
+
+        // For non-browser apps the entire session is forbidden time, so start the timer
+        // immediately. Browser sessions let checkBrowserUrl() start/stop the timer based
+        // on whether a forbidden URL pattern is currently committed in the address bar.
+        if (!isBrowserPackage(packageName)) {
+            updateForbiddenTimer(true);
+        }
+    }
+
+    private boolean isBrowserPackage(String packageName) {
+        if (supportedBrowsers == null || packageName == null) return false;
+        for (SupportedBrowserConfig browser : supportedBrowsers) {
+            if (packageName.equals(browser.packageName)) return true;
+        }
+        return false;
     }
 
     private void endStickySession() {
@@ -759,11 +574,7 @@ public class AttentionFirewallService extends AccessibilityService {
         sessionApprovedPatterns.clear();
         accumulatedForbiddenTimeMs = 0;
         lastForbiddenStartTime = 0;
-        
-        isFrictionRunning = false;
         isForbiddenConfirmed = false;
-        forbiddenConfirmedAt = 0;
-        hideFrictionOverlay();
         notificationHandler.removeCallbacks(notificationTicker);
         updateStatsNotification();
     }
@@ -800,37 +611,69 @@ public class AttentionFirewallService extends AccessibilityService {
 
     private void triggerDecisionGate() {
         lastDecisionGateTime = System.currentTimeMillis();
-        
+
         if (activeStickyPackage != null) {
             endStickySession();
         }
+
+        // Reset foreground tracking so the forbidden app is always re-detected when
+        // it returns to foreground, regardless of how the gate was dismissed (Cancel
+        // button, hardware back, or system navigation). Without this, the gate never
+        // re-fires if lastForegroundPackage still equals the forbidden app's package.
+        lastForegroundPackage = null;
 
         Intent intent = new Intent(this, DecisionGateActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         startActivity(intent);
     }
 
+    // Class-name substrings that identify app-info / package-installer screens —
+    // the only screens that show actionable "Uninstall" and "Force Stop" buttons for our app.
+    private static final List<String> APP_INFO_CLASS_FRAGMENTS = Arrays.asList(
+            "AppInfoDashboard", "InstalledAppDetails", "AppInfoBase",
+            "ManageApplications", "AppStorageSettings", "AppNotificationSettings",
+            "UninstallerActivity", "PackageInstallerActivity", "InstallAppProgress",
+            "UninstallAppProgress", "DeletePackage"
+    );
+
     private boolean isDangerZoneActive() {
+        // Use the window class name to determine whether we are on a genuine
+        // app-info or uninstaller screen — NOT an accessibility settings screen.
+        // Accessibility screens have class names containing "accessibility" or "Accessibility".
+        String cls = lastWindowClassName.toLowerCase();
+        if (cls.contains("accessibility")) return false;
+
+        // Must be on a known app-info / package-installer screen.
+        boolean onAppInfoScreen = false;
+        for (String fragment : APP_INFO_CLASS_FRAGMENTS) {
+            if (lastWindowClassName.contains(fragment)) {
+                onAppInfoScreen = true;
+                break;
+            }
+        }
+        if (!onAppInfoScreen) return false;
+
+        // Confirm the screen is actually about our app by scanning text.
         AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return false;
-        boolean foundOurApp = findTextRecursive(root, APP_PACKAGE) || findTextRecursive(root, APP_NAME);
-        boolean isDestructive = false;
-        if (foundOurApp) {
-            isDestructive = findTextRecursive(root, "info") || findTextRecursive(root, "details") || 
-                                    findTextRecursive(root, "storage") || findTextRecursive(root, "admin") || 
-                                    findTextRecursive(root, "service") || findTextRecursive(root, "off");
-        }
+        boolean foundOurApp = findTextRecursive(root, APP_PACKAGE)
+                || findTextRecursive(root, APP_NAME);
         root.recycle();
-        return foundOurApp && isDestructive;
+        return foundOurApp;
     }
 
     private boolean findTextRecursive(AccessibilityNodeInfo node, String text) {
-        if (node == null) return false;
-        if (node.getText() != null && node.getText().toString().toLowerCase().contains(text.toLowerCase())) return true;
-        if (node.getContentDescription() != null && node.getContentDescription().toString().toLowerCase().contains(text.toLowerCase())) return true;
+        return findTextRecursiveInternal(node, text.toLowerCase(), 0);
+    }
+
+    // MEDIUM-03: Depth-limited to prevent StackOverflowError on deep accessibility trees.
+    private boolean findTextRecursiveInternal(AccessibilityNodeInfo node, String lowerText, int depth) {
+        if (node == null || depth > 30) return false;
+        if (node.getText() != null && node.getText().toString().toLowerCase().contains(lowerText)) return true;
+        if (node.getContentDescription() != null && node.getContentDescription().toString().toLowerCase().contains(lowerText)) return true;
         for (int i = 0; i < node.getChildCount(); i++) {
             AccessibilityNodeInfo child = node.getChild(i);
-            if (findTextRecursive(child, text)) {
+            if (findTextRecursiveInternal(child, lowerText, depth + 1)) {
                 if (child != null) child.recycle();
                 return true;
             }
@@ -861,13 +704,10 @@ public class AttentionFirewallService extends AccessibilityService {
         return null;
     }
 
-    @Override public void onInterrupt() {
-        hideFrictionOverlay();
-    }
+    @Override public void onInterrupt() {}
 
     @Override public void onDestroy() {
         super.onDestroy();
-        hideFrictionOverlay();
     }
 
     private static class SupportedBrowserConfig {

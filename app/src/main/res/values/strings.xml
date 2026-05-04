@@ -72,4 +72,23 @@
     <string name="friction_hint_tired">You\'re tired.</string>
     <string name="friction_hint_breathe">Breathe.</string>
     <string name="friction_hint_stop_enough">Enough. Stop.</string>
-</resources>
+
+        <!-- UI section titles -->
+        <string name="blocked_content_section_title">Blocked Content</string>
+        <string name="security_section_title">Security</string>
+
+        <!-- Recovery / Grace labels -->
+        <string name="recovery_speed_label">Recovery Speed</string>
+        <string name="grace_window_label">Grace Window</string>
+        <string name="slow">Slow</string>
+        <string name="normal">Normal</string>
+        <string name="fast">Fast</string>
+        <string name="short_label">Short</string>
+        <string name="long_label">Long</string>
+
+        <!-- Help screen -->
+        <string name="done_label">Done</string>
+
+        <!-- Adapter toast -->
+        <string name="blocker_active_cannot_remove">Blocker is active. Cannot remove item.</string>
+    </resources>

@@ -2,10 +2,13 @@ package com.example.modernhabitrewire;
 
 import android.os.Bundle;
 import android.widget.Button;
-import android.widget.EditText;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.WindowCompat;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.textfield.TextInputEditText;
 
 public class AppPackagesListEditorActivity extends AppCompatActivity {
 
@@ -15,12 +18,16 @@ public class AppPackagesListEditorActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_package_name_list_editor);
 
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
         appPreferencesManagerSingleton = AppPreferencesManagerSingleton.getInstance(this);
 
-        EditText packageNameInput = findViewById(R.id.packageNameInput);
+        TextInputEditText packageNameEditText = findViewById(R.id.packageNameEditText);
         Button addButton = findViewById(R.id.addButton);
         RecyclerView recyclerView = findViewById(R.id.appPackageRecyclerView);
 
@@ -32,18 +39,23 @@ public class AppPackagesListEditorActivity extends AppCompatActivity {
         recyclerView.setAdapter(adapter);
 
         addButton.setOnClickListener(v -> {
-            String newAppPackage = packageNameInput.getText().toString().trim();
+            String newAppPackage = packageNameEditText.getText() != null
+                    ? packageNameEditText.getText().toString().trim() : "";
             if (!newAppPackage.isEmpty()) {
                 appPreferencesManagerSingleton.addExtractiveAppPackage(newAppPackage);
-                packageNameInput.setText("");
+                packageNameEditText.setText("");
                 refreshList();
             }
         });
     }
 
+    @Override
+    public boolean onSupportNavigateUp() {
+        finish();
+        return true;
+    }
+
     private void refreshList() {
         adapter.updateList(appPreferencesManagerSingleton.getExtractiveAppsPackages());
     }
-
-
 }

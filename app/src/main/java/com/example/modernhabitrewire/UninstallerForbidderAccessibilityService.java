@@ -116,15 +116,18 @@ public class UninstallerForbidderAccessibilityService extends AccessibilityServi
         }
 
         if (!findRecursiveNodesWithContent(root, APP_NAME)) {
+            root.recycle();
             return false;
         }
 
-        return findRecursiveNodesWithContent(root, "info") ||
+        boolean result = findRecursiveNodesWithContent(root, "info") ||
                 findRecursiveNodesWithContent(root, "permi") ||
                 findRecursiveNodesWithContent(root, "notif") ||
                 findRecursiveNodesWithContent(root, "vers") ||
                 findRecursiveNodesWithContent(root, "admin") ||
                 findRecursiveNodesWithContent(root, "instal");
+        root.recycle();
+        return result;
     }
 
     private boolean redirectIfOpenedThisAppInSettings(AccessibilityEvent accessibilityEvent, CharSequence packageName) {
@@ -151,23 +154,28 @@ public class UninstallerForbidderAccessibilityService extends AccessibilityServi
     }
 
     private Boolean findRecursiveNodesWithContent(AccessibilityNodeInfo node, String query) {
-        if (node == null) return false;
+        return findRecursiveNodesWithContentInternal(node, query.toLowerCase(), 0);
+    }
+
+    // MEDIUM-03: Depth-limited to prevent StackOverflowError on deep accessibility trees.
+    private Boolean findRecursiveNodesWithContentInternal(AccessibilityNodeInfo node, String lowerQuery, int depth) {
+        if (node == null || depth > 30) return false;
 
         CharSequence text = node.getText();
         CharSequence desc = node.getContentDescription();
 
-        if ((text != null && text.toString().toLowerCase().contains(query.toLowerCase())) ||
-                (desc != null && desc.toString().toLowerCase().contains(query.toLowerCase()))) {
+        if ((text != null && text.toString().toLowerCase().contains(lowerQuery)) ||
+                (desc != null && desc.toString().toLowerCase().contains(lowerQuery))) {
             return true;
         }
 
         for (int i = 0; i < node.getChildCount(); i++) {
 
             AccessibilityNodeInfo child = node.getChild(i);
-            if(child == null){
-                return false;
+            if (child == null) {
+                continue;  // null child is legitimate on Android; don't abort sibling search
             }
-            Boolean found = findRecursiveNodesWithContent(child, query);
+            Boolean found = findRecursiveNodesWithContentInternal(child, lowerQuery, depth + 1);
 
             if (found) {
                 child.recycle();

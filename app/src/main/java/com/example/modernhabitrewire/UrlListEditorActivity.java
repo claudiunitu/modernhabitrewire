@@ -1,9 +1,12 @@
 package com.example.modernhabitrewire;
 import android.os.Bundle;
 import android.widget.Button;
-import android.widget.EditText;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.WindowCompat;
 import androidx.recyclerview.widget.RecyclerView;
+import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.textfield.TextInputEditText;
+
 public class UrlListEditorActivity extends AppCompatActivity {
 
     private AppPreferencesManagerSingleton appPreferencesManagerSingleton;
@@ -12,12 +15,16 @@ public class UrlListEditorActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_url_list_editor);
 
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
         appPreferencesManagerSingleton = AppPreferencesManagerSingleton.getInstance(this);
 
-        EditText urlInput = findViewById(R.id.packageNameInput);
+        TextInputEditText urlEditText = findViewById(R.id.urlEditText);
         Button addButton = findViewById(R.id.addButton);
         RecyclerView recyclerView = findViewById(R.id.urlRecyclerView);
 
@@ -29,18 +36,23 @@ public class UrlListEditorActivity extends AppCompatActivity {
         recyclerView.setAdapter(adapter);
 
         addButton.setOnClickListener(v -> {
-            String newUrl = urlInput.getText().toString().trim();
+            String newUrl = urlEditText.getText() != null
+                    ? urlEditText.getText().toString().trim() : "";
             if (!newUrl.isEmpty()) {
                 appPreferencesManagerSingleton.addForbiddenUrl(newUrl);
-                urlInput.setText("");
+                urlEditText.setText("");
                 refreshList();
             }
         });
     }
 
+    @Override
+    public boolean onSupportNavigateUp() {
+        finish();
+        return true;
+    }
+
     private void refreshList() {
         adapter.updateList(appPreferencesManagerSingleton.getForbiddenUrls());
     }
-
-
 }
