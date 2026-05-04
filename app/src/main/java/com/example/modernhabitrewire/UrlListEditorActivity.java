@@ -56,38 +56,3 @@ public class UrlListEditorActivity extends AppCompatActivity {
         adapter.updateList(appPreferencesManagerSingleton.getForbiddenUrls());
     }
 }
-
-        appPreferencesManagerSingleton = AppPreferencesManagerSingleton.getInstance(this);
-
-        TextInputEditText urlEditText = findViewById(R.id.urlEditText);
-        Button addButton = findViewById(R.id.addButton);
-        RecyclerView recyclerView = findViewById(R.id.urlRecyclerView);
-
-        adapter = new UrlListRecyclerAdapter(appPreferencesManagerSingleton.getForbiddenUrls(), url -> {
-            appPreferencesManagerSingleton.removeUrl(url);
-            refreshList();
-        });
-
-        recyclerView.setAdapter(adapter);
-
-        addButton.setOnClickListener(v -> {
-            String newUrl = urlEditText.getText() != null
-                    ? urlEditText.getText().toString().trim() : "";
-            if (!newUrl.isEmpty()) {
-                appPreferencesManagerSingleton.addForbiddenUrl(newUrl);
-                urlEditText.setText("");
-                refreshList();
-            }
-        });
-    }
-
-    @Override
-    public boolean onSupportNavigateUp() {
-        finish();
-        return true;
-    }
-
-    private void refreshList() {
-        adapter.updateList(appPreferencesManagerSingleton.getForbiddenUrls());
-    }
-}
