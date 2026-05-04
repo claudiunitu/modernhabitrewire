@@ -103,9 +103,6 @@ public class AttentionFirewallService extends AccessibilityService {
     };
 
     public static void notifyGateClosed() {
-        // Do not set the decision cooldown on cancel/dismiss — that would suppress
-        // re-detection when the user re-opens the browser with a forbidden URL loaded.
-        // The cooldown is set by triggerDecisionGate() at the point of launch.
         Log.d(TAG, "Gate closed (cancelled).");
     }
 
@@ -113,9 +110,19 @@ public class AttentionFirewallService extends AccessibilityService {
         tempAllowGrantedAt = System.currentTimeMillis();
     }
 
+    public static void notifyGateCancelled() {
+        if (instance != null) {
+            instance.performGlobalAction(GLOBAL_ACTION_BACK);
+        }
+    }
+
+    // Static instance so activities can request a back action via the service
+    private static AttentionFirewallService instance;
+
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
+        instance = this;
         appPreferencesManager = AppPreferencesManagerSingleton.getInstance(this);
         // CRITICAL-01: Clear any stale temp-allow flag that survived a process death so a
         // previous gate approval can never silently bypass enforcement after restart.
@@ -757,6 +764,7 @@ public class AttentionFirewallService extends AccessibilityService {
 
     @Override public void onDestroy() {
         super.onDestroy();
+        instance = null;
     }
 
     private static class SupportedBrowserConfig {

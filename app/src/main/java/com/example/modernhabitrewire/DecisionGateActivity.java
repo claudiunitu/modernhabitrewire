@@ -143,12 +143,7 @@ public class DecisionGateActivity extends AppCompatActivity {
 
     private void goHome() {
         AttentionFirewallService.notifyGateClosed();
-        
-        Intent homeIntent = new Intent(Intent.ACTION_MAIN);
-        homeIntent.addCategory(Intent.CATEGORY_HOME);
-        homeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        startActivity(homeIntent);
-        
+        AttentionFirewallService.notifyGateCancelled();
         finish();
     }
 
