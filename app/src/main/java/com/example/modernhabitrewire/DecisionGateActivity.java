@@ -28,7 +28,7 @@ public class DecisionGateActivity extends AppCompatActivity {
     private Button cancelButton;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private int countdownSeconds = 0;
-    private boolean isExhaustedMode = false;
+    private boolean isExhaustedMode = false; // kept for layout compatibility; gate is never reached when budget <= 0
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,7 +55,7 @@ public class DecisionGateActivity extends AppCompatActivity {
         updateAwarenessMirror();
 
         proceedButton.setOnClickListener(v -> {
-            if (appPreferencesManager.getLaunchFrictionEnabled() || isExhaustedMode) {
+            if (appPreferencesManager.getLaunchFrictionEnabled()) {
                 startFrictionDelay();
             } else {
                 launchTargetApp();
@@ -91,7 +91,6 @@ public class DecisionGateActivity extends AppCompatActivity {
 
         if (remainingUnits <= 0) {
             isExhaustedMode = true;
-            proceedButton.setText(R.string.budget_exhausted_overdraw);
         }
     }
 
