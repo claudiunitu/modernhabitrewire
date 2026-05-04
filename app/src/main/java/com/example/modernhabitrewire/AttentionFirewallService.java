@@ -70,6 +70,10 @@ public class AttentionFirewallService extends AccessibilityService {
     private final Map<String, Long> lastUrlChangeTimes = new HashMap<>();
     private static final long URL_STABLE_MS = 800;
 
+    // Deferred URL checks: fire after stability window even if no further events arrive
+    private final Handler urlCheckHandler = new Handler(Looper.getMainLooper());
+    private final Map<String, Runnable> pendingUrlChecks = new HashMap<>();
+
     // Forbidden / Safe hysteresis
     private long lastForbiddenSeenAt = 0;
     private long lastSafeSeenAt = 0;
@@ -99,8 +103,10 @@ public class AttentionFirewallService extends AccessibilityService {
     };
 
     public static void notifyGateClosed() {
-        lastDecisionGateTime = System.currentTimeMillis();
-        Log.d(TAG, "Gate closure notified. Cooldown reset.");
+        // Do not set the decision cooldown on cancel/dismiss — that would suppress
+        // re-detection when the user re-opens the browser with a forbidden URL loaded.
+        // The cooldown is set by triggerDecisionGate() at the point of launch.
+        Log.d(TAG, "Gate closed (cancelled).");
     }
 
     public static void notifyTempAllowGranted() {
@@ -399,6 +405,8 @@ public class AttentionFirewallService extends AccessibilityService {
             // On window state changes (browser restored/tab switch), the URL is already
             // committed — don't skip; fall through to the forbidden check below.
             if (eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+                // Schedule a deferred check so it fires even if no further events arrive
+                scheduleDeferredUrlCheck(config, currentUrl);
                 bar.recycle();
                 root.recycle();
                 return;
@@ -431,7 +439,11 @@ public class AttentionFirewallService extends AccessibilityService {
             lastForbiddenSeenAt = now;
             lastSafeSeenAt = 0;
 
-            if (System.currentTimeMillis() - lastDecisionGateTime < DECISION_COOLDOWN_MS) {
+            // Only apply cooldown when there is an active session to prevent
+            // mid-session gate loops. Outside a session (fresh browser open),
+            // always enforce immediately.
+            if (activeStickyPackage != null &&
+                    System.currentTimeMillis() - lastDecisionGateTime < DECISION_COOLDOWN_MS) {
                 bar.recycle();
                 root.recycle();
                 return;
@@ -482,6 +494,37 @@ public class AttentionFirewallService extends AccessibilityService {
 
         bar.recycle();
         root.recycle();
+    }
+
+    private void scheduleDeferredUrlCheck(SupportedBrowserConfig config, String url) {
+        // Cancel any previously scheduled check for this browser (URL may have changed again)
+        Runnable existing = pendingUrlChecks.get(config.packageName);
+        if (existing != null) urlCheckHandler.removeCallbacks(existing);
+
+        Runnable check = () -> {
+            pendingUrlChecks.remove(config.packageName);
+            // Ignore if the URL has already been superseded by a newer observation
+            String current = lastObservedUrls.get(config.packageName);
+            if (!url.equals(current)) return;
+
+            for (String pattern : appPreferencesManager.getForbiddenUrls()) {
+                String p = pattern.toLowerCase().trim();
+                if (!p.isEmpty() && url.contains(p)) {
+                    if (dopamineBudgetEngine.getRemainingBudget() <= 0) {
+                        performGlobalAction(GLOBAL_ACTION_BACK);
+                    } else if (activeStickyPackage == null
+                            && System.currentTimeMillis() - lastDecisionGateTime >= DECISION_COOLDOWN_MS) {
+                        dopamineBudgetEngine.resetBudgetIfNeeded();
+                        appPreferencesManager.setLastInterceptedApp(config.packageName);
+                        appPreferencesManager.setLastInterceptedUrl(pattern);
+                        triggerDecisionGate();
+                    }
+                    break;
+                }
+            }
+        };
+        pendingUrlChecks.put(config.packageName, check);
+        urlCheckHandler.postDelayed(check, URL_STABLE_MS);
     }
 
     private boolean isKnownSafeNewTab(String url) {
