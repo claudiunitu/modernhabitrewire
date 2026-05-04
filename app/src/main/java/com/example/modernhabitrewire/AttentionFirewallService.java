@@ -342,7 +342,7 @@ public class AttentionFirewallService extends AccessibilityService {
                 return;
             }
             if (dopamineBudgetEngine.getRemainingBudget() <= 0) {
-                performGlobalAction(GLOBAL_ACTION_HOME);
+                performGlobalAction(GLOBAL_ACTION_BACK);
                 return;
             }
             dopamineBudgetEngine.resetBudgetIfNeeded();
@@ -421,7 +421,8 @@ public class AttentionFirewallService extends AccessibilityService {
             return;
         }
 
-        boolean committed = !bar.isFocused() || eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED;
+        // Bar focused = user is editing the URL to navigate away. Never block in that state.
+        boolean committed = !bar.isFocused();
 
         // -----------------------------
         // 3. Forbidden match
@@ -578,7 +579,7 @@ public class AttentionFirewallService extends AccessibilityService {
         if (unitCost >= sessionStartBudget) {
             isBudgetLockedOut = true;
             endStickySession();
-            performGlobalAction(GLOBAL_ACTION_HOME);
+            performGlobalAction(GLOBAL_ACTION_BACK);
         }
     }
 
