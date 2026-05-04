@@ -64,7 +64,7 @@ public class AppPackagesListRecyclerAdapter extends RecyclerView.Adapter<AppPack
             if(!appPreferencesManagerSingleton.getIsBlockerActive()){
                 deleteListener.onDeleteClick(appPackage);
             } else {
-                Toast toast = Toast.makeText(context, "Blocker is active. Cannot remove item.",  Toast.LENGTH_SHORT);
+                    Toast toast = Toast.makeText(context, context.getString(R.string.blocker_active_cannot_remove), Toast.LENGTH_SHORT);
                 toast.show();
             }
 

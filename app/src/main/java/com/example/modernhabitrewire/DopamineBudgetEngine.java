@@ -62,12 +62,9 @@ public class DopamineBudgetEngine {
         // This allows carrying over debt (negative balance) while preventing hoarding.
         long newTotal = Math.min(dailyAllowance, currentRemaining + dailyAllowance);
         
-        appPreferencesManager.setRemainingPotentialUnits(newTotal);
-        appPreferencesManager.setDailySessionCount(0);
-        appPreferencesManager.setLastBudgetResetDate(dateString);
-        
-        appPreferencesManager.setDailyForbiddenTimeMs(0);
-        appPreferencesManager.setDailySessionTimeSumMs(0);
+        // HIGH-04: Write all reset fields atomically to prevent inconsistent state on
+        // process death (previously 5 separate apply()/commit() calls).
+        appPreferencesManager.commitResetBatch(newTotal, 0, dateString, 0, 0);
         
         Log.d(TAG, "Cumulative budget reset. New Potential: " + newTotal + " DU");
     }
@@ -147,36 +144,34 @@ public class DopamineBudgetEngine {
 
     public void depleteBudget(long timeSpentMillis) {
         resetBudgetIfNeeded();
-        
+
         long dailyForbidden = appPreferencesManager.getDailyForbiddenTimeMs() + timeSpentMillis;
         long dailySessionSum = appPreferencesManager.getDailySessionTimeSumMs() + timeSpentMillis;
-        appPreferencesManager.setDailyForbiddenTimeMs(dailyForbidden);
-        appPreferencesManager.setDailySessionTimeSumMs(dailySessionSum);
 
         int sessionCount = appPreferencesManager.getDailySessionCount();
-        if (sessionCount <= 0) sessionCount = 1; 
+        if (sessionCount <= 0) sessionCount = 1;
 
-        double mu = (double) dailySessionSum / sessionCount;
-        double T = (double) dailyForbidden;
-        double R = (T == 0) ? 0 : (mu / T);
+        // CompulsionIndex: driven by session frequency. More return-visits per day
+        // indicates higher compulsion. 10 sessions normalises to cNew = 1.0.
+        // (Previous formula mu/T always collapsed to 1/sessionCount regardless of
+        // actual time values because dailySessionSum == dailyForbidden.)
+        double R = Math.min(0.5, sessionCount * 0.05);
 
         float cPrev = appPreferencesManager.getCompulsionIndexC();
         float cNew = (float) Math.max(0.0, Math.min(1.0, (R - 0.05) / 0.45));
         float c = 0.8f * cPrev + 0.2f * cNew;
-        appPreferencesManager.setCompulsionIndexC(c);
-        
-        // Lock threshold to C at violation
-        appPreferencesManager.setCAtLastForbidden(c);
 
         long unitCost = calculateEscalatedCost(timeSpentMillis);
+        long remainingUnits = appPreferencesManager.getRemainingPotentialUnits() - unitCost;
 
-        long remainingUnits = appPreferencesManager.getRemainingPotentialUnits();
-        remainingUnits -= unitCost;
-        appPreferencesManager.setRemainingPotentialUnits(remainingUnits);
+        // Write all depletion fields atomically in a single commit so a process-kill
+        // between writes can never leave remainingUnits debited but stats un-updated.
+        appPreferencesManager.commitDepletionBatch(
+                dailyForbidden, dailySessionSum,
+                c, c,
+                remainingUnits, System.currentTimeMillis());
 
-        appPreferencesManager.setLastForbiddenTimestamp(System.currentTimeMillis());
-
-        Log.d(TAG, String.format(Locale.US, 
+        Log.d(TAG, String.format(Locale.US,
                 "Adaptive Deplete: %.1fs | C: %.3f | Cost: %d DU | Rem: %d DU",
                 timeSpentMillis / 1000.0, c, unitCost, remainingUnits));
     }

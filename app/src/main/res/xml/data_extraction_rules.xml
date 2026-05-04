@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- CRITICAL-02: Exclude all SharedPreferences from backup to prevent blocker-state
+     tampering via adb backup / Google cloud restore / device-to-device transfer. -->
 <data-extraction-rules>
     <cloud-backup>
-        <include domain="sharedpref" path="."/>
+        <exclude domain="sharedpref" path="."/>
     </cloud-backup>
     <device-transfer>
-        <include domain="sharedpref" path="."/>
+        <exclude domain="sharedpref" path="."/>
     </device-transfer>
 </data-extraction-rules>

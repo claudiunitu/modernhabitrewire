@@ -1,4 +1,7 @@
+<!-- HIGH-03: Declare force-lock policy so device admin deactivation requires a
+     stronger system confirmation dialog, adding a friction layer against bypass. -->
 <device-admin xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-policies>
+        <force-lock />
     </uses-policies>
 </device-admin>

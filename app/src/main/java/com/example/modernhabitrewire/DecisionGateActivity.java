@@ -9,7 +9,12 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import java.util.Locale;
 
@@ -27,8 +32,17 @@ public class DecisionGateActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_decision_gate);
+
+        // Apply system bar insets so the content is not obscured by status/nav bars.
+        // The ConstraintLayout has fitsSystemWindows="true" which handles this via padding.
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.rootLayout), (v, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            return insets;
+        });
 
         appPreferencesManager = AppPreferencesManagerSingleton.getInstance(this);
         budgetEngine = new DopamineBudgetEngine(this);
@@ -51,6 +65,17 @@ public class DecisionGateActivity extends AppCompatActivity {
         cancelButton.setOnClickListener(v -> {
             handler.removeCallbacksAndMessages(null);
             goHome();
+        });
+
+        // Route hardware back through goHome() so the gate is always properly
+        // closed — ensuring notifyGateClosed() is called and the user lands on
+        // the home screen rather than bouncing back to the forbidden app.
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                handler.removeCallbacksAndMessages(null);
+                goHome();
+            }
         });
     }
 
@@ -92,17 +117,28 @@ public class DecisionGateActivity extends AppCompatActivity {
     }
 
     private void launchTargetApp() {
-        appPreferencesManager.setTempAllowAppLaunch(true);
-        
         String targetPackage = appPreferencesManager.getLastInterceptedApp();
         if (targetPackage != null && !targetPackage.isEmpty()) {
-            Intent intent = getPackageManager().getLaunchIntentForPackage(targetPackage);
-            if (intent != null) {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(intent);
+            String interceptedUrl = appPreferencesManager.getLastInterceptedUrl();
+            if (interceptedUrl != null && !interceptedUrl.isEmpty()) {
+                // MEDIUM-04: URL-based interception — the browser is already open with the
+                // page loaded. Only set the approval flag; relaunching would open a new blank
+                // tab and trigger the gate again when the user navigates back.
+                appPreferencesManager.setTempAllowAppLaunch(true);
+                AttentionFirewallService.notifyTempAllowGranted();
+            } else {
+                // App-based interception: explicitly launch the target app.
+                Intent intent = getPackageManager().getLaunchIntentForPackage(targetPackage);
+                if (intent != null) {
+                    // Set the flag only after confirming the intent is valid, so it can never
+                    // be stuck true when the target app is unavailable (e.g. uninstalled).
+                    appPreferencesManager.setTempAllowAppLaunch(true);
+                    AttentionFirewallService.notifyTempAllowGranted();
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(intent);
+                }
             }
         }
-        
         finish();
     }
 

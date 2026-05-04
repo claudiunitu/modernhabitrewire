@@ -1,218 +1,324 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/coordinatorLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="8dp"
+    android:fitsSystemWindows="true"
     tools:context=".MainActivity">
 
-    <TextView
-        android:id="@+id/textViewTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="@string/app_name"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
-    <ImageButton
-        android:id="@+id/button_help"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginEnd="8dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:contentDescription="@string/help_title"
-        android:onClick="onHelpClick"
-        android:src="@android:drawable/ic_menu_help"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
-    <ScrollView
+    <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginTop="16dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textViewTitle">
+        android:layout_height="wrap_content">
 
-        <LinearLayout
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp">
+            android:layout_height="?attr/actionBarSize"
+            app:title="@string/app_name" />
 
-            <Button
-                android:id="@+id/button_go_to_edit_urls"
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/contentScrollView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior"
+        android:padding="@dimen/spacing_md"
+        android:clipToPadding="false">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+    <!-- ── Blocked Content ─────────────────────────────────── -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:onClick="onEditUrlListClick"
-                android:text="@string/EditUrlListButtonLabel" />
+                android:layout_marginBottom="@dimen/spacing_md"
+                app:cardCornerRadius="@dimen/card_corner_radius"
+                app:cardElevation="1dp"
+                app:strokeWidth="0dp">
 
-            <Button
-                android:id="@+id/button_go_to_edit_packages"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:onClick="onEditAppPackagesListClick"
-                android:text="@string/EditPackagesListButtonLabel" />
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginVertical="16dp"
-                android:background="?android:attr/listDivider" />
-
-            <EditText
-                android:id="@+id/deactivationKeySetterInputText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="@string/BlockerDeactivationKeyPlaceholder"
-                android:inputType="text|textNoSuggestions" />
-
-            <Button
-                android:id="@+id/deactivationKeyButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:onClick="onDeactivationKeyButtonClick"
-                android:text="@string/LabelNotSet" />
-
-            <EditText
-                android:id="@+id/deactivationKeyUnblockerInputText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:hint="Enter Key to Deactivate"
-                android:inputType="text|textNoSuggestions" />
-
-            <Button
-                android:id="@+id/button_blocker_activate"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:onClick="onActivateBlockerListClick"
-                android:text="@string/LabelNotSet" />
-
-            <androidx.appcompat.widget.SwitchCompat
-                android:id="@+id/bypassSwitch"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="@string/ChargingBypassSwitchLabel" />
-
-            <androidx.appcompat.widget.SwitchCompat
-                android:id="@+id/forbidSettingsSwitch"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/ForbidSettingsSwitch" />
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginVertical="16dp"
-                android:background="?android:attr/listDivider" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Interaction Physics"
-                android:textStyle="bold" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="horizontal">
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Daily Budget (DU):" />
-                <EditText
-                    android:id="@+id/dailyBudgetInput"
-                    android:layout_width="100dp"
-                    android:layout_height="wrap_content"
-                    android:inputType="number" />
-            </LinearLayout>
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_md">
 
-            <LinearLayout
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="@dimen/spacing_md"
+                        android:text="@string/blocked_content_section_title"
+                        android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/button_go_to_edit_urls"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:onClick="onEditUrlListClick"
+                        android:text="@string/EditUrlListButtonLabel" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/button_go_to_edit_packages"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:onClick="onEditAppPackagesListClick"
+                        android:text="@string/EditPackagesListButtonLabel" />
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ── Security ────────────────────────────────────────── -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:text="Base Wait Time (Secs):" />
-                <EditText
-                    android:id="@+id/baseWaitInput"
-                    android:layout_width="100dp"
-                    android:layout_height="wrap_content"
-                    android:inputType="number" />
-            </LinearLayout>
+                android:layout_marginBottom="@dimen/spacing_md"
+                app:cardCornerRadius="@dimen/card_corner_radius"
+                app:cardElevation="1dp"
+                app:strokeWidth="0dp">
 
-            <LinearLayout
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_md">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="@dimen/spacing_md"
+                        android:text="@string/security_section_title"
+                        android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/deactivationKeySetterInputLayout"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="@string/BlockerDeactivationKeyPlaceholder">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/deactivationKeySetterInputText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="text|textNoSuggestions" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/deactivationKeyButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:onClick="onDeactivationKeyButtonClick"
+                        android:text="@string/LabelNotSet" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/deactivationKeyUnblockerInputLayout"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_md"
+                        android:hint="@string/enter_key_to_deactivate">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/deactivationKeyUnblockerInputText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="text|textNoSuggestions" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/button_blocker_activate"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:onClick="onActivateBlockerListClick"
+                        android:text="@string/LabelNotSet" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/bypassSwitch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_md"
+                        android:text="@string/ChargingBypassSwitchLabel" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/forbidSettingsSwitch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:text="@string/ForbidSettingsSwitch" />
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ── Interaction Physics ──────────────────────────────── -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
+                android:layout_marginBottom="@dimen/spacing_md"
+                app:cardCornerRadius="@dimen/card_corner_radius"
+                app:cardElevation="1dp"
+                app:strokeWidth="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Base Multiplier (>= 1.0):" />
-                <EditText
-                    android:id="@+id/costFactorInput"
-                    android:layout_width="100dp"
-                    android:layout_height="wrap_content"
-                    android:inputType="numberDecimal" />
-            </LinearLayout>
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_md">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="Recovery Speed" />
-            <RadioGroup
-                android:id="@+id/recoverySpeedGroup"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-                <RadioButton android:id="@+id/recoverySlow" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Slow" />
-                <RadioButton android:id="@+id/recoveryNormal" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Normal" />
-                <RadioButton android:id="@+id/recoveryFast" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Fast" />
-            </RadioGroup>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="@dimen/spacing_md"
+                        android:text="@string/interaction_physics"
+                        android:textAppearance="?attr/textAppearanceTitleMedium" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Grace Window" />
-            <RadioGroup
-                android:id="@+id/graceWindowGroup"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-                <RadioButton android:id="@+id/graceShort" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Short" />
-                <RadioButton android:id="@+id/graceNormal" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Normal" />
-                <RadioButton android:id="@+id/graceLong" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Long" />
-            </RadioGroup>
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/dailyBudgetInputLayout"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="@dimen/spacing_sm"
+                        android:hint="@string/daily_budget">
 
-            <Button
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/dailyBudgetInput"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="number" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/baseWaitInputLayout"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="@dimen/spacing_sm"
+                        android:hint="@string/base_wait_time">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/baseWaitInput"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="number" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/costFactorInputLayout"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="@dimen/spacing_md"
+                        android:hint="@string/cost_factor">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/costFactorInput"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="numberDecimal" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="@dimen/spacing_xs"
+                        android:text="@string/recovery_speed_label"
+                        android:textAppearance="?attr/textAppearanceLabelLarge" />
+
+                    <RadioGroup
+                        android:id="@+id/recoverySpeedGroup"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="@dimen/spacing_md"
+                        android:orientation="horizontal">
+
+                        <RadioButton
+                            android:id="@+id/recoverySlow"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/slow" />
+
+                        <RadioButton
+                            android:id="@+id/recoveryNormal"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/normal" />
+
+                        <RadioButton
+                            android:id="@+id/recoveryFast"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/fast" />
+
+                    </RadioGroup>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="@dimen/spacing_xs"
+                        android:text="@string/grace_window_label"
+                        android:textAppearance="?attr/textAppearanceLabelLarge" />
+
+                    <RadioGroup
+                        android:id="@+id/graceWindowGroup"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <RadioButton
+                            android:id="@+id/graceShort"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/short_label" />
+
+                        <RadioButton
+                            android:id="@+id/graceNormal"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/normal" />
+
+                        <RadioButton
+                            android:id="@+id/graceLong"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/long_label" />
+
+                    </RadioGroup>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ── Debug ───────────────────────────────────────────── -->
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/button_reset_stats"
+                style="@style/Widget.Material3.Button.TonalButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginBottom="@dimen/spacing_lg"
                 android:onClick="onResetStatsClick"
-                android:text="Reset Daily Stats (Debug)"
-                style="@style/Widget.AppCompat.Button.Colored" />
+                android:text="@string/reset_daily_stats_debug" />
 
         </LinearLayout>
-    </ScrollView>
+    </androidx.core.widget.NestedScrollView>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
+

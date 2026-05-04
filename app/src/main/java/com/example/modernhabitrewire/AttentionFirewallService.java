@@ -63,7 +63,11 @@ public class AttentionFirewallService extends AccessibilityService {
     
     // Forced Cleanup / Lockout Logic
     private boolean isBudgetLockedOut = false;
-    
+    // MEDIUM-05: Snapshot of remaining budget at session start so mid-session exhaustion
+    // is measured against the allowance for this specific approved session, not the
+    // cumulative stored value (which may already be negative from prior sessions).
+    private long sessionStartBudget = 0;
+
     // Foreground Ownership Tracking
     private String lastForegroundPackage = null;
     private long lastForegroundChangeTime = 0;
@@ -82,6 +86,10 @@ public class AttentionFirewallService extends AccessibilityService {
     // Shared cooldown to prevent browser loops
     private static long lastDecisionGateTime = 0;
     private static final long DECISION_COOLDOWN_MS = 5000;
+
+    // Grace period to protect an approved launch from being cancelled by transient overlays
+    private static long tempAllowGrantedAt = 0;
+    private static final long TEMP_ALLOW_GRACE_MS = 4000;
 
     private final Set<String> installedImePackages = new HashSet<>();
     private final Set<String> launcherPackages = new HashSet<>();
@@ -265,6 +273,9 @@ public class AttentionFirewallService extends AccessibilityService {
     }
 
     private void hideFrictionOverlay() {
+        // HIGH-01: Cancel any pending show-post queued before this call so a
+        // handler-queued overlay cannot appear after the session has ended.
+        frictionOverlayHandler.removeCallbacksAndMessages(null);
         if (frictionOverlay != null) {
             try {
                 windowManager.removeView(frictionOverlay);
@@ -280,10 +291,17 @@ public class AttentionFirewallService extends AccessibilityService {
         Log.d(TAG, "Gate closure notified. Cooldown reset.");
     }
 
+    public static void notifyTempAllowGranted() {
+        tempAllowGrantedAt = System.currentTimeMillis();
+    }
+
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
         appPreferencesManager = AppPreferencesManagerSingleton.getInstance(this);
+        // CRITICAL-01: Clear any stale temp-allow flag that survived a process death so a
+        // previous gate approval can never silently bypass enforcement after restart.
+        appPreferencesManager.setTempAllowAppLaunch(false);
         dopamineBudgetEngine = new DopamineBudgetEngine(this);
         this.supportedBrowsers = getSupportedBrowsers();
         
@@ -395,12 +413,19 @@ public class AttentionFirewallService extends AccessibilityService {
     // Micro-stutter / Reward coupling state
     private int lastNodeCount = 0;
     private long lastSignificantUiChangeTime = 0;
-    
+
     // Retry / Persistence Tracking
     private long lastHomeKickTime = 0;
 
+    // Notification throttle: avoid heavy I/O on every accessibility event
+    private long lastNotificationUpdateTime = 0;
+    private static final long NOTIFICATION_THROTTLE_MS = 1000;
+
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
+        // Guard: managers are initialised in onServiceConnected; ignore any events
+        // that arrive before that callback completes.
+        if (appPreferencesManager == null || dopamineBudgetEngine == null) return;
         if (event.getPackageName() == null) return;
         String packageName = event.getPackageName().toString();
         int eventType = event.getEventType();
@@ -442,8 +467,16 @@ public class AttentionFirewallService extends AccessibilityService {
                 startStickySession(packageName);
                 return; 
             }
-            if (isTransientSystemOverlay(packageName) || isLauncherPackage(packageName)) return; 
-            if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) appPreferencesManager.setTempAllowAppLaunch(false);
+            if (isTransientSystemOverlay(packageName) || isLauncherPackage(packageName)) return;
+            if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+                // Grace period: don't cancel an approved launch in the first TEMP_ALLOW_GRACE_MS
+                // after the flag was granted. This prevents brief system overlays (e.g. Google
+                // Play Services dialogs, permission prompts) from killing the launch before
+                // the target app has had a chance to appear in the foreground.
+                if (System.currentTimeMillis() - tempAllowGrantedAt > TEMP_ALLOW_GRACE_MS) {
+                    appPreferencesManager.setTempAllowAppLaunch(false);
+                }
+            }
         }
 
         if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
@@ -497,16 +530,29 @@ public class AttentionFirewallService extends AccessibilityService {
             checkLiveBudgetExhaustion();
         }
 
-        updateStatsNotification();
+        // Throttle notification updates: the 1-second ticker handles updates while
+        // forbidden time is actively running; outside of that, cap at once per second
+        // to avoid SharedPreferences reads + NotificationManager.notify() on every scroll.
+        long now2 = System.currentTimeMillis();
+        if (lastForbiddenStartTime == 0 && now2 - lastNotificationUpdateTime >= NOTIFICATION_THROTTLE_MS) {
+            lastNotificationUpdateTime = now2;
+            updateStatsNotification();
+        }
     }
 
     private int countNodes(AccessibilityNodeInfo node) {
-        if (node == null) return 0;
+        return countNodesInternal(node, 0);
+    }
+
+    // MEDIUM-01: Depth-limited to prevent StackOverflowError on deeply nested
+    // WebView/SPA trees (YouTube, Twitter can exceed 500 levels).
+    private int countNodesInternal(AccessibilityNodeInfo node, int depth) {
+        if (node == null || depth > 30) return 0;
         int count = 1;
-        for (int i = 0; i < node.getChildCount(); i++) {
+        for (int i = 0; i < node.getChildCount() && count < 500; i++) {
             AccessibilityNodeInfo child = node.getChild(i);
             if (child != null) {
-                count += countNodes(child);
+                count += countNodesInternal(child, depth + 1);
                 child.recycle();
             }
         }
@@ -526,6 +572,8 @@ public class AttentionFirewallService extends AccessibilityService {
                 return;
             }
             if (dopamineBudgetEngine.getRemainingBudget() <= 0 && !isApprovedPackage(packageName)) {
+                appPreferencesManager.setLastInterceptedApp(packageName);
+                appPreferencesManager.setLastInterceptedUrl("");
                 triggerDecisionGate();
                 return;
             }
@@ -572,6 +620,7 @@ public class AttentionFirewallService extends AccessibilityService {
         // 1. URL missing → uncertainty
         // -----------------------------
         if (bar == null || bar.getText() == null) {
+            if (bar != null) bar.recycle();
             root.recycle();
             return;
         }
@@ -622,6 +671,8 @@ public class AttentionFirewallService extends AccessibilityService {
             }
 
             if (dopamineBudgetEngine.getRemainingBudget() <= 0 && activeStickyPackage == null) {
+                appPreferencesManager.setLastInterceptedApp(config.packageName);
+                appPreferencesManager.setLastInterceptedUrl(matchedPattern);
                 triggerDecisionGate();
                 bar.recycle();
                 root.recycle();
@@ -718,15 +769,17 @@ public class AttentionFirewallService extends AccessibilityService {
     }
 
     private void checkLiveBudgetExhaustion() {
-        if (activeStickyPackage == null || isBudgetLockedOut || dopamineBudgetEngine.getRemainingBudget() <= 0) return;
-        
-        long remainingUnits = dopamineBudgetEngine.getRemainingBudget();
+        if (activeStickyPackage == null || isBudgetLockedOut) return;
+        // MEDIUM-05: Only enforce mid-session gate when this session started with positive
+        // budget. If sessionStartBudget <= 0, the gate already confirmed overdraw is
+        // allowed, so the session runs until the user navigates away.
+        if (sessionStartBudget <= 0) return;
+
         long currentForbiddenSegmentMs = (lastForbiddenStartTime == 0) ? 0 : (System.currentTimeMillis() - lastForbiddenStartTime);
         long totalForbiddenTimeMs = accumulatedForbiddenTimeMs + currentForbiddenSegmentMs;
-        
         long unitCost = dopamineBudgetEngine.calculateEscalatedCost(totalForbiddenTimeMs);
 
-        if (remainingUnits <= 0 || unitCost >= remainingUnits) {
+        if (unitCost >= sessionStartBudget) {
             isBudgetLockedOut = true;
             appPreferencesManager.setLastInterceptedApp(activeStickyPackage);
             endStickySession();
@@ -735,19 +788,35 @@ public class AttentionFirewallService extends AccessibilityService {
     }
 
     private void startStickySession(String packageName) {
-        isBudgetLockedOut = false; 
+        isBudgetLockedOut = false;
+        sessionStartBudget = dopamineBudgetEngine.getRemainingBudget();
 
         activeStickyPackage = packageName;
         sessionApprovedPatterns.clear();
         String interceptedUrl = appPreferencesManager.getLastInterceptedUrl();
         if (!interceptedUrl.isEmpty()) sessionApprovedPatterns.add(interceptedUrl);
-        
+
         accumulatedForbiddenTimeMs = 0;
         isForbiddenConfirmed = false;
         forbiddenConfirmedAt = 0;
-        lastForbiddenStartTime = 0; 
-        
+        lastForbiddenStartTime = 0;
+
         dopamineBudgetEngine.incrementSessionCount();
+
+        // For non-browser apps the entire session is forbidden time, so start the timer
+        // immediately. Browser sessions let checkBrowserUrl() start/stop the timer based
+        // on whether a forbidden URL pattern is currently committed in the address bar.
+        if (!isBrowserPackage(packageName)) {
+            updateForbiddenTimer(true);
+        }
+    }
+
+    private boolean isBrowserPackage(String packageName) {
+        if (supportedBrowsers == null || packageName == null) return false;
+        for (SupportedBrowserConfig browser : supportedBrowsers) {
+            if (packageName.equals(browser.packageName)) return true;
+        }
+        return false;
     }
 
     private void endStickySession() {
@@ -800,10 +869,16 @@ public class AttentionFirewallService extends AccessibilityService {
 
     private void triggerDecisionGate() {
         lastDecisionGateTime = System.currentTimeMillis();
-        
+
         if (activeStickyPackage != null) {
             endStickySession();
         }
+
+        // Reset foreground tracking so the forbidden app is always re-detected when
+        // it returns to foreground, regardless of how the gate was dismissed (Cancel
+        // button, hardware back, or system navigation). Without this, the gate never
+        // re-fires if lastForegroundPackage still equals the forbidden app's package.
+        lastForegroundPackage = null;
 
         Intent intent = new Intent(this, DecisionGateActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
@@ -813,24 +888,39 @@ public class AttentionFirewallService extends AccessibilityService {
     private boolean isDangerZoneActive() {
         AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return false;
-        boolean foundOurApp = findTextRecursive(root, APP_PACKAGE) || findTextRecursive(root, APP_NAME);
+        // HIGH-02: Include service labels as well as the app name/package so that the
+        // Accessibility settings toggle screen (which shows the label, not the package)
+        // is correctly identified.
+        // MEDIUM-02: Match only action-oriented destruction keywords, not generic words
+        // like "info" or "off" that appear on every settings page.
+        boolean foundOurApp = findTextRecursive(root, APP_PACKAGE)
+                || findTextRecursive(root, APP_NAME)
+                || findTextRecursive(root, "Attention Firewall")
+                || findTextRecursive(root, "Uninstaller Guard");
         boolean isDestructive = false;
         if (foundOurApp) {
-            isDestructive = findTextRecursive(root, "info") || findTextRecursive(root, "details") || 
-                                    findTextRecursive(root, "storage") || findTextRecursive(root, "admin") || 
-                                    findTextRecursive(root, "service") || findTextRecursive(root, "off");
+            isDestructive = findTextRecursive(root, "uninstall")
+                    || findTextRecursive(root, "force stop")
+                    || findTextRecursive(root, "disable")
+                    || findTextRecursive(root, "deactivate")
+                    || findTextRecursive(root, "remove");
         }
         root.recycle();
         return foundOurApp && isDestructive;
     }
 
     private boolean findTextRecursive(AccessibilityNodeInfo node, String text) {
-        if (node == null) return false;
-        if (node.getText() != null && node.getText().toString().toLowerCase().contains(text.toLowerCase())) return true;
-        if (node.getContentDescription() != null && node.getContentDescription().toString().toLowerCase().contains(text.toLowerCase())) return true;
+        return findTextRecursiveInternal(node, text.toLowerCase(), 0);
+    }
+
+    // MEDIUM-03: Depth-limited to prevent StackOverflowError on deep accessibility trees.
+    private boolean findTextRecursiveInternal(AccessibilityNodeInfo node, String lowerText, int depth) {
+        if (node == null || depth > 30) return false;
+        if (node.getText() != null && node.getText().toString().toLowerCase().contains(lowerText)) return true;
+        if (node.getContentDescription() != null && node.getContentDescription().toString().toLowerCase().contains(lowerText)) return true;
         for (int i = 0; i < node.getChildCount(); i++) {
             AccessibilityNodeInfo child = node.getChild(i);
-            if (findTextRecursive(child, text)) {
+            if (findTextRecursiveInternal(child, lowerText, depth + 1)) {
                 if (child != null) child.recycle();
                 return true;
             }

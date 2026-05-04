@@ -2,16 +2,16 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#44000000">
+    android:background="#99000000">
 
     <TextView
         android:id="@+id/friction_message"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:text="Pause."
-        android:textColor="#BBFFFFFF"
-        android:textSize="20sp"
+        android:text="@string/friction_hint_pause"
+        android:textAppearance="?attr/textAppearanceHeadlineMedium"
+        android:textColor="#FFFFFFFF"
         android:visibility="gone" />
 
 </FrameLayout>

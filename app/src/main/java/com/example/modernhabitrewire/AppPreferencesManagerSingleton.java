@@ -3,6 +3,9 @@ package com.example.modernhabitrewire;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -50,15 +53,16 @@ public class AppPreferencesManagerSingleton {
 
     private SharedPreferences prefs;
 
-    public AppPreferencesManagerSingleton(Context context) {
-        prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+    private AppPreferencesManagerSingleton(Context context) {
+        // Use application context to avoid leaking Activity/Service contexts
+        prefs = context.getApplicationContext().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
     }
 
-    public static AppPreferencesManagerSingleton getInstance(Context context) {
+    public static synchronized AppPreferencesManagerSingleton getInstance(Context context) {
         if (_instance == null) {
             _instance = new AppPreferencesManagerSingleton(context);
         }
-        return AppPreferencesManagerSingleton._instance;
+        return _instance;
     }
 
     public void setForbidSettingsSwitchValue(Boolean flag){
@@ -85,12 +89,35 @@ public class AppPreferencesManagerSingleton {
         return prefs.getBoolean(BYPASS_SWITCH_VALUE, false);
     }
 
-    public void setDeactivationKey(String key){
-        prefs.edit().putString(DEACTIVATION_KEY, key).apply();
+    private static String sha256(String input) {
+        if (input == null || input.isEmpty()) return "";
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder();
+            for (byte b : hash) hex.append(String.format("%02x", b));
+            return hex.toString();
+        } catch (NoSuchAlgorithmException e) {
+            // SHA-256 is guaranteed to be present on all Android versions
+            throw new RuntimeException("SHA-256 not available", e);
+        }
     }
 
-    public String getDeactivationKey(){
+    /** Store the key as a SHA-256 hash so the raw value is never persisted. */
+    public void setDeactivationKey(String key) {
+        prefs.edit().putString(DEACTIVATION_KEY, sha256(key)).apply();
+    }
+
+    /** Returns true if the stored hash is empty (no key has been set). */
+    public String getDeactivationKey() {
         return prefs.getString(DEACTIVATION_KEY, "");
+    }
+
+    /** Compare a raw input against the stored hash without exposing the key. */
+    public boolean verifyDeactivationKey(String input) {
+        String stored = getDeactivationKey();
+        if (stored.isEmpty()) return false;
+        return stored.equals(sha256(input));
     }
 
     public List<String> getForbiddenUrls() {
@@ -306,5 +333,38 @@ public class AppPreferencesManagerSingleton {
         prefs.edit().putLong(KEY_METRIC_RETRY_LATENCY_SUM, sum + ms)
                    .putInt(KEY_METRIC_RETRY_COUNT, count + 1)
                    .apply();
+    }
+
+    /**
+     * HIGH-04: Writes all daily-reset fields atomically in a single synchronous commit.
+     * Prevents partial-reset state on process death during forceResetBudget().
+     */
+    public void commitResetBatch(long remaining, int sessionCount, String date,
+                                 long dailyForbiddenMs, long dailySessionSumMs) {
+        prefs.edit()
+                .putLong(KEY_REMAINING_POTENTIAL_UNITS, remaining)
+                .putInt(KEY_DAILY_SESSION_COUNT, sessionCount)
+                .putString(KEY_LAST_BUDGET_RESET_DATE, date)
+                .putLong(KEY_DAILY_FORBIDDEN_TIME_MS, dailyForbiddenMs)
+                .putLong(KEY_DAILY_SESSION_TIME_SUM_MS, dailySessionSumMs)
+                .commit();
+    }
+
+    /**
+     * Writes all budget-depletion fields atomically in a single synchronous commit.
+     * Prevents the data-inconsistency window that occurs when the process is killed
+     * between individual apply() calls and the single commit() on remainingUnits.
+     */
+    public void commitDepletionBatch(long dailyForbiddenMs, long dailySessionSumMs,
+                                     float compulsionC, float cAtForbidden,
+                                     long remainingUnits, long forbiddenTimestamp) {
+        prefs.edit()
+                .putLong(KEY_DAILY_FORBIDDEN_TIME_MS, dailyForbiddenMs)
+                .putLong(KEY_DAILY_SESSION_TIME_SUM_MS, dailySessionSumMs)
+                .putFloat(KEY_COMPULSION_INDEX_C, compulsionC)
+                .putFloat(KEY_C_AT_LAST_FORBIDDEN, cAtForbidden)
+                .putLong(KEY_REMAINING_POTENTIAL_UNITS, remainingUnits)
+                .putLong(KEY_LAST_FORBIDDEN_TIMESTAMP, forbiddenTimestamp)
+                .commit();
     }
 }
