@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" 
+        tools:ignore="QueryAllPackagesPermission" />
+    <!-- Grayscale mode: must be granted once via ADB:
+         adb shell pm grant com.example.modernhabitrewire android.permission.WRITE_SECURE_SETTINGS -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+
+    <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.ModernHabitRewire"
+        android:enableOnBackInvokedCallback="true"
+        tools:targetApi="35">
+        
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.ModernHabitRewire.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".UrlListEditorActivity"
+            android:exported="false"
+            android:theme="@style/Theme.ModernHabitRewire.NoActionBar"
+            android:parentActivityName=".MainActivity"/>
+
+        <activity
+            android:name=".AppPackagesListEditorActivity"
+            android:exported="false"
+            android:theme="@style/Theme.ModernHabitRewire.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".HelpActivity"
+            android:exported="false"
+            android:theme="@style/Theme.ModernHabitRewire.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+            
+        <activity
+            android:name=".DecisionGateActivity"
+            android:exported="false"
+            android:taskAffinity=".firewall"
+            android:noHistory="true"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.ModernHabitRewire.NoActionBar" />
+
+        <service
+            android:name=".AttentionFirewallService"
+            android:enabled="true"
+            android:exported="true"
+            android:label="Attention Firewall Service"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/attention_firewall_accessibility_service" />
+        </service>
+
+        <receiver
+            android:name=".MyDeviceAdminReceiver"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin_receiver" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name=".UninstallerForbidderAccessibilityService"
+            android:enabled="true"
+            android:exported="true"
+            android:label="Uninstaller Guard Service"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/window_status_changed_accessibility_service" />
+        </service>
+
+    </application>
+</manifest>

@@ -1,0 +1,95 @@
+<resources>
+    <string name="app_name">Modern Habit Rewire</string>
+    <string name="action_settings">Settings</string>
+    <string name="ForbiddenURLsListLabel">Forbidden URLs</string>
+    <string name="AddURLButtonLabel">Add Forbidden URL</string>
+    <string name="AddURLInputHint">Enter new forbidden URL</string>
+    <string name="EditUrlListButtonLabel">Edit Forbidden URLs</string>
+    <string name="N_A">N/A</string>
+    <string name="Remove">Remove</string>
+    <string name="ActivateButtonLabel">Activate</string>
+    <string name="ButtonBlockerDeactivateLabel">Deactivate Blocker</string>
+    <string name="ButtonBlockerActivateLabel">Activate Blocker</string>
+    <string name="BlockerDeactivationKeyPlaceholder">Deactivation Key</string>
+    <string name="BlockerDeactivationKeySetButtonlabel">Set Deactivation Key</string>
+    <string name="BlockerDeactivationKeyUnsetButtonlabel">Unset Deactivation Key</string>
+    <string name="LabelNotSet">Label not set</string>
+    <string name="ChargingBypassSwitchLabel">Bypass when charging</string>
+    <string name="ForbidSettingsSwitch">Disallow uninstall</string>
+    <string name="ForbiddenAppPackagesListLabel">Forbidden app packages</string>
+    <string name="AddForbiddenAppPackageInputHint">Add new forbidden app package</string>
+    <string name="AddForbiddenAppPackageButtonLabel">Add Forbidden App Package</string>
+    <string name="EditPackagesListButtonLabel">Edit Forbidden App Packages</string>
+
+    <!-- New strings for internationalization -->
+    <string name="attention_firewall">Attention Firewall</string>
+    <string name="system_state_initial">System State:\n---\nSessions today: 0\nCurrent cost: 1.0x\nRemaining budget: 00:00:00</string>
+    <string name="proceed">Proceed</string>
+    <string name="cancel">Cancel</string>
+    <string name="enter_key_to_deactivate">Enter Key to Deactivate</string>
+    <string name="interaction_physics">Interaction Physics</string>
+    <string name="daily_budget">Daily Budget (DU):</string>
+    <string name="base_wait_time">Base Wait Time (Secs):</string>
+    <string name="cost_factor">Base Multiplier (>= 1.0):</string>
+    <string name="reset_daily_stats_debug">Reset Daily Stats (Debug)</string>
+
+    <!-- Notification strings -->
+    <string name="notification_channel_name">Firewall Live Stats</string>
+    <string name="notification_channel_description">Shows real-time budget and session statistics</string>
+    <string name="blocker_active">Blocker: ACTIVE</string>
+    <string name="blocker_inactive">Blocker: INACTIVE</string>
+    <string name="notification_stats_template">P: %1$d | S: -%2$d | x%3$.1f</string>
+
+    <!-- Decision Gate strings -->
+    <string name="system_state_template">System State:\n---\nSessions today: %1$d\nCurrent cost: %2$.1fx\nRemaining potential: %3$d DU</string>
+    <string name="potential_depleted">POTENTIAL DEPLETED</string>
+    <string name="interaction_latency_template">Interaction Latency: %1$ds remaining...</string>
+    <string name="incorrect_key">Incorrect Key</string>
+    <string name="set_key_first">Set key first</string>
+    <string name="cannot_be_empty">Cannot be empty</string>
+    <string name="all_stats_reset">All stats reset</string>
+    <string name="budget_exhausted_overdraw">WITHDRAW FROM TOMORROW</string>
+    <string name="gate_action_go_back">Go Back</string>
+    <string name="budget_depleted_gate_message">Daily budget depleted. You cannot proceed until tomorrow.</string>
+
+    <!-- Help Page Strings -->
+    <string name="help_title">Help &amp; Guide</string>
+    <string name="help_intro_title">Project Overview</string>
+    <string name="help_intro_content">Modern Habit Rewire is a behavioral intervention tool designed to combat digital compulsion. It implements an \"Economic Physics\" model that treats attention as a finite resource.</string>
+    
+    <string name="help_guide_title">How to Rewire Your Habits</string>
+    <string name="help_guide_content">1. Permissions: Grant Accessibility, Device Admin, and Notification permissions.\n2. The Lists: Define your \"Extractive Apps\" and \"Forbidden URLs\".\n3. Set Your Budget: Define your Daily Allowance Units (DU).\n4. Set the Key: Create a Deactivation Key as your self-binding contract.</string>
+
+    <string name="help_physics_title">The Economic Physics</string>
+    <string name="help_physics_content">The app uses a non-linear escalation model. Frequent re-entry and prolonged immersion become increasingly expensive in terms of your daily budget (DU). Staying \"clean\" allows your system to recover over time.</string>
+
+    <string name="help_security_title">Security &amp; Friction</string>
+    <string name="help_security_content">The Deactivation Key prevents you from changing settings or deactivating the blocker in moments of low impulse control. The Decision Gate introduces a mandatory wait time before accessing restricted apps.</string>
+
+    <!-- Friction Overlay Strings -->
+    <string name="friction_kick_home_message">I will get you out of here</string>
+    <string name="friction_hint_pause">Pause.</string>
+    <string name="friction_hint_enough">Enough.</string>
+    <string name="friction_hint_tired">You\'re tired.</string>
+    <string name="friction_hint_breathe">Breathe.</string>
+    <string name="friction_hint_stop_enough">Enough. Stop.</string>
+
+        <!-- UI section titles -->
+        <string name="blocked_content_section_title">Blocked Content</string>
+        <string name="security_section_title">Security</string>
+
+        <!-- Recovery / Grace labels -->
+        <string name="recovery_speed_label">Recovery Speed</string>
+        <string name="grace_window_label">Grace Window</string>
+        <string name="slow">Slow</string>
+        <string name="normal">Normal</string>
+        <string name="fast">Fast</string>
+        <string name="short_label">Short</string>
+        <string name="long_label">Long</string>
+
+        <!-- Help screen -->
+        <string name="done_label">Done</string>
+
+        <!-- Adapter toast -->
+        <string name="blocker_active_cannot_remove">Blocker is active. Cannot remove item.</string>
+    </resources>
