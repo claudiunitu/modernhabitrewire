@@ -4,6 +4,16 @@ Voward is a private Android self-management app that adds an intentional pause b
 
 Voward is not medical treatment, a diagnostic device, or a validated measure of addiction or any biological or psychological state. If digital use is causing significant distress, sleep loss, unsafe behavior, or loss of control, consider seeking help from a qualified mental-health professional.
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/voward-today.png" alt="Voward Today dashboard showing active protection and the remaining daily allowance" width="30%" />
+  <img src="docs/screenshots/voward-rules.png" alt="Voward Rules screen showing protected apps and websites" width="30%" />
+  <img src="docs/screenshots/voward-gate.png" alt="Voward decision gate asking for an intention and session length before opening YouTube" width="30%" />
+</p>
+
+<p align="center"><sub>Daily status &middot; Protected rules &middot; Intentional-use decision gate</sub></p>
+
 ## Current features
 
 - Protect launchable apps selected from an installed-app picker.
