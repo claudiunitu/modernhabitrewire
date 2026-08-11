@@ -9,44 +9,44 @@ def releaseKeyPassword = System.getenv('MHR_RELEASE_KEY_PASSWORD')
 def hasReleaseSigning = releaseStorePath && releaseStorePassword && releaseKeyAlias && releaseKeyPassword
 
 android {
-    namespace 'com.example.voward'
-    compileSdk 36
+    namespace = 'com.example.voward'
+    compileSdk = 36
 
     defaultConfig {
-        applicationId "com.example.voward"
-        minSdk 26
-        targetSdk 36
-        versionCode 11007
-        versionName "1.10.7"
+        applicationId = "com.example.voward"
+        minSdk = 26
+        targetSdk = 36
+        versionCode = 11007
+        versionName = "1.10.7"
 
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
         if (hasReleaseSigning) {
             release {
-                storeFile file(releaseStorePath)
-                storePassword releaseStorePassword
-                keyAlias releaseKeyAlias
-                keyPassword releaseKeyPassword
+                storeFile = rootProject.file(releaseStorePath)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
             }
         }
     }
 
     buildTypes {
         debug {
-            enableUnitTestCoverage true
+            enableUnitTestCoverage = true
         }
         release {
-            minifyEnabled true
-            shrinkResources true
+            minifyEnabled = true
+            shrinkResources = true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            if (hasReleaseSigning) signingConfig signingConfigs.release
+            if (hasReleaseSigning) signingConfig = signingConfigs.release
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     testOptions {
         unitTests.includeAndroidResources = true
