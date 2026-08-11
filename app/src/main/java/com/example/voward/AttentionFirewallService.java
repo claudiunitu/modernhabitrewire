@@ -36,15 +36,8 @@ import java.util.Set;
 public class AttentionFirewallService extends AccessibilityService {
 
     private static final String TAG = "AttentionFirewall";
-    private static final String APP_NAME = "Voward";
-    private static final String APP_PACKAGE = "com.example.voward";
     private static final String CHANNEL_ID = "firewall_stats_channel";
     private static final int NOTIFICATION_ID = 1;
-    
-    private static final List<String> DANGER_PACKAGES = Arrays.asList(
-            "com.android.settings", "com.android.packageinstaller", 
-            "com.google.android.packageinstaller", "com.android.vending"
-    );
 
     private AppPreferencesManagerSingleton appPreferencesManager;
     private AttentionBudgetEngine attentionBudgetEngine;
@@ -88,6 +81,14 @@ public class AttentionFirewallService extends AccessibilityService {
     private final Map<String, Runnable> pendingUrlChecks = new HashMap<>();
     private final Map<String, Integer> browserRedirectAttempts = new HashMap<>();
     private static final int MAX_BROWSER_REDIRECT_ATTEMPTS = 4;
+
+    // Uninstall guard navigation is isolated from browser callbacks so one feature can
+    // never cancel the other's pending work.
+    private final Handler uninstallGuardHandler = new Handler(Looper.getMainLooper());
+    private Runnable pendingGuardHomeAction;
+    private long lastUninstallGuardActionAt = 0;
+    private static final long UNINSTALL_GUARD_COOLDOWN_MS = 900;
+    private static final long UNINSTALL_GUARD_HOME_DELAY_MS = 180;
 
     // Pending browser URL clear: set when the gate is cancelled for a browser interception.
     // Fired the next time that browser package comes to the foreground, rather than on a
@@ -291,6 +292,8 @@ public class AttentionFirewallService extends AccessibilityService {
 
     // Current window class tracking for danger-zone detection
     private String lastWindowClassName = "";
+    private String lastWindowPackageName = "";
+    private int lastWindowId = -1;
 
     // Notification throttle: avoid heavy I/O on every accessibility event
     private long lastNotificationUpdateTime = 0;
@@ -307,7 +310,7 @@ public class AttentionFirewallService extends AccessibilityService {
         int eventType = event.getEventType();
         long eventTime = SystemClock.elapsedRealtime();
 
-        if (packageName.equals(APP_PACKAGE)) {
+        if (packageName.equals(getPackageName())) {
             boolean activeNow = appPreferencesManager.getIsBlockerActive();
             if (lastNotifiedActive == null || activeNow != lastNotifiedActive
                     || eventTime - lastNotificationUpdateTime >= NOTIFICATION_THROTTLE_MS) {
@@ -319,13 +322,17 @@ public class AttentionFirewallService extends AccessibilityService {
 
         if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && event.getClassName() != null) {
             lastWindowClassName = event.getClassName().toString();
+            lastWindowPackageName = packageName;
+            lastWindowId = event.getWindowId();
         }
 
         if (appPreferencesManager.getIsBlockerActive()
                 && appPreferencesManager.isUninstallGuardEnabled()
-                && DANGER_PACKAGES.contains(packageName)) {
-            if (isDangerZoneActive()) {
-                performGlobalAction(GLOBAL_ACTION_HOME);
+                && UninstallGuardPolicy.isGuardHostPackage(packageName)) {
+            UninstallGuardPolicy.GuardTarget guardTarget = classifyGuardScreen(
+                    packageName, event.getWindowId());
+            if (guardTarget != UninstallGuardPolicy.GuardTarget.NONE) {
+                blockGuardedSystemScreen(guardTarget);
                 return;
             }
         }
@@ -426,7 +433,7 @@ public class AttentionFirewallService extends AccessibilityService {
 
     private void handleAppInterception(String packageName) {
         if (appPreferencesManager.isRestrictedApp(packageName)
-                && !SafetyPolicy.isCriticalPackage(packageName, APP_PACKAGE)) {
+                && !SafetyPolicy.isCriticalPackage(packageName, getPackageName())) {
             appPreferencesManager.setLastInterceptedApp(packageName);
             appPreferencesManager.setLastInterceptedUrl("");
             appPreferencesManager.setLastInterceptionKind("APP");
@@ -1055,59 +1062,157 @@ public class AttentionFirewallService extends AccessibilityService {
         startActivity(intent);
     }
 
-    // Class-name substrings that identify app-info / package-installer screens —
-    // the only screens that show actionable "Uninstall" and "Force Stop" buttons for our app.
-    private static final List<String> APP_INFO_CLASS_FRAGMENTS = Arrays.asList(
-            "AppInfoDashboard", "InstalledAppDetails", "AppInfoBase",
-            "ManageApplications", "AppStorageSettings", "AppNotificationSettings",
-            "UninstallerActivity", "PackageInstallerActivity", "InstallAppProgress",
-            "UninstallAppProgress", "DeletePackage"
-    );
+    // Evidence gathered from the current Settings or installer accessibility tree.
+    private static final class GuardScreenScan {
+        boolean targetVisible;
+        boolean appControlVisible;
+        boolean deviceAdminControlVisible;
+        boolean accessibilityContextVisible;
+        boolean checkableControlVisible;
+    }
 
-    private boolean isDangerZoneActive() {
-        // Use the window class name to determine whether we are on a genuine
-        // app-info or uninstaller screen — NOT an accessibility settings screen.
-        // Accessibility screens have class names containing "accessibility" or "Accessibility".
-        String cls = lastWindowClassName.toLowerCase(Locale.ROOT);
-        if (cls.contains("accessibility")) return false;
+    private UninstallGuardPolicy.GuardTarget classifyGuardScreen(
+            String eventPackageName, int eventWindowId) {
+        if (!UninstallGuardPolicy.isGuardHostPackage(eventPackageName)) {
+            return UninstallGuardPolicy.GuardTarget.NONE;
+        }
 
-        // Must be on a known app-info / package-installer screen.
-        boolean onAppInfoScreen = false;
-        for (String fragment : APP_INFO_CLASS_FRAGMENTS) {
-            if (lastWindowClassName.contains(fragment)) {
-                onAppInfoScreen = true;
+        // Window-content events do not reliably carry an Activity class. Tie them to
+        // the most recent state-change event from the same package and window so a
+        // stale app-info class cannot make an unrelated Settings page look dangerous.
+        if (!eventPackageName.equals(lastWindowPackageName)) {
+            return UninstallGuardPolicy.GuardTarget.NONE;
+        }
+        if (eventWindowId != -1 && lastWindowId != -1 && eventWindowId != lastWindowId) {
+            return UninstallGuardPolicy.GuardTarget.NONE;
+        }
+
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        if (root == null) return UninstallGuardPolicy.GuardTarget.NONE;
+        try {
+            CharSequence rootPackage = root.getPackageName();
+            if (rootPackage != null && !eventPackageName.contentEquals(rootPackage)) {
+                return UninstallGuardPolicy.GuardTarget.NONE;
+            }
+
+            GuardScreenScan scan = new GuardScreenScan();
+            List<String> targetIdentifiers = Arrays.asList(
+                    getPackageName().toLowerCase(Locale.ROOT),
+                    getString(R.string.app_name).toLowerCase(Locale.ROOT),
+                    getString(R.string.accessibility_service_label).toLowerCase(Locale.ROOT),
+                    "attention firewall service"
+            );
+            scanGuardScreen(root, targetIdentifiers, scan, 0);
+
+            return UninstallGuardPolicy.classify(
+                    eventPackageName,
+                    lastWindowClassName,
+                    new UninstallGuardPolicy.ScreenEvidence(
+                            scan.targetVisible,
+                            scan.appControlVisible,
+                            scan.deviceAdminControlVisible,
+                            scan.accessibilityContextVisible && scan.checkableControlVisible));
+        } finally {
+            root.recycle();
+        }
+    }
+
+    // Depth-limited to protect against malformed or unusually deep OEM Settings trees.
+    private void scanGuardScreen(
+            AccessibilityNodeInfo node,
+            List<String> targetIdentifiers,
+            GuardScreenScan scan,
+            int depth) {
+        if (node == null || depth > 30) return;
+
+        String text = node.getText() == null ? "" : node.getText().toString();
+        String description = node.getContentDescription() == null
+                ? ""
+                : node.getContentDescription().toString();
+        String viewId = node.getViewIdResourceName() == null
+                ? ""
+                : node.getViewIdResourceName();
+        String combined = (text + " " + description + " " + viewId)
+                .toLowerCase(Locale.ROOT);
+
+        for (String identifier : targetIdentifiers) {
+            if (!identifier.isEmpty() && combined.contains(identifier)) {
+                scan.targetVisible = true;
                 break;
             }
         }
-        if (!onAppInfoScreen) return false;
 
-        // Confirm the screen is actually about our app by scanning text.
-        AccessibilityNodeInfo root = getRootInActiveWindow();
-        if (root == null) return false;
-        boolean foundOurApp = findTextRecursive(root, APP_PACKAGE)
-                || findTextRecursive(root, APP_NAME);
-        root.recycle();
-        return foundOurApp;
-    }
+        if (containsAnyGuardTerm(combined,
+                "uninstall", "delete app", "remove app", "force stop", "force_stop",
+                "clear data", "clear storage", "clear_data", "clear_storage")) {
+            scan.appControlVisible = true;
+        }
+        if (containsAnyGuardTerm(combined,
+                "deactivate", "remove device admin", "device administrator",
+                "device_admin", "device admin")) {
+            scan.deviceAdminControlVisible = true;
+        }
+        if (containsAnyGuardTerm(combined,
+                "accessibility", "accessibility service", "accessibility_service")) {
+            scan.accessibilityContextVisible = true;
+        }
 
-    private boolean findTextRecursive(AccessibilityNodeInfo node, String text) {
-        return findTextRecursiveInternal(node, text.toLowerCase(Locale.ROOT), 0);
-    }
+        CharSequence className = node.getClassName();
+        String normalizedClass = className == null
+                ? ""
+                : className.toString().toLowerCase(Locale.ROOT);
+        if (node.isCheckable()
+                || normalizedClass.contains("switch")
+                || normalizedClass.contains("togglebutton")
+                || viewId.toLowerCase(Locale.ROOT).contains("switch")) {
+            scan.checkableControlVisible = true;
+        }
 
-    // MEDIUM-03: Depth-limited to prevent StackOverflowError on deep accessibility trees.
-    private boolean findTextRecursiveInternal(AccessibilityNodeInfo node, String lowerText, int depth) {
-        if (node == null || depth > 30) return false;
-        if (node.getText() != null && node.getText().toString().toLowerCase(Locale.ROOT).contains(lowerText)) return true;
-        if (node.getContentDescription() != null && node.getContentDescription().toString().toLowerCase(Locale.ROOT).contains(lowerText)) return true;
         for (int i = 0; i < node.getChildCount(); i++) {
             AccessibilityNodeInfo child = node.getChild(i);
-            if (findTextRecursiveInternal(child, lowerText, depth + 1)) {
-                if (child != null) child.recycle();
-                return true;
+            if (child == null) continue;
+            try {
+                scanGuardScreen(child, targetIdentifiers, scan, depth + 1);
+            } finally {
+                child.recycle();
             }
-            if (child != null) child.recycle();
+        }
+    }
+
+    private boolean containsAnyGuardTerm(String value, String... terms) {
+        for (String term : terms) {
+            if (value.contains(term)) return true;
         }
         return false;
+    }
+
+    private void blockGuardedSystemScreen(UninstallGuardPolicy.GuardTarget guardTarget) {
+        long now = SystemClock.elapsedRealtime();
+        if (now - lastUninstallGuardActionAt < UNINSTALL_GUARD_COOLDOWN_MS) return;
+        lastUninstallGuardActionAt = now;
+
+        Log.i(TAG, "Blocked guarded system screen: " + guardTarget);
+        Toast.makeText(this, R.string.uninstall_guard_blocked_message, Toast.LENGTH_LONG).show();
+
+        if (pendingGuardHomeAction != null) {
+            uninstallGuardHandler.removeCallbacks(pendingGuardHomeAction);
+        }
+
+        boolean backedOut = performGlobalAction(GLOBAL_ACTION_BACK);
+        pendingGuardHomeAction = () -> {
+            pendingGuardHomeAction = null;
+            if (appPreferencesManager != null
+                    && appPreferencesManager.getIsBlockerActive()
+                    && appPreferencesManager.isUninstallGuardEnabled()) {
+                performGlobalAction(GLOBAL_ACTION_HOME);
+            }
+        };
+        if (backedOut) {
+            uninstallGuardHandler.postDelayed(
+                    pendingGuardHomeAction, UNINSTALL_GUARD_HOME_DELAY_MS);
+        } else {
+            pendingGuardHomeAction.run();
+        }
     }
 
     private AccessibilityNodeInfo findUrlBarByContentDescription(AccessibilityNodeInfo root) {
@@ -1141,6 +1246,8 @@ public class AttentionFirewallService extends AccessibilityService {
         destroyed = true;
         notificationHandler.removeCallbacksAndMessages(null);
         urlCheckHandler.removeCallbacksAndMessages(null);
+        uninstallGuardHandler.removeCallbacksAndMessages(null);
+        pendingGuardHomeAction = null;
         pendingUrlChecks.clear();
         browserRedirectAttempts.clear();
         supportedBrowserByPackage.clear();

@@ -1,5 +1,7 @@
 <resources>
     <string name="app_name">Voward</string>
+    <string name="accessibility_service_label">Voward protection service</string>
+    <string name="uninstall_guard_blocked_message">Protected while Voward is active. Deactivate protection in Voward first.</string>
     <string name="restricted_urls_title">Restricted URLs</string>
     <string name="add_restricted_url">Add restricted URL</string>
     <string name="restricted_url_hint">Enter a restricted URL rule</string>
