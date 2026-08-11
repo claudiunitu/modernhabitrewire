@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="status_positive">@color/status_positive_dark</color>
+    <color name="status_positive_container">@color/status_positive_container_dark</color>
+    <color name="status_warning">@color/status_warning_dark</color>
+    <color name="status_warning_container">@color/status_warning_container_dark</color>
+</resources>

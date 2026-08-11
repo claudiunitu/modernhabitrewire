@@ -1,103 +1,111 @@
-# Modern Habit Rewire: Deep Dive Analysis
+# Voward
 
-## 1. Project Overview
-**Modern Habit Rewire** is a sophisticated Android-based behavioral intervention tool designed to combat digital compulsion—specifically targeting "extractive" apps and mindless browsing. Unlike simple site blockers, it implements a dynamic **"Economic Physics"** model that treats attention and dopamine as finite resources governed by mathematical decay and escalation.
+Voward is a private Android self-management app that adds an intentional pause before selected apps and websites. It asks the user to state a purpose, choose a session length, wait, and then explicitly decide whether to continue.
 
----
+Voward is not medical treatment, a diagnostic device, or a validated measure of addiction or any biological or psychological state. If digital use is causing significant distress, sleep loss, unsafe behavior, or loss of control, consider seeking help from a qualified mental-health professional.
 
-## 2. User Guide: How to Rewire Your Habits
+## Current features
 
-### Initial Setup
-1.  **Permissions:** Upon first launch, the app will request **Accessibility Service** (to monitor apps/URLs), **Device Admin** (to prevent uninstallation), and **Notification** permissions. All are required for the "Physics" to work.
-2.  **The Lists:** Go to the "Edit Lists" section to define your **"Extractive Apps"** (e.g., Social Media, Video Apps) and **"Forbidden URLs"** (e.g., news sites, infinite-scroll domains).
-3.  **Set Your Budget:** Define your **Daily Allowance Units (DU)**. Think of these as seconds of "high-intensity" attention. A good starting point is 1800 (30 minutes).
-4.  **Set the Key:** Create a **Deactivation Key**. This is your "Self-Binding Contract." Once you activate the blocker, you cannot change settings or deactivate without this key. The key is stored as a SHA-256 hash—it cannot be read back, only verified.
-5.  **Tune the Physics (Optional):** The main screen exposes controls for **Base Wait**, **Cost Factor**, **Recovery Speed**, and **Grace Window**. These let you dial in how aggressive the friction is without touching the source code.
+- Protect launchable apps selected from an installed-app picker.
+- Protect website domains, paths, exact queries, or explicit `keyword:` rules in supported browsers.
+- Require a purpose and a planned session of 1–60 minutes before regular protected content opens.
+- Apply a configurable entry pause. Repeat entries increase the pause according to the configured growth percentage.
+- Require a second **Open intentionally** choice after the pause; the app never opens protected content automatically when the timer reaches zero.
+- Spend one allowance second for each second of approved protected use and end the session at the smaller of the planned duration or remaining allowance.
+- Mark individual app or website rules as strict. Strict rules cannot be opened while protection is active.
+- Show the remaining allowance, next pause, protected-rule count, sessions, sessions ended early, and limits reached.
+- Keep rules and settings read-only while protection is active.
+- Import and export portable configuration as JSON.
+- Optionally show allowance notifications, enable Device Admin uninstall friction, and use system grayscale during approved sessions.
 
-### Daily Interaction
-*   **The Decision Gate:** When you open a forbidden app, you'll see the **Awareness Mirror**. It shows your current daily session count, the current cost multiplier, and your remaining DU. You must wait out the countdown before you can proceed. Once granted access, the screen switches to **grayscale** for the entire session as a passive reminder that you are in a forbidden zone.
-*   **Budget Exhaustion:** When your DU balance reaches zero or below, the blocker prevents new sessions from starting entirely. The countdown gate is not shown; you are immediately redirected home. Budget is restored the next day via the carry-over reset.
-*   **Live Stats Notification:** While the blocker is active, a persistent notification shows remaining DU, the current session's running cost, and the active multiplier in real time.
+## Requirements
 
-### Advanced Concepts
-*   **Charging Bypass:** If enabled, you can deactivate the blocker without the key if the phone is plugged into a charger. This allows for "safe" maintenance while physically tethered.
-*   **Cumulative Budgeting:** The system uses a carry-over model. If you use less than your allowance, you save units for the next day. If you overdraw within a session, you start the next day with a reduced balance.
-*   **In-App Help:** Tap the Help menu item from the main screen for a guided explanation of all settings and concepts.
+- Android 8.0 (API 26) or newer.
+- The **Attention Firewall** accessibility service is required for protection.
+- Device Admin is optional and only adds uninstall friction.
+- Notification permission is optional.
+- Grayscale is optional and requires `WRITE_SECURE_SETTINGS`, which normal Android installs cannot grant from the app.
 
----
+The app is intended for direct/private installation. Its accessibility and uninstall-protection behavior has not been prepared for Google Play accessibility-policy review.
 
-## 3. Psychological Framework
+## Setup
 
-### The Dopamine Economy
-The app treats digital consumption as a transaction. By assigning a cost to "extractive" apps, it shifts the behavior from an **automatic/impulsive** system (System 1) to a **deliberative/rational** system (System 2).
+1. Open Voward and review the disclosure.
+2. Set a real-life goal, daily allowance, default session length, base entry pause, and repeat-entry growth.
+3. Add at least one protected app or website rule. Mark a rule strict only if it should remain unavailable while protection is active.
+4. Enable the **Attention Firewall** accessibility service.
+5. Optionally enable Device Admin uninstall protection and notifications.
+6. Create a recovery key.
+7. Review the setup summary and activate protection.
 
-### Agency Preservation
-The system avoids instant punishment. Early interaction remains affordable, allowing the user to notice, reflect, and disengage without panic. This preserves a sense of control, which is essential for users with compulsive or ADHD-driven behavior.
+Activation requires the accessibility service, at least one rule, a positive daily allowance, and a recovery key. While protection is active, rules and timing settings are locked. Enter the recovery key on the Settings tab to deactivate protection.
 
-### Recovery Decay
-After clean periods (no forbidden app usage), the compulsion index decays automatically, reducing future multipliers. This rewards streaks of self-control with lighter friction going forward.
+The recovery key is stored as a salted PBKDF2-HMAC-SHA256 hash and cannot be displayed or recovered. There is no timed or charging bypass. Device Admin and accessibility add friction, but they do not turn a normal Android installation into kiosk mode.
 
----
+## Allowance and sessions
 
-## 4. Technical Architecture
+All allowance values are stored in seconds:
 
-### Core Components
-*   **`AttentionFirewallService` (Accessibility):** The central enforcement engine. It monitors window state changes to intercept extractive app launches and inspects browser address bars to catch forbidden URLs. It tracks active sessions with a sticky timer, meters budget depletion against elapsed session time, updates the live stats notification, applies a full-screen grayscale overlay for the duration of each approved session, and terminates a session when the running cost reaches the opening balance.
-*   **`UninstallerForbidderAccessibilityService`:** A dedicated security layer that scans Settings screens for this app's info page and backs the user out if the settings-lock switch is on, preventing uninstallation or force-stop while the blocker is active.
-*   **`DopamineBudgetEngine`:** The mathematical core. It calculates costs, multipliers, and remaining "Dopamine Units" (DU) using adaptive depletion, carry-over resets, and recovery decay logic.
-*   **`DecisionGateActivity`:** The friction UI. Intercepts app launches and forbidden URL navigations, displays the Awareness Mirror (session count, multiplier, remaining DU), and enforces the Interaction Latency countdown before granting access.
-*   **`AppPreferencesManagerSingleton`:** Centralized SharedPreferences wrapper for all persistent state: blocker status, forbidden URLs, extractive app packages, budget values, compulsion metrics, decay parameters, and friction counters.
-*   **`HelpActivity`:** An in-app help screen explaining all settings and concepts, accessible from the main screen menu.
+```text
+session_cost = elapsed approved seconds
+session_limit = min(remaining allowance at entry, planned duration)
+next_pause = clamp(base pause × (1 + growth × ln(1 + sessions today)), 1, 3600)
+```
 
-### Security Mechanisms
-1.  **Settings Lock:** A dedicated toggle prevents opening this app's system settings page or the package installer while the blocker is active. Both `AttentionFirewallService` and `UninstallerForbidderAccessibilityService` enforce this independently.
-2.  **Uninstaller Protection:** Uses Device Admin (`MyDeviceAdminReceiver`) alongside the `UninstallerForbidder` service to make removal significantly harder during low-impulse moments.
-3.  **Hashed Key Storage:** The deactivation key is hashed with SHA-256 before being written to SharedPreferences. The plaintext key is never persisted.
-4.  **Live Budget Enforcement:** The session timer is continuously compared against the opening DU balance. When running cost equals the opening balance, the session is terminated and the user is redirected home.
+One allowance second always buys one second of approved protected use. The session limit shown at the gate stays fixed for that session. The remaining balance cannot fall below zero, and carried allowance is capped at one daily allowance.
 
-### Dormant / In-Progress Components
-The following classes exist in the source but are not wired up in the current build:
+Choosing **Not now** or leaving during the pause returns to the Android Home screen. Leaving protected content ends its active metering segment; reaching the quoted limit sends an app session Home or replaces the restricted browser tab. When no allowance remains, a new regular session cannot start. Strict rules ignore allowance and remain blocked until protection is deactivated.
 
-*   **`SystemPhysicsController`:** Manages the full-screen grayscale overlay applied during every approved forbidden session. The overlay is activated when a session starts (DU > 0) and removed automatically when the session ends or the service stops.
-*   **`ScreenReaderAccessibilityService`:** A legacy browser URL blocker that predates the URL interception logic now built into `AttentionFirewallService`. Not declared in the manifest.
-*   **`ChargingState`:** A `BroadcastReceiver` for tracking power connection state. Not declared in the manifest; charging detection is currently handled inline in `MainActivity`.
-*   **`friction_overlay.xml`:** Layout asset for a full-screen friction message overlay. Planned for a future stochastic in-session interruption feature.
+## Website rules
 
----
+- `example.com` matches the domain and its subdomains, but not `notexample.com`.
+- `example.com/news` matches `/news` and its subtree, but not `/newspaper`.
+- `example.com/search?q=focus` requires that exact query string.
+- `keyword:shorts` performs an intentionally broad text match.
 
-## 5. Mathematical Appendix: The "Economic Physics"
+Ambiguous single-word and malformed rules are rejected. URL enforcement depends on the visible address field exposed by a supported browser. Browser or OEM updates can change accessibility behavior, so website blocking should be tested on each target device.
 
-### Core Variables
-*   **$DU_{rem}$ (Remaining Dopamine Units):** Your daily attention budget. Cannot go below zero for starting a new session; debt can accumulate within a running session.
-*   **$C$ (Compulsion Index):** A value ($0.0$ to $1.0$) representing your behavioral signature (Session Duration / Total Time). Decays after clean periods.
-*   **$F_{entry}$ (Entry Multiplier):** The base cost for the start of a session.
+## Privacy and safety
 
-### The Formulas
+- The accessibility service can observe foreground apps, window content, and supported browser address text. It can show the decision gate, navigate Home, replace a blocked browser tab, and—when optional uninstall protection is enabled—guard relevant app-info and uninstall screens.
+- Rules, preferences, and usage counters remain on the device. Voward has no analytics SDK or external network client.
+- The `INTERNET` manifest permission is used by a loopback-only server that serves the local browser block page.
+- Configuration export writes only the selected JSON file. It excludes the recovery key, active-protection state, current allowance balance, usage counters, and temporary approvals.
+- Purpose text entered at the gate is not stored.
+- Android backup and data extraction are disabled.
+- Voward prevents known emergency, dialer, Settings, System UI, permission-controller, and Voward packages from being selected as protected apps.
 
-#### 1. Cumulative Reset (The Carry-over)
-$$DU_{new} = DU_{remaining} + Allowance$$
-*   **Logic:** Unlike a hard reset, this model creates a persistent "financial" relationship with your time. Unused units carry forward; overdrawn units reduce tomorrow's balance.
+## Optional grayscale
 
-#### 2. Entry Multiplier: The "Impulse Toll"
-$$F_{entry} = f_0 + (0.5 + 0.5C) \times \text{SessionCount}$$
-*   **Logic:** $f_0$ is the base factor (min 1.0). Frequent re-entry drives this value up, making each successive return more expensive.
+On a development or privately managed device, grant grayscale access with ADB:
 
-#### 3. Instantaneous Multiplier: The "Gravity of Time"
-The cost per second ($M(t)$) at time $t$:
-$$M(t) = F_{entry} + \alpha \times t$$
-$$\alpha = (0.001 + 0.005C) \times \text{GraceMultiplier}$$
-*   **Logic:** $\alpha$ escalates cost faster for users with a high compulsion index (tendency for long sessions). The Grace Window parameter controls how long $\alpha$ stays suppressed at session start.
+```shell
+adb shell pm grant com.example.voward android.permission.WRITE_SECURE_SETTINGS
+```
 
-#### 4. Recovery Decay (Clean Period Reward)
-$$C_{new} = C_{current} \times (1 - \text{RecoverySpeed})$$
-*   **Logic:** After a day with no forbidden app usage, the compulsion index decays by the configured recovery speed, reducing future multipliers and gate wait times.
+Voward reports whether this permission is available and restores the previous Android color-correction state when an approved session ends. The rest of the app works without this permission.
 
----
+## Build and test
 
-## 6. Operational Context & Philosophy
+The project uses the checked-in Gradle wrapper, Java 17, compile/target SDK 36, and application ID `com.example.voward`.
 
-### Typical Day Example
-A user opens a forbidden app briefly; they incur minimal cost (low multiplier, short duration). If they stay too long, the per-second cost climbs and the session is eventually terminated automatically when the running cost equals their opening balance. Once DU hits zero, the blocker refuses entry entirely until the next daily reset. Clean days reduce the compulsion index, making subsequent days lighter.
+On Windows:
 
-### Summary
-**Modern Habit Rewire** acts as a **Digital Environment Simulator**. It re-introduces "scarcity" into a world designed to be infinite and frictionless. By making digital dopamine "expensive" and "heavy," it trains the brain to naturally prioritize more intentional and fulfilling activities.
+```powershell
+.\gradlew.bat testDebugUnitTest lintDebug assembleDebug
+```
+
+On macOS or Linux:
+
+```shell
+./gradlew testDebugUnitTest lintDebug assembleDebug
+```
+
+Release signing is read from these environment variables:
+
+- `MHR_RELEASE_STORE_FILE`
+- `MHR_RELEASE_STORE_PASSWORD`
+- `MHR_RELEASE_KEY_ALIAS`
+- `MHR_RELEASE_KEY_PASSWORD`
+
+Keep the signing material outside source control and preserve the application ID and signing key for upgrades. Accessibility interception, browser compatibility, Device Admin behavior, notifications, grayscale restoration, rotation, process death, and battery use also require testing on real target devices.

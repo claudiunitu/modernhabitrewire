@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- Round/standard/monochrome launcher variants intentionally share raster layers. -->
+    <issue id="IconDuplicates">
+        <ignore path="src/main/res/mipmap-mdpi" />
+        <ignore path="src/main/res/mipmap-hdpi" />
+        <ignore path="src/main/res/mipmap-xhdpi" />
+        <ignore path="src/main/res/mipmap-xxhdpi" />
+        <ignore path="src/main/res/mipmap-xxxhdpi" />
+    </issue>
+    <!-- These launcher compatibility resource folders are retained as generated assets. -->
+    <issue id="ObsoleteSdkInt">
+        <ignore path="src/main/res/drawable-v24" />
+        <ignore path="src/main/res/mipmap-anydpi-v26" />
+    </issue>
+</lint>

@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/mainRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    tools:context=".ModernMainActivity"
+    tools:ignore="TooDeepLayout,TooManyViews">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="0dp"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorSurface"
+        android:elevation="0dp"
+        app:title="@string/nav_today"
+        app:titleTextAppearance="?attr/textAppearanceHeadlineSmall"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <FrameLayout
+        android:id="@+id/mainContent"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavigation"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/toolbar">
+
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/todayScreen"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:fillViewport="true"
+            android:paddingBottom="@dimen/spacing_xl">
+
+            <androidx.constraintlayout.widget.ConstraintLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingStart="@dimen/content_horizontal_padding"
+                    android:paddingEnd="@dimen/content_horizontal_padding"
+                    android:paddingTop="@dimen/spacing_sm"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintWidth_max="@dimen/content_max_width">
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/statusHeroCard"
+                        style="@style/Widget.ModernHabit.Card"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:cardBackgroundColor="?attr/colorPrimaryContainer">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="@dimen/hero_padding">
+                            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" tools:ignore="UseCompoundDrawables">
+                                <ImageView android:layout_width="48dp" android:layout_height="48dp" android:contentDescription="@null" android:scaleType="fitCenter" android:src="@drawable/ic_launcher_foreground_voward" />
+                                <TextView android:id="@+id/protectionStatusBadge" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="@dimen/spacing_sm" android:background="@drawable/bg_status_attention" android:text="@string/protection_off_badge" android:textAppearance="?attr/textAppearanceLabelLarge" android:textColor="@color/status_warning" />
+                            </LinearLayout>
+                            <TextView android:id="@+id/protectionStatusTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_md" android:text="@string/protection_needs_attention" android:textAppearance="?attr/textAppearanceHeadlineMedium" android:textColor="?attr/colorOnPrimaryContainer" />
+                            <TextView android:id="@+id/protectionStatusDetail" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs" android:text="@string/protection_status_inactive_detail" android:textAppearance="?attr/textAppearanceBodyLarge" android:textColor="?attr/colorOnPrimaryContainer" />
+                            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_lg" android:baselineAligned="false" android:orientation="horizontal">
+                                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center_horizontal" android:orientation="vertical">
+                                    <TextView android:id="@+id/remainingBudgetValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textAppearance="?attr/textAppearanceHeadlineSmall" android:textColor="?attr/colorOnPrimaryContainer" />
+                                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:maxLines="2" android:text="@string/remaining_today" android:textAlignment="center" android:textAppearance="?attr/textAppearanceLabelMedium" android:textColor="?attr/colorOnPrimaryContainer" />
+                                </LinearLayout>
+                                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center_horizontal" android:orientation="vertical">
+                                    <TextView android:id="@+id/nextPauseValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textAppearance="?attr/textAppearanceHeadlineSmall" android:textColor="?attr/colorOnPrimaryContainer" />
+                                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:maxLines="2" android:text="@string/next_pause" android:textAlignment="center" android:textAppearance="?attr/textAppearanceLabelMedium" android:textColor="?attr/colorOnPrimaryContainer" />
+                                </LinearLayout>
+                                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center_horizontal" android:orientation="vertical">
+                                    <TextView android:id="@+id/protectedCountValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textAppearance="?attr/textAppearanceHeadlineSmall" android:textColor="?attr/colorOnPrimaryContainer" />
+                                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:maxLines="2" android:text="@string/rules_protected" android:textAlignment="center" android:textAppearance="?attr/textAppearanceLabelMedium" android:textColor="?attr/colorOnPrimaryContainer" />
+                                </LinearLayout>
+                            </LinearLayout>
+                            <com.google.android.material.button.MaterialButton android:id="@+id/heroActionButton" style="@style/Widget.ModernHabit.Button.Pill" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_lg" android:text="@string/activate_protection" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/setupReadinessCard"
+                        style="@style/Widget.ModernHabit.Card"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/section_gap"
+                        app:cardBackgroundColor="?attr/colorSecondaryContainer">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="@dimen/spacing_lg">
+                            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/finish_setup_title" android:textAppearance="?attr/textAppearanceTitleLarge" android:textColor="?attr/colorOnSecondaryContainer" />
+                            <TextView android:id="@+id/setupReadinessSummary" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs" android:text="@string/finish_setup_body" android:textAppearance="?attr/textAppearanceBodyMedium" android:textColor="?attr/colorOnSecondaryContainer" />
+                            <com.google.android.material.button.MaterialButton android:id="@+id/resumeSetupButton" style="@style/Widget.ModernHabit.Button.Pill" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_md" android:text="@string/continue_setup" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/section_gap" android:text="@string/today_reflection" android:textAppearance="?attr/textAppearanceTitleLarge" />
+
+                    <com.google.android.material.card.MaterialCardView style="@style/Widget.ModernHabit.Card" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" app:cardBackgroundColor="?attr/colorSurfaceVariant">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="@dimen/spacing_lg">
+                            <TextView android:id="@+id/todayGoalText" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/no_goal_yet" android:textAppearance="?attr/textAppearanceBodyLarge" android:textColor="?attr/colorOnSurfaceVariant" />
+                            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_lg" android:orientation="horizontal">
+                                <TextView android:id="@+id/sessionsMetric" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:textAppearance="?attr/textAppearanceTitleMedium" />
+                                <TextView android:id="@+id/earlyMetric" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:textAppearance="?attr/textAppearanceTitleMedium" />
+                                <TextView android:id="@+id/limitsMetric" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:textAppearance="?attr/textAppearanceTitleMedium" />
+                            </LinearLayout>
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+                </LinearLayout>
+            </androidx.constraintlayout.widget.ConstraintLayout>
+        </androidx.core.widget.NestedScrollView>
+
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/rulesScreen"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:fillViewport="true"
+            android:paddingBottom="@dimen/spacing_xl"
+            android:visibility="gone">
+            <androidx.constraintlayout.widget.ConstraintLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:orientation="vertical" android:paddingStart="@dimen/content_horizontal_padding" android:paddingEnd="@dimen/content_horizontal_padding" android:paddingTop="@dimen/spacing_sm" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toTopOf="parent" app:layout_constraintWidth_max="@dimen/content_max_width">
+                    <TextView android:id="@+id/rulesLockBanner" android:layout_width="match_parent" android:layout_height="wrap_content" android:background="@drawable/bg_status_active" android:padding="@dimen/spacing_md" android:text="@string/rules_locked_read_only" android:textAppearance="?attr/textAppearanceBodyMedium" android:visibility="gone" />
+                    <com.google.android.material.card.MaterialCardView style="@style/Widget.ModernHabit.Card" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_md" app:cardBackgroundColor="?attr/colorPrimaryContainer">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="@dimen/spacing_lg">
+                            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/restricted_apps_title" android:textAppearance="?attr/textAppearanceTitleLarge" android:textColor="?attr/colorOnPrimaryContainer" />
+                            <TextView android:id="@+id/appsRulesSummary" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs" android:text="@string/no_apps_protected" android:textAppearance="?attr/textAppearanceBodyMedium" android:textColor="?attr/colorOnPrimaryContainer" />
+                            <com.google.android.material.button.MaterialButton android:id="@+id/button_go_to_edit_packages" style="@style/Widget.ModernHabit.Button.Pill" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_md" android:onClick="onEditAppPackagesListClick" android:text="@string/manage_apps" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+                    <com.google.android.material.card.MaterialCardView style="@style/Widget.ModernHabit.Card" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/section_gap" app:cardBackgroundColor="?attr/colorSecondaryContainer">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="@dimen/spacing_lg">
+                            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/restricted_urls_title" android:textAppearance="?attr/textAppearanceTitleLarge" android:textColor="?attr/colorOnSecondaryContainer" />
+                            <TextView android:id="@+id/urlRulesSummary" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs" android:text="@string/no_sites_protected" android:textAppearance="?attr/textAppearanceBodyMedium" android:textColor="?attr/colorOnSecondaryContainer" />
+                            <com.google.android.material.button.MaterialButton android:id="@+id/button_go_to_edit_urls" style="@style/Widget.ModernHabit.Button.Pill" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_md" android:onClick="onEditUrlListClick" android:text="@string/manage_websites" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/section_gap" android:padding="@dimen/spacing_md" android:text="@string/rules_privacy_note" android:textAppearance="?attr/textAppearanceBodyMedium" android:textColor="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
+            </androidx.constraintlayout.widget.ConstraintLayout>
+        </androidx.core.widget.NestedScrollView>
+
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/settingsScreen"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:fillViewport="true"
+            android:paddingBottom="@dimen/spacing_xl"
+            android:visibility="gone">
+            <androidx.constraintlayout.widget.ConstraintLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:orientation="vertical" android:paddingStart="@dimen/content_horizontal_padding" android:paddingEnd="@dimen/content_horizontal_padding" android:paddingTop="@dimen/spacing_sm" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toTopOf="parent" app:layout_constraintWidth_max="@dimen/content_max_width">
+
+                    <com.google.android.material.card.MaterialCardView android:id="@+id/settingsLockedCard" style="@style/Widget.ModernHabit.Card" android:layout_width="match_parent" android:layout_height="wrap_content" app:cardBackgroundColor="?attr/colorTertiaryContainer">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="@dimen/spacing_lg">
+                            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/settings_locked_title" android:textAppearance="?attr/textAppearanceTitleLarge" android:textColor="?attr/colorOnTertiaryContainer" />
+                            <TextView android:id="@+id/settingsLockedSummary" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs" android:text="@string/settings_locked_body" android:textAppearance="?attr/textAppearanceBodyMedium" android:textColor="?attr/colorOnTertiaryContainer" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView android:id="@+id/editableSettingsCard" style="@style/Widget.ModernHabit.Card" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/section_gap" app:cardBackgroundColor="?attr/colorSurfaceVariant">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="@dimen/spacing_lg">
+                            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="@dimen/spacing_md" android:text="@string/goal_and_time" android:textAppearance="?attr/textAppearanceTitleLarge" />
+                            <com.google.android.material.textfield.TextInputLayout android:id="@+id/functionalGoalInputLayout" style="@style/Widget.Material3.TextInputLayout.OutlinedBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="@string/functional_goal_short" app:helperText="@string/functional_goal_helper">
+                                <com.google.android.material.textfield.TextInputEditText android:id="@+id/functionalGoalInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textCapSentences" android:maxLength="200" android:maxLines="3" />
+                            </com.google.android.material.textfield.TextInputLayout>
+                            <com.google.android.material.textfield.TextInputLayout android:id="@+id/dailyBudgetInputLayout" style="@style/Widget.Material3.TextInputLayout.OutlinedBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:hint="@string/daily_budget_short" app:suffixText="@string/minutes_short">
+                                <com.google.android.material.textfield.TextInputEditText android:id="@+id/dailyBudgetInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+                            </com.google.android.material.textfield.TextInputLayout>
+                            <com.google.android.material.textfield.TextInputLayout android:id="@+id/defaultSessionInputLayout" style="@style/Widget.Material3.TextInputLayout.OutlinedBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:hint="@string/default_session_short" app:suffixText="@string/minutes_short">
+                                <com.google.android.material.textfield.TextInputEditText android:id="@+id/defaultSessionInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+                            </com.google.android.material.textfield.TextInputLayout>
+                            <com.google.android.material.textfield.TextInputLayout android:id="@+id/baseWaitInputLayout" style="@style/Widget.Material3.TextInputLayout.OutlinedBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:hint="@string/base_wait_short" app:suffixText="@string/seconds_short">
+                                <com.google.android.material.textfield.TextInputEditText android:id="@+id/baseWaitInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+                            </com.google.android.material.textfield.TextInputLayout>
+                            <com.google.android.material.textfield.TextInputLayout android:id="@+id/reentryGrowthInputLayout" style="@style/Widget.Material3.TextInputLayout.OutlinedBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:hint="@string/reentry_growth_short" app:suffixText="%">
+                                <com.google.android.material.textfield.TextInputEditText android:id="@+id/reentryGrowthInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="numberDecimal" />
+                            </com.google.android.material.textfield.TextInputLayout>
+                            <com.google.android.material.materialswitch.MaterialSwitch android:id="@+id/uninstallGuardSwitch" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:text="@string/uninstall_guard_optional_label" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView style="@style/Widget.ModernHabit.Card" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/section_gap" app:cardBackgroundColor="?attr/colorSecondaryContainer">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="@dimen/spacing_lg">
+                            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/permissions_title" android:textAppearance="?attr/textAppearanceTitleLarge" android:textColor="?attr/colorOnSecondaryContainer" />
+                            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs" android:text="@string/permissions_body" android:textAppearance="?attr/textAppearanceBodyMedium" android:textColor="?attr/colorOnSecondaryContainer" />
+                            <TextView android:id="@+id/firewallPermissionStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_lg" android:text="@string/firewall_permission_missing" android:textAppearance="?attr/textAppearanceTitleMedium" android:textColor="?attr/colorOnSecondaryContainer" />
+                            <com.google.android.material.button.MaterialButton android:id="@+id/firewallPermissionButton" style="@style/Widget.ModernHabit.Button.Pill" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:text="@string/open_accessibility_settings" />
+                            <TextView android:id="@+id/guardPermissionStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_lg" android:text="@string/uninstall_permission_optional" android:textAppearance="?attr/textAppearanceTitleMedium" android:textColor="?attr/colorOnSecondaryContainer" />
+                            <com.google.android.material.button.MaterialButton android:id="@+id/guardPermissionButton" style="@style/Widget.ModernHabit.Button.Pill" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:text="@string/configure_optional_protection" />
+                            <TextView android:id="@+id/notificationPermissionStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_lg" android:text="@string/notifications_optional" android:textAppearance="?attr/textAppearanceTitleMedium" android:textColor="?attr/colorOnSecondaryContainer" />
+                            <com.google.android.material.button.MaterialButton android:id="@+id/notificationPermissionButton" style="@style/Widget.ModernHabit.Button.Pill" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:text="@string/allow_notifications" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView style="@style/Widget.ModernHabit.Card" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/section_gap" app:cardBackgroundColor="?attr/colorSurfaceVariant">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="@dimen/spacing_lg">
+                            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/protection_and_recovery" android:textAppearance="?attr/textAppearanceTitleLarge" />
+                            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs" android:layout_marginBottom="@dimen/spacing_md" android:text="@string/recovery_explanation" android:textAppearance="?attr/textAppearanceBodyMedium" android:textColor="?attr/colorOnSurfaceVariant" />
+                            <com.google.android.material.textfield.TextInputLayout android:id="@+id/deactivationKeySetterInputLayout" style="@style/Widget.Material3.TextInputLayout.OutlinedBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="@string/create_recovery_key">
+                                <com.google.android.material.textfield.TextInputEditText android:id="@+id/deactivationKeySetterInputText" android:layout_width="match_parent" android:layout_height="wrap_content" android:importantForAutofill="no" android:inputType="textPassword" />
+                            </com.google.android.material.textfield.TextInputLayout>
+                            <com.google.android.material.button.MaterialButton android:id="@+id/deactivationKeyButton" style="@style/Widget.ModernHabit.Button.Pill" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:onClick="onDeactivationKeyButtonClick" android:text="@string/set_recovery_key" />
+                            <com.google.android.material.textfield.TextInputLayout android:id="@+id/deactivationKeyUnblockerInputLayout" style="@style/Widget.Material3.TextInputLayout.OutlinedBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_md" android:hint="@string/enter_recovery_key">
+                                <com.google.android.material.textfield.TextInputEditText android:id="@+id/deactivationKeyUnblockerInputText" android:layout_width="match_parent" android:layout_height="wrap_content" android:importantForAutofill="no" android:inputType="textPassword" />
+                            </com.google.android.material.textfield.TextInputLayout>
+                            <com.google.android.material.button.MaterialButton android:id="@+id/button_blocker_activate" style="@style/Widget.ModernHabit.Button.Pill" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:onClick="onActivateBlockerListClick" android:text="@string/activate_protection" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView style="@style/Widget.ModernHabit.Card" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/section_gap" app:cardBackgroundColor="?attr/colorSurfaceVariant">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="@dimen/spacing_lg">
+                            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/advanced_and_data" android:textAppearance="?attr/textAppearanceTitleLarge" />
+                            <TextView android:id="@+id/grayscaleStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:text="@string/grayscale_unavailable" android:textAppearance="?attr/textAppearanceBodyMedium" android:textColor="?attr/colorOnSurfaceVariant" />
+                            <com.google.android.material.button.MaterialButton android:id="@+id/rerunSetupButton" style="@style/Widget.Material3.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:text="@string/review_setup_and_permissions" />
+                            <com.google.android.material.button.MaterialButton android:id="@+id/button_reset_stats" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:onClick="onResetStatsClick" android:text="@string/reset_daily_stats_debug" android:textColor="?attr/colorError" app:strokeColor="?attr/colorError" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+                </LinearLayout>
+            </androidx.constraintlayout.widget.ConstraintLayout>
+        </androidx.core.widget.NestedScrollView>
+    </FrameLayout>
+
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomNavigation"
+        android:layout_width="0dp"
+        android:layout_height="@dimen/bottom_navigation_height"
+        android:background="?attr/colorSurface"
+        app:labelVisibilityMode="labeled"
+        app:menu="@menu/menu_main_navigation"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+</androidx.constraintlayout.widget.ConstraintLayout>

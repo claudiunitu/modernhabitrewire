@@ -3,12 +3,59 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" 
-        tools:ignore="QueryAllPackagesPermission" />
+    <!-- Hosts the offline browser block page on the device loopback interface only. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- Grayscale mode: must be granted once via ADB:
-         adb shell pm grant com.example.modernhabitrewire android.permission.WRITE_SECURE_SETTINGS -->
-    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+         adb shell pm grant com.example.voward android.permission.WRITE_SECURE_SETTINGS -->
+    <!-- Optional developer/device-owner feature; normal installs run without grayscale. -->
+    <uses-permission
+        android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- Package visibility is limited to launchable apps and explicitly supported browsers. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.APP_BROWSER" />
+        </intent>
+        <package android:name="com.android.chrome" />
+        <package android:name="com.chrome.beta" />
+        <package android:name="com.chrome.dev" />
+        <package android:name="com.chrome.canary" />
+        <package android:name="com.brave.browser" />
+        <package android:name="com.brave.browser_beta" />
+        <package android:name="com.brave.browser_nightly" />
+        <package android:name="com.microsoft.emmx" />
+        <package android:name="com.microsoft.emmx.beta" />
+        <package android:name="com.microsoft.emmx.dev" />
+        <package android:name="com.microsoft.emmx.canary" />
+        <package android:name="com.vivaldi.browser" />
+        <package android:name="com.vivaldi.browser.snapshot" />
+        <package android:name="com.kiwibrowser.browser" />
+        <package android:name="org.cromite.cromite" />
+        <package android:name="com.ecosia.android" />
+        <package android:name="org.mozilla.firefox" />
+        <package android:name="org.mozilla.firefox_beta" />
+        <package android:name="org.mozilla.fenix" />
+        <package android:name="org.mozilla.focus" />
+        <package android:name="org.mozilla.klar" />
+        <package android:name="org.mozilla.fennec_fdroid" />
+        <package android:name="io.github.forkmaintainers.iceraven" />
+        <package android:name="us.spotco.fennec_dos" />
+        <package android:name="org.torproject.torbrowser" />
+        <package android:name="org.torproject.torbrowser_alpha" />
+        <package android:name="com.opera.browser" />
+        <package android:name="com.opera.browser.beta" />
+        <package android:name="com.opera.mini.native" />
+        <package android:name="com.opera.gx" />
+        <package android:name="com.duckduckgo.mobile.android" />
+        <package android:name="com.sec.android.app.sbrowser" />
+        <package android:name="com.sec.android.app.sbrowser.beta" />
+    </queries>
 
     <application
         android:allowBackup="false"
@@ -18,14 +65,14 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.ModernHabitRewire"
+        android:theme="@style/Theme.Voward"
         android:enableOnBackInvokedCallback="true"
         tools:targetApi="35">
         
         <activity
-            android:name=".MainActivity"
+            android:name=".ModernMainActivity"
             android:exported="true"
-            android:theme="@style/Theme.ModernHabitRewire.NoActionBar">
+            android:theme="@style/Theme.Voward.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -35,28 +82,39 @@
         <activity
             android:name=".UrlListEditorActivity"
             android:exported="false"
-            android:theme="@style/Theme.ModernHabitRewire.NoActionBar"
-            android:parentActivityName=".MainActivity"/>
+            android:theme="@style/Theme.Voward.NoActionBar"
+            android:parentActivityName=".ModernMainActivity"/>
 
         <activity
             android:name=".AppPackagesListEditorActivity"
             android:exported="false"
-            android:theme="@style/Theme.ModernHabitRewire.NoActionBar"
-            android:parentActivityName=".MainActivity" />
+            android:theme="@style/Theme.Voward.NoActionBar"
+            android:parentActivityName=".ModernMainActivity" />
 
         <activity
             android:name=".HelpActivity"
             android:exported="false"
-            android:theme="@style/Theme.ModernHabitRewire.NoActionBar"
-            android:parentActivityName=".MainActivity" />
+            android:theme="@style/Theme.Voward.NoActionBar"
+            android:parentActivityName=".ModernMainActivity" />
+
+        <activity
+            android:name=".SetupActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Voward.NoActionBar"
+            android:parentActivityName=".ModernMainActivity" />
+
+        <activity
+            android:name=".InstalledAppPickerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Voward.NoActionBar"
+            android:parentActivityName=".AppPackagesListEditorActivity" />
             
         <activity
             android:name=".DecisionGateActivity"
             android:exported="false"
             android:taskAffinity=".firewall"
-            android:noHistory="true"
             android:excludeFromRecents="true"
-            android:theme="@style/Theme.ModernHabitRewire.NoActionBar" />
+            android:theme="@style/Theme.Voward.NoActionBar" />
 
         <service
             android:name=".AttentionFirewallService"
@@ -83,20 +141,6 @@
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
             </intent-filter>
         </receiver>
-
-        <service
-            android:name=".UninstallerForbidderAccessibilityService"
-            android:enabled="true"
-            android:exported="true"
-            android:label="Uninstaller Guard Service"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/window_status_changed_accessibility_service" />
-        </service>
 
     </application>
 </manifest>

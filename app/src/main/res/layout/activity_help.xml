@@ -63,14 +63,14 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/spacing_md"
-                android:text="@string/help_physics_title"
+                android:text="@string/help_model_title"
                 android:textAppearance="?attr/textAppearanceTitleMedium" />
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/spacing_xs"
-                android:text="@string/help_physics_content"
+                android:text="@string/help_model_content"
                 android:textAppearance="?attr/textAppearanceBodyMedium" />
 
             <TextView

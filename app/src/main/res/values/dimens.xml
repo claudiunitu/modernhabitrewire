@@ -1,13 +1,18 @@
-<resources>
-    <dimen name="fab_margin">16dp</dimen>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <dimen name="fab_margin" tools:ignore="UnusedResources">16dp</dimen>
     <!-- 4dp spacing grid -->
     <dimen name="spacing_xs">4dp</dimen>
     <dimen name="spacing_sm">8dp</dimen>
     <dimen name="spacing_md">16dp</dimen>
     <dimen name="spacing_lg">24dp</dimen>
     <dimen name="spacing_xl">32dp</dimen>
-    <dimen name="spacing_xxl">48dp</dimen>
     <!-- Component tokens -->
     <dimen name="card_corner_radius">12dp</dimen>
+    <dimen name="card_corner_radius_large">32dp</dimen>
     <dimen name="touch_target_min">48dp</dimen>
+    <dimen name="content_max_width">720dp</dimen>
+    <dimen name="content_horizontal_padding">22dp</dimen>
+    <dimen name="section_gap">20dp</dimen>
+    <dimen name="hero_padding">24dp</dimen>
+    <dimen name="bottom_navigation_height">80dp</dimen>
 </resources>

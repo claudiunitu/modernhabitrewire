@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/setupRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    tools:context=".SetupActivity">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/setupToolbar"
+        android:layout_width="0dp"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorSurface"
+        app:title="@string/setup_title"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <com.google.android.material.progressindicator.LinearProgressIndicator
+        android:id="@+id/setupProgressBar"
+        android:layout_width="0dp"
+        android:layout_height="4dp"
+        android:max="6"
+        android:progress="1"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/setupToolbar" />
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/setupScroll"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        app:layout_constraintBottom_toTopOf="@id/setupActions"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/setupProgressBar">
+
+        <androidx.constraintlayout.widget.ConstraintLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="@dimen/content_horizontal_padding"
+                android:paddingEnd="@dimen/content_horizontal_padding"
+                android:paddingTop="@dimen/spacing_lg"
+                android:paddingBottom="@dimen/spacing_xl"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintWidth_max="@dimen/content_max_width">
+
+                <TextView android:id="@+id/setupStepLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/setup_progress" android:textAppearance="?attr/textAppearanceLabelLarge" android:textColor="?attr/colorPrimary" />
+                <TextView android:id="@+id/setupStepTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:text="@string/setup_welcome_title" android:textAppearance="?attr/textAppearanceHeadlineLarge" />
+                <TextView android:id="@+id/setupStepBody" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:text="@string/setup_welcome_body" android:textAppearance="?attr/textAppearanceBodyLarge" android:textColor="?attr/colorOnSurfaceVariant" />
+
+                <LinearLayout android:id="@+id/setupWelcomeStep" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xl" android:orientation="vertical">
+                    <com.google.android.material.card.MaterialCardView style="@style/Widget.ModernHabit.Card" android:layout_width="match_parent" android:layout_height="wrap_content" app:cardBackgroundColor="?attr/colorPrimaryContainer">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="@dimen/spacing_lg">
+                            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/setup_privacy_title" android:textAppearance="?attr/textAppearanceTitleLarge" android:textColor="?attr/colorOnPrimaryContainer" />
+                            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:text="@string/setup_privacy_body" android:textAppearance="?attr/textAppearanceBodyMedium" android:textColor="?attr/colorOnPrimaryContainer" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+                </LinearLayout>
+
+                <LinearLayout android:id="@+id/setupGoalStep" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xl" android:orientation="vertical" android:visibility="gone">
+                    <com.google.android.material.textfield.TextInputLayout android:id="@+id/setupGoalInputLayout" style="@style/Widget.Material3.TextInputLayout.OutlinedBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="@string/functional_goal_short" app:helperText="@string/functional_goal_helper">
+                        <com.google.android.material.textfield.TextInputEditText android:id="@+id/setupGoalInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textCapSentences" android:maxLength="200" android:maxLines="3" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                    <com.google.android.material.textfield.TextInputLayout android:id="@+id/setupBudgetInputLayout" style="@style/Widget.Material3.TextInputLayout.OutlinedBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:hint="@string/daily_budget_short" app:suffixText="@string/minutes_short">
+                        <com.google.android.material.textfield.TextInputEditText android:id="@+id/setupBudgetInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                    <com.google.android.material.textfield.TextInputLayout android:id="@+id/setupSessionInputLayout" style="@style/Widget.Material3.TextInputLayout.OutlinedBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:hint="@string/default_session_short" app:suffixText="@string/minutes_short">
+                        <com.google.android.material.textfield.TextInputEditText android:id="@+id/setupSessionInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
+
+                <LinearLayout android:id="@+id/setupRulesStep" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xl" android:orientation="vertical" android:visibility="gone">
+                    <TextView android:id="@+id/setupRulesSummary" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="@dimen/spacing_md" android:textAppearance="?attr/textAppearanceTitleMedium" />
+                    <com.google.android.material.button.MaterialButton android:id="@+id/setupChooseAppsButton" style="@style/Widget.ModernHabit.Button.Pill" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_md" android:text="@string/manage_apps" />
+                    <com.google.android.material.button.MaterialButton android:id="@+id/setupChooseSitesButton" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:text="@string/manage_websites" />
+                </LinearLayout>
+
+                <LinearLayout android:id="@+id/setupPermissionsStep" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xl" android:orientation="vertical" android:visibility="gone">
+                    <com.google.android.material.card.MaterialCardView style="@style/Widget.ModernHabit.Card" android:layout_width="match_parent" android:layout_height="wrap_content" app:cardBackgroundColor="?attr/colorSecondaryContainer">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="@dimen/spacing_lg">
+                            <TextView android:id="@+id/setupFirewallStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/firewall_permission_missing" android:textAppearance="?attr/textAppearanceTitleMedium" android:textColor="?attr/colorOnSecondaryContainer" />
+                            <com.google.android.material.button.MaterialButton android:id="@+id/setupFirewallButton" style="@style/Widget.ModernHabit.Button.Pill" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:text="@string/open_accessibility_settings" />
+                            <TextView android:id="@+id/setupGuardStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_lg" android:text="@string/uninstall_permission_optional" android:textAppearance="?attr/textAppearanceTitleMedium" android:textColor="?attr/colorOnSecondaryContainer" />
+                            <com.google.android.material.button.MaterialButton android:id="@+id/setupGuardButton" style="@style/Widget.ModernHabit.Button.Pill" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:text="@string/configure_optional_protection" />
+                            <TextView android:id="@+id/setupNotificationStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_lg" android:text="@string/notifications_optional" android:textAppearance="?attr/textAppearanceTitleMedium" android:textColor="?attr/colorOnSecondaryContainer" />
+                            <com.google.android.material.button.MaterialButton android:id="@+id/setupNotificationButton" style="@style/Widget.ModernHabit.Button.Pill" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:text="@string/allow_notifications" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+                </LinearLayout>
+
+                <LinearLayout android:id="@+id/setupKeyStep" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xl" android:orientation="vertical" android:visibility="gone">
+                    <TextView android:id="@+id/setupKeyReady" android:layout_width="match_parent" android:layout_height="wrap_content" android:background="@drawable/bg_status_active" android:padding="@dimen/spacing_md" android:text="@string/recovery_key_ready" android:textAppearance="?attr/textAppearanceTitleMedium" android:visibility="gone" />
+                    <com.google.android.material.textfield.TextInputLayout android:id="@+id/setupKeyInputLayout" style="@style/Widget.Material3.TextInputLayout.OutlinedBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="@string/create_recovery_key" app:helperText="@string/recovery_key_helper">
+                        <com.google.android.material.textfield.TextInputEditText android:id="@+id/setupKeyInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:importantForAutofill="no" android:inputType="textPassword" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
+
+                <LinearLayout android:id="@+id/setupReviewStep" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xl" android:orientation="vertical" android:visibility="gone">
+                    <com.google.android.material.card.MaterialCardView style="@style/Widget.ModernHabit.Card" android:layout_width="match_parent" android:layout_height="wrap_content" app:cardBackgroundColor="?attr/colorPrimaryContainer">
+                        <TextView android:id="@+id/setupReviewSummary" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="@dimen/spacing_lg" android:text="@string/setup_review_body" android:textAppearance="?attr/textAppearanceBodyLarge" android:textColor="?attr/colorOnPrimaryContainer" />
+                    </com.google.android.material.card.MaterialCardView>
+                    <TextView android:id="@+id/setupReadinessText" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_lg" android:textAppearance="?attr/textAppearanceTitleMedium" />
+                </LinearLayout>
+            </LinearLayout>
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <LinearLayout
+        android:id="@+id/setupActions"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorSurface"
+        android:gravity="center_vertical|end"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/content_horizontal_padding"
+        android:paddingEnd="@dimen/content_horizontal_padding"
+        android:paddingTop="@dimen/spacing_sm"
+        android:paddingBottom="@dimen/spacing_md"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <com.google.android.material.button.MaterialButton android:id="@+id/setupSkipButton" style="@style/Widget.Material3.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/setup_skip" />
+        <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/setupBackButton" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/setup_back" android:visibility="gone" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/setupNextButton" style="@style/Widget.ModernHabit.Button.Pill" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="@dimen/spacing_sm" android:text="@string/setup_next" />
+    </LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

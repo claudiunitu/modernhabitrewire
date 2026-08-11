@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The canonical mark has launcher-safe transparent padding. Negative insets let the
+     same alpha silhouette fill Android's much smaller notification-icon viewport. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:bottom="-4dp"
+        android:drawable="@drawable/ic_launcher_foreground_voward"
+        android:left="-4dp"
+        android:right="-4dp"
+        android:top="-4dp" />
+</layer-list>

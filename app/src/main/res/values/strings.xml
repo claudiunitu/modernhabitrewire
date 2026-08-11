@@ -1,95 +1,273 @@
 <resources>
-    <string name="app_name">Modern Habit Rewire</string>
-    <string name="action_settings">Settings</string>
-    <string name="ForbiddenURLsListLabel">Forbidden URLs</string>
-    <string name="AddURLButtonLabel">Add Forbidden URL</string>
-    <string name="AddURLInputHint">Enter new forbidden URL</string>
-    <string name="EditUrlListButtonLabel">Edit Forbidden URLs</string>
+    <string name="app_name">Voward</string>
+    <string name="restricted_urls_title">Restricted URLs</string>
+    <string name="add_restricted_url">Add restricted URL</string>
+    <string name="restricted_url_hint">Enter a restricted URL rule</string>
+    <string name="edit_restricted_urls">Edit restricted URLs</string>
     <string name="N_A">N/A</string>
     <string name="Remove">Remove</string>
-    <string name="ActivateButtonLabel">Activate</string>
     <string name="ButtonBlockerDeactivateLabel">Deactivate Blocker</string>
     <string name="ButtonBlockerActivateLabel">Activate Blocker</string>
     <string name="BlockerDeactivationKeyPlaceholder">Deactivation Key</string>
     <string name="BlockerDeactivationKeySetButtonlabel">Set Deactivation Key</string>
     <string name="BlockerDeactivationKeyUnsetButtonlabel">Unset Deactivation Key</string>
     <string name="LabelNotSet">Label not set</string>
-    <string name="ChargingBypassSwitchLabel">Bypass when charging</string>
-    <string name="ForbidSettingsSwitch">Disallow uninstall</string>
-    <string name="ForbiddenAppPackagesListLabel">Forbidden app packages</string>
-    <string name="AddForbiddenAppPackageInputHint">Add new forbidden app package</string>
-    <string name="AddForbiddenAppPackageButtonLabel">Add Forbidden App Package</string>
-    <string name="EditPackagesListButtonLabel">Edit Forbidden App Packages</string>
+    <string name="uninstall_guard_label">Disallow uninstall</string>
+    <string name="restricted_apps_title">Restricted apps</string>
+    <string name="restricted_app_package_hint">Add a restricted app package</string>
+    <string name="add_restricted_app">Add restricted app</string>
+    <string name="edit_restricted_apps">Edit restricted apps</string>
 
     <!-- New strings for internationalization -->
     <string name="attention_firewall">Attention Firewall</string>
     <string name="system_state_initial">System State:\n---\nSessions today: 0\nCurrent cost: 1.0x\nRemaining budget: 00:00:00</string>
-    <string name="proceed">Proceed</string>
     <string name="cancel">Cancel</string>
     <string name="enter_key_to_deactivate">Enter Key to Deactivate</string>
-    <string name="interaction_physics">Interaction Physics</string>
-    <string name="daily_budget">Daily Budget (DU):</string>
-    <string name="base_wait_time">Base Wait Time (Secs):</string>
-    <string name="cost_factor">Base Multiplier (>= 1.0):</string>
-    <string name="reset_daily_stats_debug">Reset Daily Stats (Debug)</string>
+    <string name="attention_budget">Attention budget</string>
+    <string name="daily_budget">Daily restricted-use budget (minutes)</string>
+    <string name="base_wait_time">Base re-entry pause (seconds)</string>
+    <string name="reentry_pause_growth">Re-entry pause growth (0–100%)</string>
+    <string name="default_session_minutes">Default planned session (1–60 minutes)</string>
+    <string name="functional_goal_hint">What should more intentional use make easier in real life?</string>
+    <string name="reset_daily_stats_debug">Reset today’s statistics</string>
 
     <!-- Notification strings -->
     <string name="notification_channel_name">Firewall Live Stats</string>
     <string name="notification_channel_description">Shows real-time budget and session statistics</string>
-    <string name="blocker_active">Blocker: ACTIVE</string>
-    <string name="blocker_inactive">Blocker: INACTIVE</string>
-    <string name="notification_stats_template">P: %1$d | S: -%2$d | x%3$.1f</string>
+    <string name="blocker_active">Voward protection is active</string>
+    <string name="blocker_inactive">Voward protection is inactive</string>
+    <string name="notification_stats_template">Remaining %1$s · this session %2$s</string>
 
     <!-- Decision Gate strings -->
-    <string name="system_state_template">System State:\n---\nSessions today: %1$d\nCurrent cost: %2$.1fx\nRemaining potential: %3$d DU</string>
-    <string name="potential_depleted">POTENTIAL DEPLETED</string>
-    <string name="interaction_latency_template">Interaction Latency: %1$ds remaining...</string>
+    <string name="system_state_template">Sessions today: %1$d\nRemaining budget: %2$s\n%3$s\nPrice: 1 budget second = 1 use second</string>
+    <plurals name="quoted_reentry_pause">
+        <item quantity="one">Quoted re-entry pause: %d second</item>
+        <item quantity="other">Quoted re-entry pause: %d seconds</item>
+    </plurals>
+    <plurals name="interaction_latency_template">
+        <item quantity="one">Pause: %d second remaining…</item>
+        <item quantity="other">Pause: %d seconds remaining…</item>
+    </plurals>
     <string name="incorrect_key">Incorrect Key</string>
     <string name="set_key_first">Set key first</string>
     <string name="cannot_be_empty">Cannot be empty</string>
     <string name="all_stats_reset">All stats reset</string>
-    <string name="budget_exhausted_overdraw">WITHDRAW FROM TOMORROW</string>
-    <string name="gate_action_go_back">Go Back</string>
-    <string name="budget_depleted_gate_message">Daily budget depleted. You cannot proceed until tomorrow.</string>
+    <string name="session_complete_redirect_message">Planned session complete. Redirecting this tab.</string>
+    <string name="gate_purpose_hint">What exactly are you opening this for?</string>
+    <string name="gate_planned_minutes_hint">Planned duration (1–60 minutes)</string>
+    <string name="gate_replacement_prompt">Before continuing, consider a small replacement: stand up, drink water, send one message, or do the next two-minute task.</string>
+    <string name="gate_replacement_with_goal">Your real-life goal: %1$s\nConsider a small replacement first: stand up, drink water, send one message, or do the next two-minute task.</string>
+    <string name="gate_terms_before_plan">Your final cap will be the smaller of the planned duration and the remaining budget.</string>
+    <string name="gate_terms_quoted">Fixed session cap: %1$s. It will not become more expensive while you use it.</string>
+    <string name="gate_purpose_required">Name a specific purpose before continuing</string>
+    <string name="gate_minutes_error">Enter 1 to 60 minutes</string>
+    <string name="gate_start_pause">Start pause</string>
+    <string name="gate_not_now">Not now</string>
+    <string name="gate_open_intentionally">Open intentionally</string>
+    <string name="gate_pause_complete">Pause complete. Review your purpose, then choose explicitly.</string>
+    <string name="no_attention_budget_remaining">No attention budget remains for a new session.</string>
 
     <!-- Help Page Strings -->
     <string name="help_title">Help &amp; Guide</string>
-    <string name="help_intro_title">Project Overview</string>
-    <string name="help_intro_content">Modern Habit Rewire is a behavioral intervention tool designed to combat digital compulsion. It implements an \"Economic Physics\" model that treats attention as a finite resource.</string>
+    <string name="help_intro_title">Use protected apps and sites intentionally</string>
+    <string name="help_intro_content">Voward adds a planning pause and clear time limits before selected apps and websites. It is a private self-management tool—not medical treatment or a diagnostic device. If digital use causes significant distress, sleep loss, unsafe behavior, or loss of control, consider seeking help from a qualified mental-health professional.</string>
     
     <string name="help_guide_title">How to Rewire Your Habits</string>
-    <string name="help_guide_content">1. Permissions: Grant Accessibility, Device Admin, and Notification permissions.\n2. The Lists: Define your \"Extractive Apps\" and \"Forbidden URLs\".\n3. Set Your Budget: Define your Daily Allowance Units (DU).\n4. Set the Key: Create a Deactivation Key as your self-binding contract.</string>
+    <string name="help_guide_content">1. Review the disclosure, then grant only the permissions you accept.\n2. Choose restricted apps from the installed-app picker and add domain/path rules for sites.\n3. Set a daily budget in minutes and a default planned session.\n4. Set a deactivation key. At each gate, write a purpose, choose a duration, wait, and confirm again.\n5. Review whether sessions ended early or reached their limit; adjust gradually.</string>
 
-    <string name="help_physics_title">The Economic Physics</string>
-    <string name="help_physics_content">The app uses a non-linear escalation model. Frequent re-entry and prolonged immersion become increasingly expensive in terms of your daily budget (DU). Staying \"clean\" allows your system to recover over time.</string>
+    <string name="help_model_title">Transparent model and URL rules</string>
+    <string name="help_model_content">One budget second always buys one second of restricted use. The balance carries at most one daily allowance and can never fall below zero or borrow from a future day. When today’s allowance is depleted, no new restricted session can start. The re-entry pause grows logarithmically with sessions; it never changes a quoted session price. Domain rules match the domain and subdomains. A path matches only that path and its subtree; a configured query must match exactly. Use keyword:text only when broad text matching is intentional.</string>
 
     <string name="help_security_title">Security &amp; Friction</string>
-    <string name="help_security_content">The Deactivation Key prevents you from changing settings or deactivating the blocker in moments of low impulse control. The Decision Gate introduces a mandatory wait time before accessing restricted apps.</string>
-
-    <!-- Friction Overlay Strings -->
-    <string name="friction_kick_home_message">I will get you out of here</string>
-    <string name="friction_hint_pause">Pause.</string>
-    <string name="friction_hint_enough">Enough.</string>
-    <string name="friction_hint_tired">You\'re tired.</string>
-    <string name="friction_hint_breathe">Breathe.</string>
-    <string name="friction_hint_stop_enough">Enough. Stop.</string>
+    <string name="help_security_content">The recovery key is the only in-app way to deactivate active protection. There is no timer or charging bypass. For stronger commitment, have someone you trust create and keep the key. The optional uninstall guard adds friction but cannot turn a normal Android installation into an unbreakable kiosk. Accessibility can observe foreground app/window content and supported browser address text. Data stays on-device unless you explicitly export it.</string>
 
         <!-- UI section titles -->
         <string name="blocked_content_section_title">Blocked Content</string>
         <string name="security_section_title">Security</string>
-
-        <!-- Recovery / Grace labels -->
-        <string name="recovery_speed_label">Recovery Speed</string>
-        <string name="grace_window_label">Grace Window</string>
-        <string name="slow">Slow</string>
-        <string name="normal">Normal</string>
-        <string name="fast">Fast</string>
-        <string name="short_label">Short</string>
-        <string name="long_label">Long</string>
 
         <!-- Help screen -->
         <string name="done_label">Done</string>
 
         <!-- Adapter toast -->
         <string name="blocker_active_cannot_remove">Blocker is active. Cannot remove item.</string>
+        <string name="blocker_active_cannot_change">Blocker is active. Configuration cannot be changed.</string>
+        <string name="export_configuration">Export configuration</string>
+        <string name="import_configuration">Import configuration</string>
+        <string name="configuration_exported">Configuration exported</string>
+        <string name="configuration_export_failed">Could not export configuration</string>
+        <string name="configuration_imported">Configuration imported</string>
+        <string name="configuration_import_failed">Could not import this configuration</string>
+        <string name="deactivate_before_import">Deactivate the blocker before importing configuration</string>
+        <string name="choose_installed_app">Choose an installed app</string>
+        <string name="search_apps">Search apps</string>
+        <string name="critical_app_cannot_be_blocked">This app is required for emergency access or device recovery and cannot be restricted.</string>
+        <string name="package_not_installed">That package is not an installed app visible to this device.</string>
+        <string name="progress_summary_template">Today: %1$s remaining · sessions: %2$d\nEnded early: %3$d · limits reached: %4$d\n%5$s</string>
+        <string name="grayscale_available">Grayscale reminder available</string>
+        <string name="grayscale_unavailable">Grayscale unavailable (optional ADB grant not present)</string>
+        <string name="setup_disclosure_title">Before enabling control permissions</string>
+        <string name="setup_disclosure_message">Accessibility observes foreground apps, window content, and supported browser address text so it can show a gate, navigate Home, or replace a blocked tab. Device Admin makes uninstall harder. Notification access shows budget status. Restricted-use records remain on this device unless you export configuration. Emergency and recovery apps are never blocked. This is a self-management tool, not medical treatment.</string>
+        <string name="setup_continue">I understand — continue setup</string>
+        <string name="setup_not_now">Not now</string>
+        <string name="url_rule_helper">Examples: example.com · example.com/news · keyword:shorts</string>
+        <string name="invalid_url_rule">Use a domain, an optional domain/path, or an explicit keyword:text rule.</string>
+
+        <!-- 2026 expressive information architecture -->
+        <string name="nav_today">Today</string>
+        <string name="nav_rules">Rules</string>
+        <string name="nav_settings">Settings</string>
+        <string name="protection_on_badge">PROTECTED</string>
+        <string name="protection_off_badge">SETUP NEEDED</string>
+        <string name="protection_active_title">Protection is active</string>
+        <string name="protection_needs_attention">Ready when you are</string>
+        <string name="protection_status_active_detail">Your selected apps and sites will pause before opening.</string>
+        <string name="protection_status_inactive_detail">Finish the essentials, then activate protection.</string>
+        <string name="protection_incomplete_title">Protection needs attention</string>
+        <string name="protection_incomplete_detail">Protection is switched on, but an essential setup item is missing.</string>
+        <string name="remaining_today">remaining today</string>
+        <string name="next_pause">next pause</string>
+        <string name="rules_protected">rules</string>
+        <string name="activate_protection">Activate protection</string>
+        <string name="manage_protection">Manage protection</string>
+        <string name="finish_setup_title">Finish the essentials</string>
+        <string name="finish_setup_body">A short checklist makes sure protection can work safely.</string>
+        <string name="continue_setup">Continue setup</string>
+        <string name="today_reflection">Today at a glance</string>
+        <string name="no_goal_yet">Add a real-life goal so each pause has something meaningful to point back to.</string>
+        <string name="goal_summary">Your intention: %1$s</string>
+        <string name="sessions_metric">%1$d\nSessions</string>
+        <string name="early_metric">%1$d\nEnded early</string>
+        <string name="limits_metric">%1$d\nLimits</string>
+        <plurals name="seconds_compact"><item quantity="one">%d sec</item><item quantity="other">%d sec</item></plurals>
+        <plurals name="protected_apps_summary"><item quantity="one">%d app is protected.</item><item quantity="other">%d apps are protected.</item></plurals>
+        <plurals name="protected_sites_summary"><item quantity="one">%d website rule is protected.</item><item quantity="other">%d website rules are protected.</item></plurals>
+        <string name="no_apps_protected">No apps selected yet.</string>
+        <string name="no_sites_protected">No website rules added yet.</string>
+        <string name="manage_apps">Manage apps</string>
+        <string name="manage_websites">Manage websites</string>
+        <string name="rules_locked_read_only">Protection is active. You can review rules, but editing stays locked until you deactivate.</string>
+        <string name="rules_privacy_note">Rules and usage records stay on this device. App names and website rules are not sent to an analytics service.</string>
+        <string name="settings_locked_title">Settings are protected</string>
+        <string name="settings_locked_body">Deactivate protection to change the goal, timing, or optional recovery behavior. Your current values remain visible here.</string>
+        <string name="settings_locked_values">Goal: %1$s\nDaily allowance (min): %2$d · Default session (min): %3$d\nBase pause (sec): %4$d · Re-entry growth: %5$d%%</string>
+        <string name="no_goal_compact">Not set</string>
+        <string name="goal_and_time">Goal &amp; time</string>
+        <string name="functional_goal_short">Real-life goal</string>
+        <string name="functional_goal_helper">What should more intentional use make easier?</string>
+        <string name="daily_budget_short">Daily allowance</string>
+        <string name="default_session_short">Default planned session</string>
+        <string name="base_wait_short">Base entry pause</string>
+        <string name="reentry_growth_short">Pause growth after repeat entries</string>
+        <string name="minutes_short">min</string>
+        <string name="seconds_short">sec</string>
+        <string name="uninstall_guard_optional_label">Use optional uninstall protection</string>
+        <string name="permissions_title">Permissions</string>
+        <string name="permissions_body">One Attention Firewall accessibility service handles blocking and optional uninstall protection. Device Admin and notifications are separate optional choices.</string>
+        <string name="firewall_permission_ready">Attention Firewall · Ready</string>
+        <string name="firewall_permission_missing">Attention Firewall · Required</string>
+        <string name="uninstall_permission_ready">Uninstall protection · Ready</string>
+        <string name="uninstall_permission_optional">Uninstall protection · Optional</string>
+        <string name="notifications_ready">Budget notifications · Ready</string>
+        <string name="notifications_optional">Budget notifications · Optional</string>
+        <string name="open_accessibility_settings">Open accessibility settings</string>
+        <string name="configure_optional_protection">Configure optional protection</string>
+        <string name="allow_notifications">Allow notifications</string>
+        <string name="protection_and_recovery">Protection &amp; recovery</string>
+        <string name="recovery_explanation">Your recovery key is the only in-app deactivation method. There is no timer or charging bypass. For stronger commitment, let someone you trust create and keep it.</string>
+        <string name="create_recovery_key">Create a recovery key</string>
+        <string name="enter_recovery_key">Enter recovery key to deactivate</string>
+        <string name="set_recovery_key">Set recovery key</string>
+        <string name="unset_recovery_key">Remove recovery key</string>
+        <string name="remove_key_title">Remove recovery key?</string>
+        <string name="remove_key_message">You will need to create a new key before protection can be activated again.</string>
+        <string name="remove_key_confirm">Remove key</string>
+        <string name="reset_stats_title">Reset today’s statistics?</string>
+        <string name="reset_stats_message">This clears today’s session and gate counts. It does not change your rules, allowance, key, or protection state.</string>
+        <string name="reset_stats_confirm">Reset statistics</string>
+        <string name="advanced_and_data">Advanced &amp; data</string>
+        <string name="review_setup_and_permissions">Review setup and permissions</string>
+        <string name="permission_required_to_activate">Enable the Attention Firewall accessibility service before activating protection.</string>
+        <string name="rules_required_to_activate">Choose at least one app or website rule before activating protection.</string>
+        <string name="allowance_required_to_activate">Set a daily allowance above zero before activating protection.</string>
+        <string name="setup_ready_summary">Required setup complete. Optional protection can be reviewed anytime.</string>
+        <plurals name="setup_missing_items"><item quantity="one">%d essential setup item remaining.</item><item quantity="other">%d essential setup items remaining.</item></plurals>
+
+        <!-- Guided setup -->
+        <string name="setup_title">Set up intentional use</string>
+        <string name="setup_progress">Step %1$d of %2$d</string>
+        <string name="setup_welcome_title">A pause with a purpose</string>
+        <string name="setup_welcome_body">Voward adds a private planning pause before selected apps and sites. It is a self-management tool—not treatment or a diagnostic device.</string>
+        <string name="setup_privacy_title">What the firewall can observe</string>
+        <string name="setup_privacy_body">The required accessibility service observes foreground apps, window content, and supported browser address text so it can show the gate or replace a blocked tab. Records stay on this device unless you export configuration.</string>
+        <string name="setup_goal_title">Choose what matters</string>
+        <string name="setup_goal_body">A concrete real-life goal gives the pause useful context. You can change these values before protection is active.</string>
+        <string name="setup_rules_title">Choose where to pause</string>
+        <string name="setup_rules_body">Select apps by their familiar names and add website domain or path rules. Emergency and recovery apps can never be restricted.</string>
+        <string name="setup_permissions_title">Enable only what you choose</string>
+        <string name="setup_permissions_body">Attention Firewall is required. Uninstall protection and notifications are optional and are requested separately.</string>
+        <string name="setup_key_title">Create a recovery path</string>
+        <string name="setup_key_body">Choose a key you can retrieve when needed. It is stored only as a salted, slow password hash.</string>
+        <string name="setup_review_title">Review and activate</string>
+        <string name="setup_review_body">Protection activates only when the firewall permission, a rule, a positive allowance, and a recovery key are ready.</string>
+        <string name="setup_back">Back</string>
+        <string name="setup_next">Continue</string>
+        <string name="setup_skip">Finish later</string>
+        <string name="setup_done">Go to Today</string>
+        <string name="setup_activate">Activate protection</string>
+        <string name="setup_rules_summary">Apps: %1$d · Website rules: %2$d</string>
+        <string name="setup_review_summary">Goal: %1$s\nDaily allowance (min): %2$d\nDefault session (min): %3$d\nProtected apps: %4$d · Website rules: %5$d</string>
+        <string name="recovery_key_ready">Recovery key · Ready</string>
+        <string name="recovery_key_helper">Use something memorable but not easily guessed. The original key cannot be recovered.</string>
+        <string name="allowance_setup_error">Enter 1 to 1440 minutes</string>
+        <string name="gate_stage_plan">1 · PLAN</string>
+        <string name="gate_stage_pause">2 · PAUSE</string>
+        <string name="gate_stage_confirm">3 · CONFIRM</string>
+        <string name="gate_plan_title">Pause before opening</string>
+        <string name="gate_pause_title">Let the impulse settle</string>
+        <string name="gate_confirm_title">Choose explicitly</string>
+        <string name="gate_target_app">You’re opening %1$s</string>
+        <string name="gate_target_site">You’re opening %1$s</string>
+        <string name="gate_target_unknown">You’re opening protected content</string>
+        <string name="gate_summary_friendly">%1$s remaining today · next pause %2$s</string>
+        <string name="choose_duration">How long do you need?</string>
+        <string name="duration_5">5 min</string>
+        <string name="duration_10">10 min</string>
+        <string name="duration_15">15 min</string>
+        <string name="duration_value_5" translatable="false">5</string>
+        <string name="duration_value_10" translatable="false">10</string>
+        <string name="duration_value_15" translatable="false">15</string>
+        <string name="custom_duration">Custom duration</string>
+        <string name="gate_plan_summary">%1$s\nUp to %2$s</string>
+        <string name="gate_terms_friendly">A %1$s session will leave about %2$s today.</string>
+        <string name="apps_empty_state">No protected apps yet. Choose installed apps by name to add the intentional-use gate.</string>
+        <string name="sites_empty_state">No protected websites yet. Add a domain, path, or explicit keyword rule.</string>
+        <string name="package_name_advanced_helper">Advanced: enter an installed Android package identifier.</string>
+        <string name="add_package_name">Add package name</string>
+        <string name="url_rule_domain">Domain and subdomains</string>
+        <string name="url_rule_path">Specific path and subtree</string>
+        <string name="url_rule_keyword">Broad keyword match</string>
+        <string name="no_apps_found">No matching installed apps</string>
+        <string name="help_quick_start_title">Quick start</string>
+        <string name="help_quick_start_content">1. Set a daily allowance, a default session length, and a real-life goal.\n2. Choose at least one protected app or website.\n3. Enable the required Attention Firewall accessibility service. Device Admin and notifications are optional.\n4. Create a recovery key, review the setup summary, and activate protection.</string>
+        <string name="help_pause_title">How the intentional pause works</string>
+        <string name="help_pause_content">At the gate, name a specific purpose and choose 1–60 minutes. Start the pause, then review the plan and explicitly choose Open intentionally or Not now. Finishing the timer never opens protected content automatically. Leaving the gate or choosing Not now returns you to Home.</string>
+        <string name="help_budget_title">Allowance and session limits</string>
+        <string name="help_budget_content">One allowance second buys one second of approved protected use. A session ends at the smaller of its planned duration or the allowance remaining when it starts. Unused allowance carries forward only up to one daily allowance, and the balance never becomes negative. Repeat entries increase only the next pause; they do not change the cost of a quoted session.</string>
+        <string name="help_rules_title">App and website rules</string>
+        <string name="help_rules_content">Choose apps from the installed-app picker. For websites, example.com covers that domain and subdomains; example.com/news covers that path and its subtree; and a configured query must match exactly. Use keyword:shorts only for an intentionally broad match. A strict rule stays blocked regardless of remaining allowance. Deactivate protection before editing any rule.</string>
+        <string name="help_privacy_title">Privacy and permissions</string>
+        <string name="help_privacy_content">The Attention Firewall accessibility service observes foreground apps, window content, and supported browser address text so it can enforce your rules. Device Admin uninstall friction and notifications are optional. Rules, settings, and usage counters stay on-device. Configuration export creates a JSON file you choose and excludes the recovery key, active-protection state, current allowance balance, usage counters, and temporary approvals. Purpose text entered at the gate is not stored.</string>
+        <string name="help_recovery_title">Safety and recovery</string>
+        <string name="help_recovery_content">The recovery key is the only in-app way to deactivate protection; it cannot be displayed or recovered, and there is no timed or charging bypass. For stronger commitment, let someone you trust create and keep it. Critical emergency and device-recovery apps cannot be selected for protection. Android accessibility is not kiosk mode, so optional uninstall protection adds friction rather than an absolute guarantee.</string>
+        <string name="strict_rule_checkbox">Strictly forbid this entry</string>
+        <string name="strict_rule_helper">Strict rules ignore the remaining allowance. Access stays blocked until you deactivate protection.</string>
+        <string name="strict_rule_row_label">Strict rule · budget cannot unlock</string>
+        <string name="strict_gate_stage">STRICT RULE</string>
+        <string name="strict_gate_title">Access blocked</string>
+        <string name="strict_gate_summary">Your remaining allowance cannot unlock this entry.</string>
+        <string name="strict_gate_explanation">This app or website is marked strictly forbidden. Deactivate protection before changing the rule or accessing it.</string>
+        <string name="strict_gate_home">Back to Home</string>
+        <string name="daily_allowance_error">Enter 0 to 1440 minutes</string>
+        <string name="base_pause_error">Enter 1 to 3600 seconds</string>
+        <string name="reentry_growth_error">Enter 0 to 100 percent</string>
     </resources>

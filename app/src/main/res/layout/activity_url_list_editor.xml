@@ -15,7 +15,7 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            app:title="@string/ForbiddenURLsListLabel" />
+            app:title="@string/restricted_urls_title" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -45,7 +45,8 @@
             android:layout_marginStart="@dimen/spacing_md"
             android:layout_marginEnd="@dimen/spacing_md"
             android:layout_marginBottom="@dimen/spacing_sm"
-            android:hint="@string/AddURLInputHint"
+            android:hint="@string/restricted_url_hint"
+            app:helperText="@string/url_rule_helper"
             app:layout_constraintBottom_toTopOf="@+id/addButton"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent">
@@ -66,7 +67,7 @@
             android:layout_marginStart="@dimen/spacing_md"
             android:layout_marginEnd="@dimen/spacing_md"
             android:layout_marginBottom="@dimen/spacing_xl"
-            android:text="@string/AddURLButtonLabel"
+            android:text="@string/add_restricted_url"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent" />
