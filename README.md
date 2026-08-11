@@ -101,6 +101,15 @@ On macOS or Linux:
 ./gradlew testDebugUnitTest lintDebug assembleDebug
 ```
 
+The local suite combines pure Java policy tests with Robolectric tests for preferences,
+receivers, activities, adapters, and Android settings behavior. Generate the JaCoCo report with:
+
+```powershell
+.\gradlew.bat createDebugUnitTestCoverageReport
+```
+
+The HTML report is written to `app/build/reports/coverage/test/debug/index.html`.
+
 Release signing is read from these environment variables:
 
 - `MHR_RELEASE_STORE_FILE`

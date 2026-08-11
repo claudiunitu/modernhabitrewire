@@ -6,7 +6,8 @@ public final class DecisionGatePolicy {
 
     public static int remainingSeconds(long deadlineElapsed, long nowElapsed) {
         long remaining = Math.max(0, deadlineElapsed - nowElapsed);
-        long roundedUp = (remaining + 999) / 1000;
+        // Divide before adding the remainder so very large deadlines cannot overflow.
+        long roundedUp = remaining / 1000 + (remaining % 1000 == 0 ? 0 : 1);
         return (int) Math.min(Integer.MAX_VALUE, roundedUp);
     }
 }
