@@ -100,6 +100,40 @@ public class AppPreferencesManagerTest {
     }
 
     @Test
+    public void replacementSuggestionsNormalizeAndCompletedDayIsArchived() {
+        preferences.setReplacementWalk("  Step outside  ");
+        preferences.setReplacementWater("");
+        preferences.setReplacementTask("x".repeat(80));
+        assertEquals("Step outside", preferences.getReplacementWalk());
+        assertEquals("Drink some water", preferences.getReplacementWater());
+        assertEquals(60, preferences.getReplacementTask().length());
+
+        LocalDate yesterday = LocalDate.now().minusDays(1);
+        preferences.setLastBudgetResetDate(yesterday.toString());
+        preferences.setLastBudgetResetEpochDay(yesterday.toEpochDay());
+        preferences.setRemainingBudgetSeconds(1_000);
+        preferences.setDailySessionCount(3);
+        preferences.applyUsageDelta(125_000, 125);
+        preferences.incrementSessionStartHour(20);
+        preferences.incrementAlternativeChoice(2);
+        preferences.recordSessionOutcome(false);
+        preferences.recordSessionOutcome(true);
+
+        LocalDate today = LocalDate.now();
+        preferences.applyResetBatch(1_800, 0, today.toString(), today.toEpochDay());
+        List<AppPreferencesManagerSingleton.DailyUsage> history =
+                preferences.getDailyUsageHistory();
+        assertEquals(1, history.size());
+        assertEquals(yesterday.toString(), history.get(0).date);
+        assertEquals(125_000, history.get(0).restrictedTimeMs);
+        assertEquals(3, history.get(0).sessions);
+        assertEquals(1, history.get(0).endedEarly);
+        assertEquals(1, history.get(0).limitsReached);
+        assertEquals(1, history.get(0).sessionHours[20]);
+        assertEquals(1, history.get(0).alternativeChoices[2]);
+    }
+
+    @Test
     public void urlRulesAreSanitizedDeduplicatedDefensiveAndStrictlyTracked() {
         List<String> source = new ArrayList<>(Arrays.asList(
                 " example.com ", "example.com", "", null, "other.test"));
@@ -195,10 +229,12 @@ public class AppPreferencesManagerTest {
         assertEquals(0, preferences.getSessionLimitReachedCount());
 
         preferences.incrementFrictionAborted();
+        preferences.incrementAlternativeChoice(0);
         preferences.resetTodayStatistics();
         assertEquals(80, preferences.getRemainingBudgetSeconds());
         assertEquals(date.toEpochDay(), preferences.getLastBudgetResetEpochDay());
         assertEquals(0, preferences.getFrictionAbortedCount());
+        assertEquals(0, preferences.getDailyAlternativeChoiceCounts()[0]);
     }
 
     @Test

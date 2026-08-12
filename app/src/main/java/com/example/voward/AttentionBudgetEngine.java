@@ -4,6 +4,7 @@ import android.content.Context;
 import android.util.Log;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 
 /**
@@ -106,5 +107,6 @@ public class AttentionBudgetEngine {
     public void incrementSessionCount() {
         resetBudgetIfNeeded();
         preferences.setDailySessionCount(preferences.getDailySessionCount() + 1);
+        preferences.incrementSessionStartHour(LocalTime.now().getHour());
     }
 }

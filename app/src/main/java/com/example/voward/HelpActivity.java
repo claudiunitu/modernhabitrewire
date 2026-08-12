@@ -20,6 +20,7 @@ public class HelpActivity extends AppCompatActivity {
         bindToggle(R.id.helpQuickStartButton, R.id.helpQuickStartContent);
         bindToggle(R.id.helpPauseButton, R.id.helpPauseContent);
         bindToggle(R.id.helpBudgetButton, R.id.helpBudgetContent);
+        bindToggle(R.id.helpProgressButton, R.id.helpProgressContent);
         bindToggle(R.id.helpRulesButton, R.id.helpRulesContent);
         bindToggle(R.id.helpPrivacyButton, R.id.helpPrivacyContent);
         bindToggle(R.id.helpRecoveryButton, R.id.helpRecoveryContent);

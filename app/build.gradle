@@ -13,7 +13,9 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.voward"
+        // Preserve the original install identity so existing installs, IDE launch
+        // configurations, and on-device data continue to resolve correctly.
+        applicationId = "com.example.modernhabitrewire"
         minSdk = 26
         targetSdk = 36
         versionCode = 11007

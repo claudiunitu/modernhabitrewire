@@ -27,9 +27,11 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SwitchCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
+import androidx.core.widget.NestedScrollView;
 
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputLayout;
 
 import org.json.JSONObject;
@@ -37,6 +39,10 @@ import org.json.JSONObject;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -100,8 +106,10 @@ public class ModernMainActivity extends AppCompatActivity {
             int id = item.getItemId();
             findViewById(R.id.todayScreen).setVisibility(id == R.id.navigation_today ? View.VISIBLE : View.GONE);
             findViewById(R.id.rulesScreen).setVisibility(id == R.id.navigation_rules ? View.VISIBLE : View.GONE);
+            findViewById(R.id.progressScreen).setVisibility(id == R.id.navigation_progress ? View.VISIBLE : View.GONE);
             findViewById(R.id.settingsScreen).setVisibility(id == R.id.navigation_settings ? View.VISIBLE : View.GONE);
             if (id == R.id.navigation_rules) toolbar.setTitle(R.string.nav_rules);
+            else if (id == R.id.navigation_progress) toolbar.setTitle(R.string.nav_progress);
             else if (id == R.id.navigation_settings) toolbar.setTitle(R.string.nav_settings);
             else toolbar.setTitle(R.string.nav_today);
             return true;
@@ -112,6 +120,7 @@ public class ModernMainActivity extends AppCompatActivity {
     private void setupActions() {
         findViewById(R.id.resumeSetupButton).setOnClickListener(v -> openSetup());
         findViewById(R.id.rerunSetupButton).setOnClickListener(v -> openSetup());
+        findViewById(R.id.editIntentionButton).setOnClickListener(v -> openSettingsAtIntention());
         findViewById(R.id.heroActionButton).setOnClickListener(v -> {
             if (preferences.getIsBlockerActive()) {
                 ((BottomNavigationView) findViewById(R.id.bottomNavigation))
@@ -144,6 +153,9 @@ public class ModernMainActivity extends AppCompatActivity {
         ((EditText) findViewById(R.id.defaultSessionInput)).setText(String.valueOf(
                 preferences.getDefaultSessionSeconds() / 60));
         ((EditText) findViewById(R.id.functionalGoalInput)).setText(preferences.getFunctionalGoal());
+        ((EditText) findViewById(R.id.replacementOneInput)).setText(preferences.getReplacementWalk());
+        ((EditText) findViewById(R.id.replacementTwoInput)).setText(preferences.getReplacementWater());
+        ((EditText) findViewById(R.id.replacementThreeInput)).setText(preferences.getReplacementTask());
         ((SwitchCompat) findViewById(R.id.uninstallGuardSwitch)).setChecked(
                 preferences.isUninstallGuardEnabled());
         updatingFields = false;
@@ -193,20 +205,60 @@ public class ModernMainActivity extends AppCompatActivity {
                     valid ? null : getString(R.string.gate_minutes_error));
             if (valid) preferences.setDefaultSessionSeconds(minutes * 60);
         });
-        watch(R.id.functionalGoalInput, value -> {
-            if (!preferences.getIsBlockerActive()) preferences.setFunctionalGoal(value);
+        watch(R.id.functionalGoalInput, true, value -> {
+            if (!preferences.getIsBlockerActive()) {
+                preferences.setFunctionalGoal(value);
+                refreshTodayGoal();
+            }
+        });
+        watch(R.id.replacementOneInput, value -> {
+            if (!preferences.getIsBlockerActive()) preferences.setReplacementWalk(value);
+        });
+        watch(R.id.replacementTwoInput, value -> {
+            if (!preferences.getIsBlockerActive()) preferences.setReplacementWater(value);
+        });
+        watch(R.id.replacementThreeInput, value -> {
+            if (!preferences.getIsBlockerActive()) preferences.setReplacementTask(value);
         });
         watch(R.id.deactivationKeySetterInputText, value -> refreshKeyButton());
     }
 
     private void watch(int viewId, TextListener listener) {
+        watch(viewId, false, listener);
+    }
+
+    private void watch(int viewId, boolean notifyWhenEmpty, TextListener listener) {
         ((EditText) findViewById(viewId)).addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                if (!updatingFields && s.length() > 0) listener.onTextChanged(s.toString());
+                if (!updatingFields && (notifyWhenEmpty || s.length() > 0)) {
+                    listener.onTextChanged(s.toString());
+                }
             }
             @Override public void afterTextChanged(Editable s) { }
         });
+    }
+
+    private void openSettingsAtIntention() {
+        View focusedView = getCurrentFocus();
+        if (focusedView != null) focusedView.clearFocus();
+
+        ((BottomNavigationView) findViewById(R.id.bottomNavigation))
+                .setSelectedItemId(R.id.navigation_settings);
+
+        NestedScrollView settingsScreen = findViewById(R.id.settingsScreen);
+        EditText intentionInput = findViewById(R.id.functionalGoalInput);
+        settingsScreen.post(() -> {
+            intentionInput.requestFocus();
+            intentionInput.setSelection(intentionInput.length());
+            settingsScreen.scrollTo(0, 0);
+        });
+    }
+
+    private void refreshTodayGoal() {
+        String goal = preferences.getFunctionalGoal();
+        ((TextView) findViewById(R.id.todayGoalText)).setText(goal.isEmpty()
+                ? getString(R.string.no_goal_yet) : goal);
     }
 
     private void refreshAll() {
@@ -238,6 +290,9 @@ public class ModernMainActivity extends AppCompatActivity {
                 ? R.string.protection_status_active_detail
                 : active ? R.string.protection_incomplete_detail : R.string.protection_status_inactive_detail);
         ((TextView) findViewById(R.id.remainingBudgetValue)).setText(formatMinutesSeconds(remaining));
+        int dailyAllowance = preferences.getDailyAllowanceSeconds();
+        ((AllowanceRingView) findViewById(R.id.allowanceRing)).setFraction(
+                dailyAllowance <= 0 ? 0 : remaining / (float) dailyAllowance);
         int pause = budgetEngine.calculateWaitSeconds();
         ((TextView) findViewById(R.id.nextPauseValue)).setText(getResources().getQuantityString(
                 R.plurals.seconds_compact, pause, pause));
@@ -246,14 +301,14 @@ public class ModernMainActivity extends AppCompatActivity {
                 ? R.string.manage_protection : R.string.activate_protection);
 
         String goal = preferences.getFunctionalGoal();
-        ((TextView) findViewById(R.id.todayGoalText)).setText(goal.isEmpty()
-                ? getString(R.string.no_goal_yet) : getString(R.string.goal_summary, goal));
+        refreshTodayGoal();
         ((TextView) findViewById(R.id.sessionsMetric)).setText(getString(
                 R.string.sessions_metric, preferences.getDailySessionCount()));
         ((TextView) findViewById(R.id.earlyMetric)).setText(getString(
                 R.string.early_metric, preferences.getSessionsEndedEarlyCount()));
         ((TextView) findViewById(R.id.limitsMetric)).setText(getString(
                 R.string.limits_metric, preferences.getSessionLimitReachedCount()));
+        refreshProgress();
 
         ((TextView) findViewById(R.id.appsRulesSummary)).setText(appCount == 0
                 ? getString(R.string.no_apps_protected)
@@ -262,6 +317,12 @@ public class ModernMainActivity extends AppCompatActivity {
                 ? getString(R.string.no_sites_protected)
                 : getResources().getQuantityString(R.plurals.protected_sites_summary, urlCount, urlCount));
         findViewById(R.id.rulesLockBanner).setVisibility(active ? View.VISIBLE : View.GONE);
+        MaterialButton appsButton = findViewById(R.id.button_go_to_edit_packages);
+        MaterialButton sitesButton = findViewById(R.id.button_go_to_edit_urls);
+        appsButton.setText(active ? R.string.view_locked_apps : R.string.manage_apps);
+        sitesButton.setText(active ? R.string.view_locked_websites : R.string.manage_websites);
+        appsButton.setIconResource(active ? R.drawable.ic_lock : 0);
+        sitesButton.setIconResource(active ? R.drawable.ic_lock : 0);
 
         int missing = 0;
         if (!firewallReady) missing++;
@@ -282,6 +343,8 @@ public class ModernMainActivity extends AppCompatActivity {
         View resetStatsButton = findViewById(R.id.button_reset_stats);
         resetStatsButton.setEnabled(!active);
         resetStatsButton.setAlpha(active ? 0.38f : 1f);
+        View editIntentionButton = findViewById(R.id.editIntentionButton);
+        editIntentionButton.setVisibility(active ? View.GONE : View.VISIBLE);
         ((TextView) findViewById(R.id.settingsLockedSummary)).setText(getString(
                 R.string.settings_locked_values,
                 goal.isEmpty() ? getString(R.string.no_goal_compact) : goal,
@@ -301,6 +364,84 @@ public class ModernMainActivity extends AppCompatActivity {
                 GrayscaleController.isGrayscaleAvailable(this)
                         ? R.string.grayscale_available : R.string.grayscale_unavailable);
         refreshRecovery(active);
+    }
+
+    private void refreshProgress() {
+        LocalDate today = LocalDate.now();
+        LocalDate monday = today.with(DayOfWeek.MONDAY);
+        long[] usageSeconds = new long[7];
+        int weekSessions = 0;
+        int weekEarly = 0;
+        int weekLimits = 0;
+        int[] weekHours = new int[24];
+        int[] weekAlternatives = new int[3];
+
+        List<AppPreferencesManagerSingleton.DailyUsage> history = preferences.getDailyUsageHistory();
+        for (AppPreferencesManagerSingleton.DailyUsage day : history) {
+            try {
+                LocalDate date = LocalDate.parse(day.date);
+                int index = (int) (date.toEpochDay() - monday.toEpochDay());
+                if (index >= 0 && index < 7) {
+                    usageSeconds[index] = day.restrictedTimeMs / 1000;
+                    weekSessions += day.sessions;
+                    weekEarly += day.endedEarly;
+                    weekLimits += day.limitsReached;
+                    for (int hour = 0; hour < 24; hour++) {
+                        weekHours[hour] += day.sessionHours[hour];
+                    }
+                    for (int choice = 0; choice < 3; choice++) {
+                        weekAlternatives[choice] += day.alternativeChoices[choice];
+                    }
+                }
+            } catch (DateTimeParseException ignored) { }
+        }
+
+        int todayIndex = today.getDayOfWeek().getValue() - 1;
+        long todaySeconds = preferences.getDailyRestrictedTimeMs() / 1000;
+        usageSeconds[todayIndex] = todaySeconds;
+        weekSessions += preferences.getDailySessionCount();
+        weekEarly += preferences.getSessionsEndedEarlyCount();
+        weekLimits += preferences.getSessionLimitReachedCount();
+        int[] todayHours = preferences.getDailySessionHourCounts();
+        for (int hour = 0; hour < 24; hour++) weekHours[hour] += todayHours[hour];
+        int[] todayAlternatives = preferences.getDailyAlternativeChoiceCounts();
+        for (int choice = 0; choice < 3; choice++) {
+            weekAlternatives[choice] += todayAlternatives[choice];
+        }
+        long weekSeconds = 0;
+        for (long value : usageSeconds) weekSeconds += value;
+
+        ((TextView) findViewById(R.id.progressTodayUsage)).setText(formatCompactDuration(todaySeconds));
+        ((TextView) findViewById(R.id.progressWeekUsage)).setText(formatCompactDuration(weekSeconds));
+        ((TextView) findViewById(R.id.progressWeekSessions)).setText(String.valueOf(weekSessions));
+        ((TextView) findViewById(R.id.progressEarlyMetric)).setText(
+                getString(R.string.early_metric, weekEarly));
+        ((TextView) findViewById(R.id.progressLimitsMetric)).setText(
+                getString(R.string.limits_metric, weekLimits));
+        ((WeeklyUsageChartView) findViewById(R.id.weeklyUsageChart)).setUsageSeconds(usageSeconds);
+        int commonHour = -1;
+        for (int hour = 0; hour < 24; hour++) {
+            if (weekHours[hour] > 0 && (commonHour < 0 || weekHours[hour] > weekHours[commonHour])) {
+                commonHour = hour;
+            }
+        }
+        ((TextView) findViewById(R.id.progressCommonTime)).setText(commonHour < 0
+                ? getString(R.string.no_time_pattern)
+                : getString(R.string.most_common_time, formatHourRange(commonHour)));
+        int mostChosen = -1;
+        for (int choice = 0; choice < 3; choice++) {
+            if (weekAlternatives[choice] > 0
+                    && (mostChosen < 0 || weekAlternatives[choice] > weekAlternatives[mostChosen])) {
+                mostChosen = choice;
+            }
+        }
+        String[] labels = {preferences.getReplacementWalk(), preferences.getReplacementWater(),
+                preferences.getReplacementTask()};
+        ((TextView) findViewById(R.id.progressAlternativeChoice)).setText(mostChosen < 0
+                ? getString(R.string.no_alternative_pattern)
+                : getResources().getQuantityString(R.plurals.most_chosen_alternative,
+                        weekAlternatives[mostChosen], labels[mostChosen],
+                        weekAlternatives[mostChosen]));
     }
 
     private void refreshPermissionRow(int statusId, int buttonId, boolean ready,
@@ -575,6 +716,19 @@ public class ModernMainActivity extends AppCompatActivity {
         long safe = seconds == Long.MIN_VALUE ? Long.MAX_VALUE : Math.abs(seconds);
         String value = String.format(Locale.getDefault(), "%d:%02d", safe / 60, safe % 60);
         return negative ? "-" + value : value;
+    }
+
+    private static String formatCompactDuration(long seconds) {
+        long minutes = Math.max(0, seconds) / 60;
+        if (minutes < 60) return minutes + "m";
+        return String.format(Locale.getDefault(), "%dh %02dm", minutes / 60, minutes % 60);
+    }
+
+    private static String formatHourRange(int hour) {
+        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter
+                .ofPattern("h a", Locale.getDefault());
+        return java.time.LocalTime.of(hour, 0).format(formatter) + "–"
+                + java.time.LocalTime.of((hour + 1) % 24, 0).format(formatter);
     }
 
     private static int parseInt(String value) {

@@ -6,7 +6,7 @@
     <!-- Hosts the offline browser block page on the device loopback interface only. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Grayscale mode: must be granted once via ADB:
-         adb shell pm grant com.example.voward android.permission.WRITE_SECURE_SETTINGS -->
+         adb shell pm grant com.example.modernhabitrewire android.permission.WRITE_SECURE_SETTINGS -->
     <!-- Optional developer/device-owner feature; normal installs run without grayscale. -->
     <uses-permission
         android:name="android.permission.WRITE_SECURE_SETTINGS"
@@ -70,7 +70,7 @@
         tools:targetApi="35">
         
         <activity
-            android:name=".ModernMainActivity"
+            android:name="com.example.voward.ModernMainActivity"
             android:exported="true"
             android:theme="@style/Theme.Voward.NoActionBar">
             <intent-filter>
@@ -80,44 +80,44 @@
         </activity>
 
         <activity
-            android:name=".UrlListEditorActivity"
+            android:name="com.example.voward.UrlListEditorActivity"
             android:exported="false"
             android:theme="@style/Theme.Voward.NoActionBar"
-            android:parentActivityName=".ModernMainActivity"/>
+            android:parentActivityName="com.example.voward.ModernMainActivity"/>
 
         <activity
-            android:name=".AppPackagesListEditorActivity"
+            android:name="com.example.voward.AppPackagesListEditorActivity"
             android:exported="false"
             android:theme="@style/Theme.Voward.NoActionBar"
-            android:parentActivityName=".ModernMainActivity" />
+            android:parentActivityName="com.example.voward.ModernMainActivity" />
 
         <activity
-            android:name=".HelpActivity"
+            android:name="com.example.voward.HelpActivity"
             android:exported="false"
             android:theme="@style/Theme.Voward.NoActionBar"
-            android:parentActivityName=".ModernMainActivity" />
+            android:parentActivityName="com.example.voward.ModernMainActivity" />
 
         <activity
-            android:name=".SetupActivity"
+            android:name="com.example.voward.SetupActivity"
             android:exported="false"
             android:theme="@style/Theme.Voward.NoActionBar"
-            android:parentActivityName=".ModernMainActivity" />
+            android:parentActivityName="com.example.voward.ModernMainActivity" />
 
         <activity
-            android:name=".InstalledAppPickerActivity"
+            android:name="com.example.voward.InstalledAppPickerActivity"
             android:exported="false"
             android:theme="@style/Theme.Voward.NoActionBar"
-            android:parentActivityName=".AppPackagesListEditorActivity" />
+            android:parentActivityName="com.example.voward.AppPackagesListEditorActivity" />
             
         <activity
-            android:name=".DecisionGateActivity"
+            android:name="com.example.voward.DecisionGateActivity"
             android:exported="false"
             android:taskAffinity=".firewall"
             android:excludeFromRecents="true"
             android:theme="@style/Theme.Voward.NoActionBar" />
 
         <service
-            android:name=".AttentionFirewallService"
+            android:name="com.example.voward.AttentionFirewallService"
             android:enabled="true"
             android:exported="true"
             android:label="@string/accessibility_service_label"
@@ -131,7 +131,7 @@
         </service>
 
         <receiver
-            android:name=".MyDeviceAdminReceiver"
+            android:name="com.example.voward.MyDeviceAdminReceiver"
             android:exported="true"
             android:permission="android.permission.BIND_DEVICE_ADMIN">
             <meta-data

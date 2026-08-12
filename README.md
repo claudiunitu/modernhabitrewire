@@ -7,12 +7,13 @@ Voward is not medical treatment, a diagnostic device, or a validated measure of 
 ## Screenshots
 
 <p align="center">
-  <img src="docs/screenshots/voward-today.png" alt="Voward Today dashboard showing active protection and the remaining daily allowance" width="30%" />
-  <img src="docs/screenshots/voward-rules.png" alt="Voward Rules screen showing protected apps and websites" width="30%" />
-  <img src="docs/screenshots/voward-gate.png" alt="Voward decision gate asking for an intention and session length before opening YouTube" width="30%" />
+  <img src="docs/screenshots/voward-today.png" alt="Voward Today dashboard showing active protection and the remaining daily allowance" width="23%" />
+  <img src="docs/screenshots/voward-rules.png" alt="Voward Rules screen showing protected apps and websites" width="23%" />
+  <img src="docs/screenshots/voward-progress.png" alt="Voward Progress screen showing measured weekly protected use" width="23%" />
+  <img src="docs/screenshots/voward-gate.png" alt="Voward decision gate asking for an intention and session length before opening YouTube" width="23%" />
 </p>
 
-<p align="center"><sub>Daily status &middot; Protected rules &middot; Intentional-use decision gate</sub></p>
+<p align="center"><sub>Daily status &middot; Protected rules &middot; Local progress &middot; Intentional-use decision gate</sub></p>
 
 ## Current features
 
@@ -21,9 +22,11 @@ Voward is not medical treatment, a diagnostic device, or a validated measure of 
 - Require a purpose and a planned session of 1–60 minutes before regular protected content opens.
 - Apply a configurable entry pause. Repeat entries increase the pause according to the configured growth percentage.
 - Require a second **Open intentionally** choice after the pause; the app never opens protected content automatically when the timer reaches zero.
+- Offer three configurable alternative next steps at the gate; selecting one returns to Android Home.
 - Spend one allowance second for each second of approved protected use and end the session at the smaller of the planned duration or remaining allowance.
 - Mark individual app or website rules as strict. Strict rules cannot be opened while protection is active.
 - Show the remaining allowance, next pause, protected-rule count, sessions, sessions ended early, and limits reached.
+- Keep up to 14 completed daily summaries on-device and show current-week protected-use time, sessions, outcomes, and common session start time.
 - Keep rules and settings read-only while protection is active.
 - Import and export portable configuration as JSON.
 - Optionally show allowance notifications, enable Device Admin uninstall friction, and use system grayscale during approved sessions.
@@ -41,7 +44,7 @@ The app is intended for direct/private installation. Its accessibility and unins
 ## Setup
 
 1. Open Voward and review the disclosure.
-2. Set a real-life goal, daily allowance, default session length, base entry pause, and repeat-entry growth.
+2. Set an intention, daily allowance, default session length, base entry pause, repeat-entry growth, and optional alternative next steps.
 3. Add at least one protected app or website rule. Mark a rule strict only if it should remain unavailable while protection is active.
 4. Enable the **Attention Firewall** accessibility service.
 5. Optionally enable Device Admin uninstall protection and notifications.
@@ -65,6 +68,12 @@ next_pause = clamp(base pause × (1 + growth × ln(1 + sessions today)), 1, 3600
 One allowance second always buys one second of approved protected use. The session limit shown at the gate stays fixed for that session. The remaining balance cannot fall below zero, and carried allowance is capped at one daily allowance.
 
 Choosing **Not now** or leaving during the pause returns to the Android Home screen. Leaving protected content ends its active metering segment; reaching the quoted limit sends an app session Home or replaces the restricted browser tab. When no allowance remains, a new regular session cannot start. Strict rules ignore allowance and remain blocked until protection is deactivated.
+
+## Progress
+
+The Progress tab reports only activity measured by Voward: protected-use time, session count, sessions ended early, limits reached, and the most common session start hour for the current week. Completed daily summaries are retained locally for up to 14 days. Voward does not estimate “time saved” or infer urges, wellbeing, or health outcomes.
+
+Resetting today’s statistics clears the current day’s counters without restoring allowance. The reset action and other timing/configuration controls are unavailable while protection is active.
 
 ## Website rules
 
@@ -90,14 +99,14 @@ Ambiguous single-word and malformed rules are rejected. URL enforcement depends 
 On a development or privately managed device, grant grayscale access with ADB:
 
 ```shell
-adb shell pm grant com.example.voward android.permission.WRITE_SECURE_SETTINGS
+adb shell pm grant com.example.modernhabitrewire android.permission.WRITE_SECURE_SETTINGS
 ```
 
 Voward reports whether this permission is available and restores the previous Android color-correction state when an approved session ends. The rest of the app works without this permission.
 
 ## Build and test
 
-The project uses the checked-in Gradle wrapper, Java 17, compile/target SDK 36, and application ID `com.example.voward`.
+The project uses the checked-in Gradle wrapper, Java 17, compile/target SDK 36, application ID `com.example.modernhabitrewire`, and Java namespace `com.example.voward`.
 
 On Windows:
 

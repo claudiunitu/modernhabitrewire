@@ -3,6 +3,7 @@ package com.example.voward;
 import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Looper;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -17,6 +18,7 @@ import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
+import org.robolectric.Shadows;
 import org.robolectric.android.controller.ActivityController;
 import org.robolectric.annotation.Config;
 
@@ -222,6 +224,62 @@ public class ActivityAndAdapterTest {
     }
 
     @Test
+    public void progressNavigationAndConfiguredGateAlternativesAreVisible() {
+        preferences.setSetupSeen(true);
+        preferences.setReplacementWalk("Step onto the balcony");
+        preferences.setReplacementWater("Make tea");
+        preferences.setReplacementTask("Write one sentence");
+
+        ActivityController<ModernMainActivity> main =
+                Robolectric.buildActivity(ModernMainActivity.class).setup();
+        com.google.android.material.bottomnavigation.BottomNavigationView navigation =
+                main.get().findViewById(R.id.bottomNavigation);
+        navigation.setSelectedItemId(R.id.navigation_progress);
+        assertEquals(View.VISIBLE, main.get().findViewById(R.id.progressScreen).getVisibility());
+        assertEquals(View.GONE, main.get().findViewById(R.id.todayScreen).getVisibility());
+        main.destroy();
+
+        ActivityController<DecisionGateActivity> gate =
+                Robolectric.buildActivity(DecisionGateActivity.class).setup();
+        assertEquals("Step onto the balcony", ((TextView) gate.get().findViewById(
+                R.id.replacementWalk)).getText().toString());
+        assertEquals("Make tea", ((TextView) gate.get().findViewById(
+                R.id.replacementWater)).getText().toString());
+        assertEquals("Write one sentence", ((TextView) gate.get().findViewById(
+                R.id.replacementTask)).getText().toString());
+        gate.get().findViewById(R.id.replacementWater).performClick();
+        assertEquals(1, preferences.getDailyAlternativeChoiceCounts()[1]);
+        gate.destroy();
+    }
+
+    @Test
+    public void intentionEditsRefreshTodayAndShortcutFocusesTheSettingAtTop() {
+        preferences.setSetupSeen(true);
+        preferences.setFunctionalGoal("Read after dinner");
+        ActivityController<ModernMainActivity> controller =
+                Robolectric.buildActivity(ModernMainActivity.class).setup();
+        ModernMainActivity activity = controller.get();
+        EditText intentionInput = activity.findViewById(R.id.functionalGoalInput);
+        TextView todayGoal = activity.findViewById(R.id.todayGoalText);
+
+        intentionInput.setText("Call a friend");
+        assertEquals("Call a friend", todayGoal.getText().toString());
+        intentionInput.setText("");
+        assertEquals("", preferences.getFunctionalGoal());
+        assertEquals(application.getString(R.string.no_goal_yet), todayGoal.getText().toString());
+
+        intentionInput.setText("Take a walk");
+        ((EditText) activity.findViewById(R.id.deactivationKeyUnblockerInputText)).requestFocus();
+        activity.findViewById(R.id.editIntentionButton).performClick();
+        Shadows.shadowOf(Looper.getMainLooper()).idle();
+
+        assertEquals(View.VISIBLE, activity.findViewById(R.id.settingsScreen).getVisibility());
+        assertTrue(intentionInput.hasFocus());
+        assertEquals(0, activity.findViewById(R.id.settingsScreen).getScrollY());
+        controller.destroy();
+    }
+
+    @Test
     public void activeProtectionLocksAdvancedActionsAndSettingListeners() {
         preferences.setDailyAllowanceSeconds(600);
         preferences.setRemainingBudgetSeconds(120);
@@ -233,11 +291,13 @@ public class ActivityAndAdapterTest {
         ModernMainActivity activity = controller.get();
         View setupButton = activity.findViewById(R.id.rerunSetupButton);
         View resetButton = activity.findViewById(R.id.button_reset_stats);
+        View editIntentionButton = activity.findViewById(R.id.editIntentionButton);
 
         assertFalse(setupButton.isEnabled());
         assertEquals(0.38f, setupButton.getAlpha(), 0.001f);
         assertFalse(resetButton.isEnabled());
         assertEquals(0.38f, resetButton.getAlpha(), 0.001f);
+        assertEquals(View.GONE, editIntentionButton.getVisibility());
         ((EditText) activity.findViewById(R.id.dailyBudgetInput)).setText("20");
         activity.onResetStatsClick(resetButton);
         assertEquals(600, preferences.getDailyAllowanceSeconds());

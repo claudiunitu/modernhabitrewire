@@ -104,9 +104,18 @@
                 </LinearLayout>
 
                 <TextView android:id="@+id/gatePlanSummary" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_lg" android:background="@drawable/bg_status_active" android:padding="@dimen/spacing_md" android:textAppearance="?attr/textAppearanceTitleMedium" android:visibility="gone" />
-                <TextView android:id="@+id/replacement_prompt" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_lg" android:text="@string/gate_replacement_prompt" android:textAppearance="?attr/textAppearanceBodyLarge" android:textColor="?attr/colorOnSurfaceVariant" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_lg" android:text="@string/healthy_next_step" android:textAppearance="?attr/textAppearanceTitleMedium" />
+                <TextView android:id="@+id/replacement_prompt" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs" android:text="@string/gate_replacement_prompt" android:textAppearance="?attr/textAppearanceBodyMedium" android:textColor="?attr/colorOnSurfaceVariant" />
+                <LinearLayout android:id="@+id/replacementActions" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:orientation="vertical">
+                    <com.google.android.material.button.MaterialButton android:id="@+id/replacementWalk" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/replacement_walk" />
+                    <com.google.android.material.button.MaterialButton android:id="@+id/replacementWater" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs" android:text="@string/replacement_water" />
+                    <com.google.android.material.button.MaterialButton android:id="@+id/replacementTask" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs" android:text="@string/replacement_task" />
+                </LinearLayout>
                 <TextView android:id="@+id/session_terms" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_md" android:text="@string/gate_terms_before_plan" android:textAppearance="?attr/textAppearanceBodyMedium" android:textColor="?attr/colorOnSurfaceVariant" />
-                <TextView android:id="@+id/friction_status" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xl" android:gravity="center" android:textAppearance="?attr/textAppearanceHeadlineMedium" android:textColor="?attr/colorPrimary" android:visibility="invisible" />
+                <FrameLayout android:id="@+id/pauseVisual" android:layout_width="184dp" android:layout_height="184dp" android:layout_gravity="center_horizontal" android:layout_marginTop="@dimen/spacing_lg" android:visibility="gone">
+                    <com.example.voward.AllowanceRingView android:id="@+id/pauseRing" android:layout_width="match_parent" android:layout_height="match_parent" android:contentDescription="@string/pause_countdown_description" />
+                    <TextView android:id="@+id/friction_status" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:padding="28dp" android:textAppearance="?attr/textAppearanceTitleMedium" android:textColor="?attr/colorPrimary" />
+                </FrameLayout>
             </LinearLayout>
         </androidx.constraintlayout.widget.ConstraintLayout>
     </androidx.core.widget.NestedScrollView>

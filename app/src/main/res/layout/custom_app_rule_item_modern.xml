@@ -7,6 +7,7 @@
                 <TextView android:id="@+id/app_name_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:textAppearance="?attr/textAppearanceTitleMedium" />
                 <TextView android:id="@+id/package_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:ellipsize="middle" android:maxLines="1" android:textAppearance="?attr/textAppearanceBodySmall" android:textColor="?attr/colorOnSurfaceVariant" />
             </LinearLayout>
+            <TextView android:id="@+id/strict_badge" android:layout_width="wrap_content" android:layout_height="wrap_content" android:background="@drawable/bg_status_attention" android:text="@string/strict_badge" android:textAppearance="?attr/textAppearanceLabelSmall" android:textColor="@color/status_warning" android:visibility="gone" />
             <ImageButton android:id="@+id/delete_button" android:layout_width="@dimen/touch_target_min" android:layout_height="@dimen/touch_target_min" android:background="?attr/selectableItemBackgroundBorderless" android:contentDescription="@string/Remove" android:src="@drawable/ic_delete" app:tint="?attr/colorError" />
         </LinearLayout>
         <com.google.android.material.checkbox.MaterialCheckBox android:id="@+id/strict_rule_checkbox" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/strict_rule_row_label" app:buttonTint="?attr/colorError" />

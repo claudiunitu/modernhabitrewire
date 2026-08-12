@@ -32,6 +32,7 @@ public class DecisionGateActivity extends AppCompatActivity {
     private static final String STATE_OUTCOME = "gate_outcome";
     private static final String STATE_QUOTED_SECONDS = "gate_quoted_seconds";
     private static final String STATE_STRICT_BLOCK = "gate_strict_block";
+    private static final String STATE_COUNTDOWN_TOTAL = "gate_countdown_total";
     private static final int STAGE_PLANNING = 0;
     private static final int STAGE_COUNTDOWN = 1;
     private static final int STAGE_READY = 2;
@@ -49,6 +50,7 @@ public class DecisionGateActivity extends AppCompatActivity {
     private int stage = STAGE_PLANNING;
     private long countdownDeadlineElapsed = 0;
     private long quotedSessionSeconds = 0;
+    private int countdownTotalSeconds = 0;
     private boolean outcomeRecorded = false;
     private boolean strictBlocked = false;
 
@@ -87,6 +89,9 @@ public class DecisionGateActivity extends AppCompatActivity {
             ((TextView) findViewById(R.id.replacement_prompt)).setText(getString(
                     R.string.gate_replacement_with_goal, functionalGoal));
         }
+        ((Button) findViewById(R.id.replacementWalk)).setText(appPreferencesManager.getReplacementWalk());
+        ((Button) findViewById(R.id.replacementWater)).setText(appPreferencesManager.getReplacementWater());
+        ((Button) findViewById(R.id.replacementTask)).setText(appPreferencesManager.getReplacementTask());
 
         if (savedInstanceState == null) {
             plannedMinutesInput.setText(String.valueOf(
@@ -96,6 +101,7 @@ public class DecisionGateActivity extends AppCompatActivity {
             countdownDeadlineElapsed = savedInstanceState.getLong(STATE_DEADLINE, 0);
             outcomeRecorded = savedInstanceState.getBoolean(STATE_OUTCOME, false);
             quotedSessionSeconds = savedInstanceState.getLong(STATE_QUOTED_SECONDS, 0);
+            countdownTotalSeconds = savedInstanceState.getInt(STATE_COUNTDOWN_TOTAL, 0);
         }
 
         MaterialButtonToggleGroup durations = findViewById(R.id.durationChips);
@@ -117,6 +123,9 @@ public class DecisionGateActivity extends AppCompatActivity {
             recordAborted();
             goHome();
         });
+        findViewById(R.id.replacementWalk).setOnClickListener(v -> chooseAlternative(0));
+        findViewById(R.id.replacementWater).setOnClickListener(v -> chooseAlternative(1));
+        findViewById(R.id.replacementTask).setOnClickListener(v -> chooseAlternative(2));
 
         // Route hardware back through goHome() so the gate is always properly
         // closed — ensuring notifyGateClosed() is called and the user lands on
@@ -169,6 +178,7 @@ public class DecisionGateActivity extends AppCompatActivity {
 
         int delay = appPreferencesManager.getLaunchFrictionEnabled()
                 ? budgetEngine.calculateWaitSeconds() : 0;
+        countdownTotalSeconds = delay;
         countdownDeadlineElapsed = SystemClock.elapsedRealtime() + delay * 1000L;
         stage = delay > 0 ? STAGE_COUNTDOWN : STAGE_READY;
         renderStage();
@@ -212,12 +222,13 @@ public class DecisionGateActivity extends AppCompatActivity {
             ((TextView) findViewById(R.id.gateStageLabel)).setText(R.string.gate_stage_pause);
             ((TextView) findViewById(R.id.gateTitle)).setText(R.string.gate_pause_title);
             proceedButton.setVisibility(View.GONE);
-            frictionTextView.setVisibility(View.VISIBLE);
+            findViewById(R.id.pauseVisual).setVisibility(View.VISIBLE);
             runCountdown();
         } else if (stage == STAGE_READY) {
             ((TextView) findViewById(R.id.gateStageLabel)).setText(R.string.gate_stage_confirm);
             ((TextView) findViewById(R.id.gateTitle)).setText(R.string.gate_confirm_title);
-            frictionTextView.setVisibility(View.VISIBLE);
+            findViewById(R.id.pauseVisual).setVisibility(View.VISIBLE);
+            ((AllowanceRingView) findViewById(R.id.pauseRing)).setFraction(1f);
             frictionTextView.setText(R.string.gate_pause_complete);
             proceedButton.setVisibility(View.VISIBLE);
             proceedButton.setText(R.string.gate_open_intentionally);
@@ -228,7 +239,7 @@ public class DecisionGateActivity extends AppCompatActivity {
         } else {
             ((TextView) findViewById(R.id.gateStageLabel)).setText(R.string.gate_stage_plan);
             ((TextView) findViewById(R.id.gateTitle)).setText(R.string.gate_plan_title);
-            frictionTextView.setVisibility(View.INVISIBLE);
+            findViewById(R.id.pauseVisual).setVisibility(View.GONE);
             proceedButton.setVisibility(View.VISIBLE);
             proceedButton.setText(R.string.gate_start_pause);
         }
@@ -249,7 +260,8 @@ public class DecisionGateActivity extends AppCompatActivity {
         replacement.setText(R.string.strict_gate_explanation);
         replacement.setTextColor(ContextCompat.getColor(this, R.color.status_warning));
         sessionTerms.setVisibility(View.GONE);
-        frictionTextView.setVisibility(View.GONE);
+        findViewById(R.id.pauseVisual).setVisibility(View.GONE);
+        findViewById(R.id.replacementActions).setVisibility(View.GONE);
         proceedButton.setVisibility(View.GONE);
         cancelButton.setText(R.string.strict_gate_home);
     }
@@ -286,6 +298,9 @@ public class DecisionGateActivity extends AppCompatActivity {
         }
         frictionTextView.setText(getResources().getQuantityString(
                 R.plurals.interaction_latency_template, seconds, seconds));
+        float completed = countdownTotalSeconds <= 0 ? 1f
+                : 1f - (seconds / (float) countdownTotalSeconds);
+        ((AllowanceRingView) findViewById(R.id.pauseRing)).setFraction(completed);
         handler.removeCallbacksAndMessages(null);
         handler.postDelayed(this::runCountdown, Math.min(1000, remainingMs));
     }
@@ -322,6 +337,13 @@ public class DecisionGateActivity extends AppCompatActivity {
         finish();
     }
 
+    private void chooseAlternative(int index) {
+        handler.removeCallbacksAndMessages(null);
+        appPreferencesManager.incrementAlternativeChoice(index);
+        recordAborted();
+        goHome();
+    }
+
     private void recordAborted() {
         if (strictBlocked) return;
         if (outcomeRecorded) return;
@@ -343,6 +365,7 @@ public class DecisionGateActivity extends AppCompatActivity {
         outState.putBoolean(STATE_OUTCOME, outcomeRecorded);
         outState.putLong(STATE_QUOTED_SECONDS, quotedSessionSeconds);
         outState.putBoolean(STATE_STRICT_BLOCK, strictBlocked);
+        outState.putInt(STATE_COUNTDOWN_TOTAL, countdownTotalSeconds);
         super.onSaveInstanceState(outState);
     }
 

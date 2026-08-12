@@ -53,6 +53,9 @@ public class AppPreferencesManagerSingleton {
     private static final String KEY_PERMISSION_DISCLOSURE_ACCEPTED = "permission_disclosure_accepted";
     private static final String KEY_SETUP_SEEN = "guided_setup_seen_v1";
     private static final String KEY_FUNCTIONAL_GOAL = "functional_goal";
+    private static final String KEY_REPLACEMENT_WALK = "replacement_walk";
+    private static final String KEY_REPLACEMENT_WATER = "replacement_water";
+    private static final String KEY_REPLACEMENT_TASK = "replacement_task";
 
     private static final String KEY_DEACTIVATION_HASH = "deactivation_hash";
     private static final String KEY_UNINSTALL_GUARD_ENABLED = "uninstall_guard_enabled";
@@ -67,6 +70,9 @@ public class AppPreferencesManagerSingleton {
     private static final String KEY_METRIC_RETRY_COUNT = "metric_retry_count";
     private static final String KEY_METRIC_SESSIONS_ENDED_EARLY = "metric_sessions_ended_early";
     private static final String KEY_METRIC_SESSION_LIMIT_REACHED = "metric_session_limit_reached";
+    private static final String KEY_DAILY_USAGE_HISTORY = "daily_usage_history_v1";
+    private static final String KEY_DAILY_SESSION_HOURS = "daily_session_hours_v1";
+    private static final String KEY_DAILY_ALTERNATIVE_CHOICES = "daily_alternative_choices_v1";
     private static final int PBKDF2_ITERATIONS = 100_000;
     private static final int PBKDF2_BITS = 256;
 
@@ -641,8 +647,107 @@ public class AppPreferencesManagerSingleton {
         prefs.edit().putString(KEY_FUNCTIONAL_GOAL, clean).apply();
     }
 
+    public String getReplacementWalk() {
+        return prefs.getString(KEY_REPLACEMENT_WALK, "Take a short walk");
+    }
+
+    public void setReplacementWalk(String value) {
+        prefs.edit().putString(KEY_REPLACEMENT_WALK, sanitizeSuggestion(value, "Take a short walk")).apply();
+    }
+
+    public String getReplacementWater() {
+        return prefs.getString(KEY_REPLACEMENT_WATER, "Drink some water");
+    }
+
+    public void setReplacementWater(String value) {
+        prefs.edit().putString(KEY_REPLACEMENT_WATER, sanitizeSuggestion(value, "Drink some water")).apply();
+    }
+
+    public String getReplacementTask() {
+        return prefs.getString(KEY_REPLACEMENT_TASK, "Do one small task");
+    }
+
+    public void setReplacementTask(String value) {
+        prefs.edit().putString(KEY_REPLACEMENT_TASK, sanitizeSuggestion(value, "Do one small task")).apply();
+    }
+
+    private static String sanitizeSuggestion(String value, String fallback) {
+        String clean = value == null ? "" : value.trim();
+        if (clean.isEmpty()) return fallback;
+        return clean.length() > 60 ? clean.substring(0, 60) : clean;
+    }
+
     public long getDailyRestrictedTimeMs() {
         return prefs.getLong(KEY_DAILY_RESTRICTED_TIME_MS, 0);
+    }
+
+    /** A completed day's local-only counters, used by the Progress screen. */
+    public static final class DailyUsage {
+        public final String date;
+        public final long restrictedTimeMs;
+        public final int sessions;
+        public final int endedEarly;
+        public final int limitsReached;
+        public final int[] sessionHours;
+        public final int[] alternativeChoices;
+
+        DailyUsage(String date, long restrictedTimeMs, int sessions,
+                   int endedEarly, int limitsReached, int[] sessionHours,
+                   int[] alternativeChoices) {
+            this.date = date;
+            this.restrictedTimeMs = Math.max(0, restrictedTimeMs);
+            this.sessions = Math.max(0, sessions);
+            this.endedEarly = Math.max(0, endedEarly);
+            this.limitsReached = Math.max(0, limitsReached);
+            this.sessionHours = sessionHours == null ? new int[24] : sessionHours.clone();
+            this.alternativeChoices = alternativeChoices == null
+                    ? new int[3] : alternativeChoices.clone();
+        }
+    }
+
+    public List<DailyUsage> getDailyUsageHistory() {
+        List<DailyUsage> result = new ArrayList<>();
+        try {
+            JSONArray history = new JSONArray(prefs.getString(KEY_DAILY_USAGE_HISTORY, "[]"));
+            for (int i = 0; i < history.length(); i++) {
+                JSONObject item = history.getJSONObject(i);
+                result.add(new DailyUsage(item.optString("date", ""),
+                        item.optLong("restrictedTimeMs", 0),
+                        item.optInt("sessions", 0),
+                        item.optInt("endedEarly", 0),
+                        item.optInt("limitsReached", 0),
+                        decodeHourCounts(item.optJSONArray("sessionHours")),
+                        decodeCounts(item.optJSONArray("alternativeChoices"), 3)));
+            }
+        } catch (JSONException ignored) {
+            // Corrupt optional history must never affect enforcement.
+        }
+        return Collections.unmodifiableList(result);
+    }
+
+    private void archiveCurrentDayIfPresent() {
+        String date = getLastBudgetResetDate();
+        if (date.isEmpty()) return;
+        try {
+            JSONArray oldHistory = new JSONArray(prefs.getString(KEY_DAILY_USAGE_HISTORY, "[]"));
+            JSONArray history = new JSONArray();
+            for (int i = 0; i < oldHistory.length(); i++) {
+                JSONObject item = oldHistory.getJSONObject(i);
+                if (!date.equals(item.optString("date"))) history.put(item);
+            }
+            history.put(new JSONObject()
+                    .put("date", date)
+                    .put("restrictedTimeMs", getDailyRestrictedTimeMs())
+                    .put("sessions", getDailySessionCount())
+                    .put("endedEarly", getSessionsEndedEarlyCount())
+                    .put("limitsReached", getSessionLimitReachedCount())
+                    .put("sessionHours", new JSONArray(getDailySessionHourCounts()))
+                    .put("alternativeChoices", new JSONArray(getDailyAlternativeChoiceCounts())));
+            while (history.length() > 14) history.remove(0);
+            prefs.edit().putString(KEY_DAILY_USAGE_HISTORY, history.toString()).apply();
+        } catch (JSONException ignored) {
+            // Progress history is best-effort and never blocks the daily reset.
+        }
     }
 
     // Metric increments
@@ -683,8 +788,70 @@ public class AppPreferencesManagerSingleton {
         prefs.edit().putInt(key, prefs.getInt(key, 0) + 1).apply();
     }
 
-    /** Applies a complete daily reset atomically in memory and queues one disk write. */
+    public int[] getDailySessionHourCounts() {
+        try {
+            return decodeHourCounts(new JSONArray(
+                    prefs.getString(KEY_DAILY_SESSION_HOURS, "[]")));
+        } catch (JSONException ignored) {
+            return new int[24];
+        }
+    }
+
+    public void incrementSessionStartHour(int hour) {
+        if (hour < 0 || hour > 23) return;
+        int[] counts = getDailySessionHourCounts();
+        counts[hour]++;
+        prefs.edit().putString(KEY_DAILY_SESSION_HOURS, encodeHourCounts(counts)).apply();
+    }
+
+    public int[] getDailyAlternativeChoiceCounts() {
+        try {
+            return decodeCounts(new JSONArray(
+                    prefs.getString(KEY_DAILY_ALTERNATIVE_CHOICES, "[]")), 3);
+        } catch (JSONException ignored) {
+            return new int[3];
+        }
+    }
+
+    public void incrementAlternativeChoice(int index) {
+        if (index < 0 || index >= 3) return;
+        int[] counts = getDailyAlternativeChoiceCounts();
+        counts[index]++;
+        JSONArray encoded = new JSONArray();
+        for (int count : counts) encoded.put(count);
+        prefs.edit().putString(KEY_DAILY_ALTERNATIVE_CHOICES,
+                encoded.toString()).apply();
+    }
+
+    private static int[] decodeCounts(JSONArray array, int size) {
+        int[] result = new int[size];
+        if (array == null) return result;
+        for (int i = 0; i < Math.min(size, array.length()); i++) {
+            result[i] = Math.max(0, array.optInt(i, 0));
+        }
+        return result;
+    }
+
+    private static int[] decodeHourCounts(JSONArray array) {
+        int[] result = new int[24];
+        if (array == null) return result;
+        for (int i = 0; i < Math.min(24, array.length()); i++) {
+            result[i] = Math.max(0, array.optInt(i, 0));
+        }
+        return result;
+    }
+
+    private static String encodeHourCounts(int[] counts) {
+        JSONArray array = new JSONArray();
+        for (int hour = 0; hour < 24; hour++) {
+            array.put(counts != null && hour < counts.length ? Math.max(0, counts[hour]) : 0);
+        }
+        return array.toString();
+    }
+
+    /** Archives the completed day, then applies the next day's reset state. */
     public void applyResetBatch(long remaining, int sessionCount, String date, long epochDay) {
+        if (epochDay > getLastBudgetResetEpochDay()) archiveCurrentDayIfPresent();
         prefs.edit()
                 .putLong(KEY_REMAINING_BUDGET_SECONDS, Math.max(0, remaining))
                 .putInt(KEY_DAILY_SESSION_COUNT, sessionCount)
@@ -693,6 +860,8 @@ public class AppPreferencesManagerSingleton {
                 .putLong(KEY_DAILY_RESTRICTED_TIME_MS, 0)
                 .putInt(KEY_METRIC_SESSIONS_ENDED_EARLY, 0)
                 .putInt(KEY_METRIC_SESSION_LIMIT_REACHED, 0)
+                .putString(KEY_DAILY_SESSION_HOURS, "[]")
+                .putString(KEY_DAILY_ALTERNATIVE_CHOICES, "[]")
                 .apply();
     }
 
@@ -719,6 +888,8 @@ public class AppPreferencesManagerSingleton {
                 .putInt(KEY_METRIC_RETRY_COUNT, 0)
                 .putInt(KEY_METRIC_SESSIONS_ENDED_EARLY, 0)
                 .putInt(KEY_METRIC_SESSION_LIMIT_REACHED, 0)
+                .putString(KEY_DAILY_SESSION_HOURS, "[]")
+                .putString(KEY_DAILY_ALTERNATIVE_CHOICES, "[]")
                 .apply();
     }
 

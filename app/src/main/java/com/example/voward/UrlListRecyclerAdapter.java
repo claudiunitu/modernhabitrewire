@@ -21,6 +21,7 @@ class UrlViewHolder extends RecyclerView.ViewHolder {
     TextView typeView;
     ImageView deleteButton;
     MaterialCheckBox strictRuleCheckbox;
+    TextView strictBadge;
 
     UrlViewHolder(@NonNull View itemView, Boolean isLocked) {
         super(itemView);
@@ -29,9 +30,12 @@ class UrlViewHolder extends RecyclerView.ViewHolder {
         typeView = itemView.findViewById(R.id.url_rule_type);
         deleteButton = itemView.findViewById(R.id.delete_button);
         strictRuleCheckbox = itemView.findViewById(R.id.strict_rule_checkbox);
+        strictBadge = itemView.findViewById(R.id.strict_badge);
         deleteButton.setVisibility(isLocked ? View.GONE : View.VISIBLE);
+        strictRuleCheckbox.setEnabled(!isLocked);
         strictRuleCheckbox.setClickable(!isLocked);
         strictRuleCheckbox.setFocusable(!isLocked);
+        if (isLocked) strictRuleCheckbox.setText(R.string.strict_rule_locked_label);
 
     }
 }
@@ -86,6 +90,8 @@ public class UrlListRecyclerAdapter extends RecyclerView.Adapter<UrlViewHolder> 
         holder.strictRuleCheckbox.setOnCheckedChangeListener(null);
         holder.strictRuleCheckbox.setChecked(
                 appPreferencesManagerSingleton.isStrictRestrictedUrlPattern(url));
+        holder.strictBadge.setVisibility(holder.strictRuleCheckbox.isChecked()
+                ? View.VISIBLE : View.GONE);
         holder.strictRuleCheckbox.setOnCheckedChangeListener((button, checked) -> {
             if (appPreferencesManagerSingleton.getIsBlockerActive()) {
                 Toast.makeText(context, R.string.blocker_active_cannot_change,

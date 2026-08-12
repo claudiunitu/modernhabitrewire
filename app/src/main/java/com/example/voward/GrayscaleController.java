@@ -14,7 +14,7 @@ import android.util.Log;
  * including other apps — without requiring a screen capture or overlay.
  *
  * Requires WRITE_SECURE_SETTINGS, which must be granted once via ADB:
- *   adb shell pm grant com.example.voward android.permission.WRITE_SECURE_SETTINGS
+ *   adb shell pm grant com.example.modernhabitrewire android.permission.WRITE_SECURE_SETTINGS
  */
 public class GrayscaleController {
 
@@ -29,6 +29,7 @@ public class GrayscaleController {
 
     private final ContentResolver resolver;
     private final SharedPreferences recoveryPrefs;
+    private final String packageName;
 
     // Saved state so we restore whatever the user had before a session.
     private int savedDaltonizerEnabled = 0;
@@ -36,6 +37,7 @@ public class GrayscaleController {
 
     public GrayscaleController(Context context) {
         this.resolver = context.getContentResolver();
+        this.packageName = context.getPackageName();
         this.recoveryPrefs = context.getApplicationContext()
                 .getSharedPreferences(RECOVERY_PREFS, Context.MODE_PRIVATE);
         restoreStaleStateIfNeeded();
@@ -72,7 +74,7 @@ public class GrayscaleController {
         } catch (SecurityException e) {
             if (enabled) recoveryPrefs.edit().clear().apply();
             Log.w(TAG, "WRITE_SECURE_SETTINGS not granted — grayscale unavailable. "
-                    + "Run: adb shell pm grant com.example.voward "
+                    + "Run: adb shell pm grant " + packageName + " "
                     + "android.permission.WRITE_SECURE_SETTINGS");
         }
     }

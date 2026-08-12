@@ -22,11 +22,11 @@
 
     <!-- New strings for internationalization -->
     <string name="attention_firewall">Attention Firewall</string>
-    <string name="system_state_initial">System State:\n---\nSessions today: 0\nCurrent cost: 1.0x\nRemaining budget: 00:00:00</string>
+    <string name="system_state_initial">System State:\n---\nSessions today: 0\nCurrent cost: 1.0x\nRemaining allowance: 00:00:00</string>
     <string name="cancel">Cancel</string>
     <string name="enter_key_to_deactivate">Enter Key to Deactivate</string>
-    <string name="attention_budget">Attention budget</string>
-    <string name="daily_budget">Daily restricted-use budget (minutes)</string>
+    <string name="attention_budget">Daily allowance</string>
+    <string name="daily_budget">Daily allowance (minutes)</string>
     <string name="base_wait_time">Base re-entry pause (seconds)</string>
     <string name="reentry_pause_growth">Re-entry pause growth (0–100%)</string>
     <string name="default_session_minutes">Default planned session (1–60 minutes)</string>
@@ -35,13 +35,13 @@
 
     <!-- Notification strings -->
     <string name="notification_channel_name">Firewall Live Stats</string>
-    <string name="notification_channel_description">Shows real-time budget and session statistics</string>
+    <string name="notification_channel_description">Shows real-time allowance and session statistics</string>
     <string name="blocker_active">Voward protection is active</string>
     <string name="blocker_inactive">Voward protection is inactive</string>
     <string name="notification_stats_template">Remaining %1$s · this session %2$s</string>
 
     <!-- Decision Gate strings -->
-    <string name="system_state_template">Sessions today: %1$d\nRemaining budget: %2$s\n%3$s\nPrice: 1 budget second = 1 use second</string>
+    <string name="system_state_template">Sessions today: %1$d\nRemaining allowance: %2$s\n%3$s\nOne allowance second equals one use second</string>
     <plurals name="quoted_reentry_pause">
         <item quantity="one">Quoted re-entry pause: %d second</item>
         <item quantity="other">Quoted re-entry pause: %d seconds</item>
@@ -58,9 +58,9 @@
     <string name="session_complete_redirect_message">Planned session complete. Redirecting this tab.</string>
     <string name="gate_purpose_hint">What exactly are you opening this for?</string>
     <string name="gate_planned_minutes_hint">Planned duration (1–60 minutes)</string>
-    <string name="gate_replacement_prompt">Before continuing, consider a small replacement: stand up, drink water, send one message, or do the next two-minute task.</string>
-    <string name="gate_replacement_with_goal">Your real-life goal: %1$s\nConsider a small replacement first: stand up, drink water, send one message, or do the next two-minute task.</string>
-    <string name="gate_terms_before_plan">Your final cap will be the smaller of the planned duration and the remaining budget.</string>
+    <string name="gate_replacement_prompt">Choose an option to leave the protected content and return Home.</string>
+    <string name="gate_replacement_with_goal">Your intention: %1$s\nChoose an option to leave the protected content and return Home.</string>
+    <string name="gate_terms_before_plan">Your final cap will be the smaller of the planned duration and the remaining allowance.</string>
     <string name="gate_terms_quoted">Fixed session cap: %1$s. It will not become more expensive while you use it.</string>
     <string name="gate_purpose_required">Name a specific purpose before continuing</string>
     <string name="gate_minutes_error">Enter 1 to 60 minutes</string>
@@ -68,7 +68,7 @@
     <string name="gate_not_now">Not now</string>
     <string name="gate_open_intentionally">Open intentionally</string>
     <string name="gate_pause_complete">Pause complete. Review your purpose, then choose explicitly.</string>
-    <string name="no_attention_budget_remaining">No attention budget remains for a new session.</string>
+    <string name="no_attention_budget_remaining">No daily allowance remains for a new session.</string>
 
     <!-- Help Page Strings -->
     <string name="help_title">Help &amp; Guide</string>
@@ -76,10 +76,10 @@
     <string name="help_intro_content">Voward adds a planning pause and clear time limits before selected apps and websites. It is a private self-management tool—not medical treatment or a diagnostic device. If digital use causes significant distress, sleep loss, unsafe behavior, or loss of control, consider seeking help from a qualified mental-health professional.</string>
     
     <string name="help_guide_title">How to Rewire Your Habits</string>
-    <string name="help_guide_content">1. Review the disclosure, then grant only the permissions you accept.\n2. Choose restricted apps from the installed-app picker and add domain/path rules for sites.\n3. Set a daily budget in minutes and a default planned session.\n4. Set a deactivation key. At each gate, write a purpose, choose a duration, wait, and confirm again.\n5. Review whether sessions ended early or reached their limit; adjust gradually.</string>
+    <string name="help_guide_content">1. Review the disclosure, then grant only the permissions you accept.\n2. Choose restricted apps from the installed-app picker and add domain/path rules for sites.\n3. Set a daily allowance in minutes and a default planned session.\n4. Set a deactivation key. At each gate, write a purpose, choose a duration, wait, and confirm again.\n5. Review whether sessions ended early or reached their limit; adjust gradually.</string>
 
     <string name="help_model_title">Transparent model and URL rules</string>
-    <string name="help_model_content">One budget second always buys one second of restricted use. The balance carries at most one daily allowance and can never fall below zero or borrow from a future day. When today’s allowance is depleted, no new restricted session can start. The re-entry pause grows logarithmically with sessions; it never changes a quoted session price. Domain rules match the domain and subdomains. A path matches only that path and its subtree; a configured query must match exactly. Use keyword:text only when broad text matching is intentional.</string>
+    <string name="help_model_content">One allowance second always buys one second of restricted use. The balance carries at most one daily allowance and can never fall below zero or borrow from a future day. When today’s allowance is depleted, no new restricted session can start. The re-entry pause grows logarithmically with sessions; it never changes a quoted session cap. Domain rules match the domain and subdomains. A path matches only that path and its subtree; a configured query must match exactly. Use keyword:text only when broad text matching is intentional.</string>
 
     <string name="help_security_title">Security &amp; Friction</string>
     <string name="help_security_content">The recovery key is the only in-app way to deactivate active protection. There is no timer or charging bypass. For stronger commitment, have someone you trust create and keep the key. The optional uninstall guard adds friction but cannot turn a normal Android installation into an unbreakable kiosk. Accessibility can observe foreground app/window content and supported browser address text. Data stays on-device unless you explicitly export it.</string>
@@ -109,7 +109,7 @@
         <string name="grayscale_available">Grayscale reminder available</string>
         <string name="grayscale_unavailable">Grayscale unavailable (optional ADB grant not present)</string>
         <string name="setup_disclosure_title">Before enabling control permissions</string>
-        <string name="setup_disclosure_message">Accessibility observes foreground apps, window content, and supported browser address text so it can show a gate, navigate Home, or replace a blocked tab. Device Admin makes uninstall harder. Notification access shows budget status. Restricted-use records remain on this device unless you export configuration. Emergency and recovery apps are never blocked. This is a self-management tool, not medical treatment.</string>
+        <string name="setup_disclosure_message">Accessibility observes foreground apps, window content, and supported browser address text so it can show a gate, navigate Home, or replace a blocked tab. Device Admin makes uninstall harder. Notification access shows allowance status. Restricted-use records remain on this device unless you export configuration. Emergency and recovery apps are never blocked. This is a self-management tool, not medical treatment.</string>
         <string name="setup_continue">I understand — continue setup</string>
         <string name="setup_not_now">Not now</string>
         <string name="url_rule_helper">Examples: example.com · example.com/news · keyword:shorts</string>
@@ -117,6 +117,7 @@
 
         <!-- 2026 expressive information architecture -->
         <string name="nav_today">Today</string>
+        <string name="nav_progress">Progress</string>
         <string name="nav_rules">Rules</string>
         <string name="nav_settings">Settings</string>
         <string name="protection_on_badge">PROTECTED</string>
@@ -136,8 +137,25 @@
         <string name="finish_setup_body">A short checklist makes sure protection can work safely.</string>
         <string name="continue_setup">Continue setup</string>
         <string name="today_reflection">Today at a glance</string>
+        <string name="daily_intention">Intention</string>
+        <string name="replacement_suggestions_setting">Alternative next steps</string>
+        <string name="replacement_suggestions_helper">These appear on the decision gate and return you Home when chosen.</string>
+        <string name="replacement_one">First suggestion</string>
+        <string name="replacement_two">Second suggestion</string>
+        <string name="replacement_three">Third suggestion</string>
+        <string name="edit_intention">Edit intention</string>
+        <string name="allowance_available">Allowance available</string>
+        <string name="progress_intro">Measured activity from Voward’s protected sessions. Everything stays on this device.</string>
+        <string name="last_seven_days">This week</string>
+        <string name="restricted_use_chart_description">Restricted-use time for the last seven days</string>
+        <string name="today_usage">Used today</string>
+        <string name="week_usage">Used this week</string>
+        <string name="week_sessions">Sessions this week</string>
+        <string name="progress_value_minutes">%1$s</string>
+        <string name="most_common_time">Most common start time · %1$s</string>
+        <string name="no_time_pattern">No session-time pattern yet</string>
+        <string name="rules_lock_icon">Locked while protection is active</string>
         <string name="no_goal_yet">Add a real-life goal so each pause has something meaningful to point back to.</string>
-        <string name="goal_summary">Your intention: %1$s</string>
         <string name="sessions_metric">%1$d\nSessions</string>
         <string name="early_metric">%1$d\nEnded early</string>
         <string name="limits_metric">%1$d\nLimits</string>
@@ -147,7 +165,9 @@
         <string name="no_apps_protected">No apps selected yet.</string>
         <string name="no_sites_protected">No website rules added yet.</string>
         <string name="manage_apps">Manage apps</string>
+        <string name="view_locked_apps">View apps</string>
         <string name="manage_websites">Manage websites</string>
+        <string name="view_locked_websites">View websites</string>
         <string name="rules_locked_read_only">Protection is active. You can review rules, but editing stays locked until you deactivate.</string>
         <string name="rules_privacy_note">Rules and usage records stay on this device. App names and website rules are not sent to an analytics service.</string>
         <string name="settings_locked_title">Settings are protected</string>
@@ -170,8 +190,8 @@
         <string name="firewall_permission_missing">Attention Firewall · Required</string>
         <string name="uninstall_permission_ready">Uninstall protection · Ready</string>
         <string name="uninstall_permission_optional">Uninstall protection · Optional</string>
-        <string name="notifications_ready">Budget notifications · Ready</string>
-        <string name="notifications_optional">Budget notifications · Optional</string>
+        <string name="notifications_ready">Allowance notifications · Ready</string>
+        <string name="notifications_optional">Allowance notifications · Optional</string>
         <string name="open_accessibility_settings">Open accessibility settings</string>
         <string name="configure_optional_protection">Configure optional protection</string>
         <string name="allow_notifications">Allow notifications</string>
@@ -242,6 +262,16 @@
         <string name="custom_duration">Custom duration</string>
         <string name="gate_plan_summary">%1$s\nUp to %2$s</string>
         <string name="gate_terms_friendly">A %1$s session will leave about %2$s today.</string>
+        <string name="healthy_next_step">Do something else instead</string>
+        <string name="no_alternative_pattern">No alternative chosen this week</string>
+        <plurals name="most_chosen_alternative">
+            <item quantity="one">Most chosen alternative: %1$s · once</item>
+            <item quantity="other">Most chosen alternative: %1$s · %2$d times</item>
+        </plurals>
+        <string name="replacement_walk">Take a short walk</string>
+        <string name="replacement_water">Drink some water</string>
+        <string name="replacement_task">Do one small task</string>
+        <string name="pause_countdown_description">Intentional pause countdown</string>
         <string name="apps_empty_state">No protected apps yet. Choose installed apps by name to add the intentional-use gate.</string>
         <string name="sites_empty_state">No protected websites yet. Add a domain, path, or explicit keyword rule.</string>
         <string name="package_name_advanced_helper">Advanced: enter an installed Android package identifier.</string>
@@ -253,9 +283,11 @@
         <string name="help_quick_start_title">Quick start</string>
         <string name="help_quick_start_content">1. Set a daily allowance, a default session length, and a real-life goal.\n2. Choose at least one protected app or website.\n3. Enable the required Attention Firewall accessibility service. Device Admin and notifications are optional.\n4. Create a recovery key, review the setup summary, and activate protection.</string>
         <string name="help_pause_title">How the intentional pause works</string>
-        <string name="help_pause_content">At the gate, name a specific purpose and choose 1–60 minutes. Start the pause, then review the plan and explicitly choose Open intentionally or Not now. Finishing the timer never opens protected content automatically. Leaving the gate or choosing Not now returns you to Home.</string>
+        <string name="help_pause_content">At the gate, name a specific purpose and choose 1–60 minutes. Start the circular pause, then review the plan and explicitly choose Open intentionally or Not now. Finishing the timer never opens protected content automatically. You can configure three alternatives in Settings; choosing one leaves the protected content, returns you Home, and is counted in Progress.</string>
         <string name="help_budget_title">Allowance and session limits</string>
         <string name="help_budget_content">One allowance second buys one second of approved protected use. A session ends at the smaller of its planned duration or the allowance remaining when it starts. Unused allowance carries forward only up to one daily allowance, and the balance never becomes negative. Repeat entries increase only the next pause; they do not change the cost of a quoted session.</string>
+        <string name="help_progress_title">Progress and local history</string>
+        <string name="help_progress_content">The Progress tab shows measured protected-use time, sessions, early exits, limits reached, the most common session start time, and the most frequently chosen alternative for the current week. Completed daily summaries are kept locally for up to 14 days. Voward does not estimate time saved or infer wellbeing, urges, or health outcomes.</string>
         <string name="help_rules_title">App and website rules</string>
         <string name="help_rules_content">Choose apps from the installed-app picker. For websites, example.com covers that domain and subdomains; example.com/news covers that path and its subtree; and a configured query must match exactly. Use keyword:shorts only for an intentionally broad match. A strict rule stays blocked regardless of remaining allowance. Deactivate protection before editing any rule.</string>
         <string name="help_privacy_title">Privacy and permissions</string>
@@ -264,7 +296,9 @@
         <string name="help_recovery_content">The recovery key is the only in-app way to deactivate protection; it cannot be displayed or recovered, and there is no timed or charging bypass. For stronger commitment, let someone you trust create and keep it. Critical emergency and device-recovery apps cannot be selected for protection. Android accessibility is not kiosk mode, so optional uninstall protection adds friction rather than an absolute guarantee.</string>
         <string name="strict_rule_checkbox">Strictly forbid this entry</string>
         <string name="strict_rule_helper">Strict rules ignore the remaining allowance. Access stays blocked until you deactivate protection.</string>
-        <string name="strict_rule_row_label">Strict rule · budget cannot unlock</string>
+        <string name="strict_rule_row_label">Strict rule · allowance cannot unlock</string>
+        <string name="strict_rule_locked_label">Strict rule · locked during protection</string>
+        <string name="strict_badge">STRICT</string>
         <string name="strict_gate_stage">STRICT RULE</string>
         <string name="strict_gate_title">Access blocked</string>
         <string name="strict_gate_summary">Your remaining allowance cannot unlock this entry.</string>

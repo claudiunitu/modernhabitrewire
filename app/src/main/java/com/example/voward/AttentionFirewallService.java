@@ -348,29 +348,35 @@ public class AttentionFirewallService extends AccessibilityService {
         long now = eventTime;
         boolean isNewForeground = lastForegroundPackage == null || !packageName.equals(lastForegroundPackage);
 
+        // Consume an intentional-open approval before normal foreground interception.
+        // Otherwise the returning restricted app reaches handleAppInterception() first and
+        // briefly opens a second decision gate before the approval can start its session.
+        if (appPreferencesManager.getTempAllowAppLaunch()) {
+            if (isApprovedPackage(packageName)) {
+                if (isNewForeground) {
+                    lastForegroundPackage = packageName;
+                    lastForegroundChangeTime = now;
+                }
+                appPreferencesManager.setTempAllowAppLaunch(false);
+                startStickySession(packageName);
+                return;
+            }
+            if (isTransientSystemOverlay(packageName) || isLauncherPackage(packageName)) return;
+            if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+                // Do not cancel an approved launch during the stabilization interval.
+                // This prevents brief system overlays (e.g. permission prompts) from killing
+                // the approval before the target app has reached the foreground.
+                if (SystemClock.elapsedRealtime() - tempAllowGrantedAt > TEMP_ALLOW_STABILIZATION_MS) {
+                    appPreferencesManager.setTempAllowAppLaunch(false);
+                }
+            }
+        }
+
         if (isNewForeground && (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
                 || now - lastForegroundChangeTime > FOREGROUND_DEBOUNCE_MS)) {
             lastForegroundPackage = packageName;
             lastForegroundChangeTime = now;
             onForegroundAppChanged(packageName);
-        }
-
-        if (appPreferencesManager.getTempAllowAppLaunch()) {
-            if (isApprovedPackage(packageName)) {
-                appPreferencesManager.setTempAllowAppLaunch(false);
-                startStickySession(packageName);
-                return; 
-            }
-            if (isTransientSystemOverlay(packageName) || isLauncherPackage(packageName)) return;
-            if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-                // Do not cancel an approved launch during the stabilization interval.
-                // after the flag was granted. This prevents brief system overlays (e.g. Google
-                // Play Services dialogs, permission prompts) from killing the launch before
-                // the target app has had a chance to appear in the foreground.
-                if (SystemClock.elapsedRealtime() - tempAllowGrantedAt > TEMP_ALLOW_STABILIZATION_MS) {
-                    appPreferencesManager.setTempAllowAppLaunch(false);
-                }
-            }
         }
 
         if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
@@ -926,11 +932,18 @@ public class AttentionFirewallService extends AccessibilityService {
             isBudgetLockedOut = true;
             sessionLimitReached = true;
             String exhaustedPackage = activeStickyPackage;
+
+            // Arm the interception guard before ending the session. endStickySession()
+            // clears activeStickyPackage, and the accessibility events produced while
+            // focusing/editing the browser address bar would otherwise see an unapproved
+            // restricted URL and open another decision gate before the redirect completes.
+            if (isBrowserPackage(exhaustedPackage)) {
+                lastDecisionGateTime = SystemClock.elapsedRealtime();
+            }
             endStickySession();
             if (isBrowserPackage(exhaustedPackage)) {
                 BrowserSupport.Config browser = findBrowserConfig(exhaustedPackage);
                 if (browser != null) beginBrowserRedirect(browser);
-                lastDecisionGateTime = SystemClock.elapsedRealtime();
                 showSessionCompleteRedirectMessage();
             } else {
                 performGlobalAction(GLOBAL_ACTION_HOME);
