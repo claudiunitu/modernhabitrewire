@@ -54,6 +54,7 @@
     <string name="set_key_first">Set key first</string>
     <string name="cannot_be_empty">Cannot be empty</string>
     <string name="all_stats_reset">All stats reset</string>
+    <string name="reset_stats_blocked">Deactivate protection before resetting today’s statistics.</string>
     <string name="session_complete_redirect_message">Planned session complete. Redirecting this tab.</string>
     <string name="gate_purpose_hint">What exactly are you opening this for?</string>
     <string name="gate_planned_minutes_hint">Planned duration (1–60 minutes)</string>

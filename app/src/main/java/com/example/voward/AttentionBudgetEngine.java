@@ -70,10 +70,8 @@ public class AttentionBudgetEngine {
                 preferences.getCarryoverCapDays()));
     }
 
-    public void resetAllStats() {
-        LocalDate today = LocalDate.now();
-        preferences.resetAllStatistics(
-                preferences.getDailyAllowanceSeconds(), today.toString(), today.toEpochDay());
+    public void resetTodayStatistics() {
+        preferences.resetTodayStatistics();
     }
 
     public boolean hasPositiveBudget() {

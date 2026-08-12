@@ -60,6 +60,11 @@ public class SetupActivity extends AppCompatActivity {
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_setup);
         preferences = AppPreferencesManagerSingleton.getInstance(this);
+        if (preferences.getIsBlockerActive()) {
+            Toast.makeText(this, R.string.blocker_active_cannot_change, Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
         budgetEngine = new AttentionBudgetEngine(this);
         step = savedInstanceState == null ? 0 : savedInstanceState.getInt("setup_step", 0);
 
@@ -200,6 +205,11 @@ public class SetupActivity extends AppCompatActivity {
     }
 
     private boolean saveGoalAndTime() {
+        if (preferences.getIsBlockerActive()) {
+            Toast.makeText(this, R.string.blocker_active_cannot_change, Toast.LENGTH_SHORT).show();
+            finish();
+            return false;
+        }
         TextInputLayout budgetLayout = findViewById(R.id.setupBudgetInputLayout);
         TextInputLayout sessionLayout = findViewById(R.id.setupSessionInputLayout);
         int budget = parseInt((EditText) findViewById(R.id.setupBudgetInput));
@@ -291,6 +301,10 @@ public class SetupActivity extends AppCompatActivity {
 
     @Override protected void onResume() {
         super.onResume();
+        if (preferences != null && preferences.getIsBlockerActive()) {
+            finish();
+            return;
+        }
         refreshStepData();
     }
 

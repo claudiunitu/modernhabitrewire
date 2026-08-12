@@ -221,6 +221,37 @@ public class ActivityAndAdapterTest {
         main.destroy();
     }
 
+    @Test
+    public void activeProtectionLocksAdvancedActionsAndSettingListeners() {
+        preferences.setDailyAllowanceSeconds(600);
+        preferences.setRemainingBudgetSeconds(120);
+        preferences.setDailySessionCount(3);
+        preferences.setIsBlockerActive(true);
+
+        ActivityController<ModernMainActivity> controller =
+                Robolectric.buildActivity(ModernMainActivity.class).setup();
+        ModernMainActivity activity = controller.get();
+        View setupButton = activity.findViewById(R.id.rerunSetupButton);
+        View resetButton = activity.findViewById(R.id.button_reset_stats);
+
+        assertFalse(setupButton.isEnabled());
+        assertEquals(0.38f, setupButton.getAlpha(), 0.001f);
+        assertFalse(resetButton.isEnabled());
+        assertEquals(0.38f, resetButton.getAlpha(), 0.001f);
+        ((EditText) activity.findViewById(R.id.dailyBudgetInput)).setText("20");
+        activity.onResetStatsClick(resetButton);
+        assertEquals(600, preferences.getDailyAllowanceSeconds());
+        assertEquals(120, preferences.getRemainingBudgetSeconds());
+        assertEquals(3, preferences.getDailySessionCount());
+        controller.destroy();
+
+        ActivityController<SetupActivity> setupController =
+                Robolectric.buildActivity(SetupActivity.class).setup();
+        assertTrue(setupController.get().isFinishing());
+        assertEquals(600, preferences.getDailyAllowanceSeconds());
+        setupController.destroy();
+    }
+
     private static void resetSingleton() throws Exception {
         Field field = AppPreferencesManagerSingleton.class.getDeclaredField("_instance");
         field.setAccessible(true);

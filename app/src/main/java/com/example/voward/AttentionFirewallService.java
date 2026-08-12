@@ -157,6 +157,10 @@ public class AttentionFirewallService extends AccessibilityService {
                 && interceptedApp != null && !interceptedApp.isEmpty() && supportedBrowsers != null) {
             for (BrowserSupport.Config config : supportedBrowsers) {
                 if (interceptedApp.equals(config.packageName)) {
+                    // Closing the gate exposes the still-restricted page before the delayed
+                    // in-place redirect runs. Refresh the cooldown now so that foreground/
+                    // content events from that brief window cannot open a second gate.
+                    lastDecisionGateTime = SystemClock.elapsedRealtime();
                     // Keep the browser usable: replace the blocked page instead of sending
                     // the entire browser to Home. This also gives the user access to the
                     // tab switcher if browser-specific navigation is unavailable.
@@ -807,6 +811,7 @@ public class AttentionFirewallService extends AccessibilityService {
         if (root == null || root.getPackageName() == null
                 || !config.packageName.equals(root.getPackageName().toString())) {
             if (root != null) root.recycle();
+            pendingBrowserAddressClear = config;
             return;
         }
         AccessibilityNodeInfo bar = findAddressBar(root, config);
@@ -818,8 +823,19 @@ public class AttentionFirewallService extends AccessibilityService {
                     AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.getId());
         }
         if (bar != null) bar.recycle();
-        if (!submitted) clickExactAddressSuggestion(root, safeUrl);
+        if (!submitted) submitted = clickExactAddressSuggestion(root, safeUrl);
         root.recycle();
+
+        if (submitted) {
+            browserRedirectAttempts.remove(config.packageName);
+            if (pendingBrowserAddressClear == config) pendingBrowserAddressClear = null;
+        } else {
+            // The user can change focus or the omnibox contents between inserting the safe
+            // address and this fallback. Do not silently abandon enforcement in that case;
+            // restart the bounded in-place retry sequence while the browser is foreground.
+            browserRedirectAttempts.putIfAbsent(config.packageName, 0);
+            scheduleBrowserRedirectRetry(config);
+        }
     }
 
     /**

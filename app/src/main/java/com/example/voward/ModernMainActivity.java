@@ -126,6 +126,10 @@ public class ModernMainActivity extends AppCompatActivity {
     }
 
     private void openSetup() {
+        if (preferences.getIsBlockerActive()) {
+            Toast.makeText(this, R.string.blocker_active_cannot_change, Toast.LENGTH_SHORT).show();
+            return;
+        }
         setupFlowLauncher.launch(new Intent(this, SetupActivity.class));
     }
 
@@ -147,9 +151,14 @@ public class ModernMainActivity extends AppCompatActivity {
 
     private void setupWatchers() {
         ((SwitchCompat) findViewById(R.id.uninstallGuardSwitch)).setOnCheckedChangeListener(
-                (view, checked) -> { if (!updatingFields) preferences.setUninstallGuardEnabled(checked); });
+                (view, checked) -> {
+                    if (!updatingFields && !preferences.getIsBlockerActive()) {
+                        preferences.setUninstallGuardEnabled(checked);
+                    }
+                });
 
         watch(R.id.dailyBudgetInput, value -> {
+            if (preferences.getIsBlockerActive()) return;
             int minutes = parseInt(value);
             TextInputLayout layout = findViewById(R.id.dailyBudgetInputLayout);
             boolean valid = minutes >= 0 && minutes <= 1440;
@@ -161,6 +170,7 @@ public class ModernMainActivity extends AppCompatActivity {
                     oldAllowance, preferences.getDailyAllowanceSeconds());
         });
         watch(R.id.baseWaitInput, value -> {
+            if (preferences.getIsBlockerActive()) return;
             int seconds = parseInt(value);
             boolean valid = seconds >= 1 && seconds <= 3600;
             ((TextInputLayout) findViewById(R.id.baseWaitInputLayout)).setError(
@@ -168,6 +178,7 @@ public class ModernMainActivity extends AppCompatActivity {
             if (valid) preferences.setBaseWaitTimeSeconds(seconds);
         });
         watch(R.id.reentryGrowthInput, value -> {
+            if (preferences.getIsBlockerActive()) return;
             float percent = parseFloat(value);
             boolean valid = percent >= 0f && percent <= 100f;
             ((TextInputLayout) findViewById(R.id.reentryGrowthInputLayout)).setError(
@@ -175,13 +186,16 @@ public class ModernMainActivity extends AppCompatActivity {
             if (valid) preferences.setReentryGrowth(percent / 100f);
         });
         watch(R.id.defaultSessionInput, value -> {
+            if (preferences.getIsBlockerActive()) return;
             int minutes = parseInt(value);
             boolean valid = minutes >= 1 && minutes <= 60;
             ((TextInputLayout) findViewById(R.id.defaultSessionInputLayout)).setError(
                     valid ? null : getString(R.string.gate_minutes_error));
             if (valid) preferences.setDefaultSessionSeconds(minutes * 60);
         });
-        watch(R.id.functionalGoalInput, preferences::setFunctionalGoal);
+        watch(R.id.functionalGoalInput, value -> {
+            if (!preferences.getIsBlockerActive()) preferences.setFunctionalGoal(value);
+        });
         watch(R.id.deactivationKeySetterInputText, value -> refreshKeyButton());
     }
 
@@ -262,6 +276,12 @@ public class ModernMainActivity extends AppCompatActivity {
 
         findViewById(R.id.settingsLockedCard).setVisibility(active ? View.VISIBLE : View.GONE);
         findViewById(R.id.editableSettingsCard).setVisibility(active ? View.GONE : View.VISIBLE);
+        View rerunSetupButton = findViewById(R.id.rerunSetupButton);
+        rerunSetupButton.setEnabled(!active);
+        rerunSetupButton.setAlpha(active ? 0.38f : 1f);
+        View resetStatsButton = findViewById(R.id.button_reset_stats);
+        resetStatsButton.setEnabled(!active);
+        resetStatsButton.setAlpha(active ? 0.38f : 1f);
         ((TextView) findViewById(R.id.settingsLockedSummary)).setText(getString(
                 R.string.settings_locked_values,
                 goal.isEmpty() ? getString(R.string.no_goal_compact) : goal,
@@ -405,12 +425,20 @@ public class ModernMainActivity extends AppCompatActivity {
     }
 
     public void onResetStatsClick(View view) {
+        if (preferences.getIsBlockerActive()) {
+            Toast.makeText(this, R.string.reset_stats_blocked, Toast.LENGTH_SHORT).show();
+            return;
+        }
         new AlertDialog.Builder(this)
                 .setTitle(R.string.reset_stats_title)
                 .setMessage(R.string.reset_stats_message)
                 .setNegativeButton(R.string.cancel, null)
                 .setPositiveButton(R.string.reset_stats_confirm, (dialog, which) -> {
-                    budgetEngine.resetAllStats();
+                    if (preferences.getIsBlockerActive()) {
+                        Toast.makeText(this, R.string.reset_stats_blocked, Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    budgetEngine.resetTodayStatistics();
                     refreshAll();
                     Toast.makeText(this, R.string.all_stats_reset, Toast.LENGTH_SHORT).show();
                 }).show();

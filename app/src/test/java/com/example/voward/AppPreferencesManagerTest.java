@@ -195,8 +195,9 @@ public class AppPreferencesManagerTest {
         assertEquals(0, preferences.getSessionLimitReachedCount());
 
         preferences.incrementFrictionAborted();
-        preferences.resetAllStatistics(50, date.toString(), date.toEpochDay());
-        assertEquals(50, preferences.getRemainingBudgetSeconds());
+        preferences.resetTodayStatistics();
+        assertEquals(80, preferences.getRemainingBudgetSeconds());
+        assertEquals(date.toEpochDay(), preferences.getLastBudgetResetEpochDay());
         assertEquals(0, preferences.getFrictionAbortedCount());
     }
 

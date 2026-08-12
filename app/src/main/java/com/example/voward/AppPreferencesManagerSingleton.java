@@ -707,12 +707,10 @@ public class AppPreferencesManagerSingleton {
                 .apply();
     }
 
-    public void resetAllStatistics(long allowance, String date, long epochDay) {
+    /** Clears today's usage metrics without changing the remaining allowance or reset marker. */
+    public void resetTodayStatistics() {
         prefs.edit()
-                .putLong(KEY_REMAINING_BUDGET_SECONDS, Math.max(0, allowance))
                 .putInt(KEY_DAILY_SESSION_COUNT, 0)
-                .putString(KEY_LAST_BUDGET_RESET_DATE, date)
-                .putLong(KEY_LAST_BUDGET_RESET_EPOCH_DAY, epochDay)
                 .putLong(KEY_DAILY_RESTRICTED_TIME_MS, 0)
                 .putInt(KEY_METRIC_FRICTION_SHOWN, 0)
                 .putInt(KEY_METRIC_FRICTION_ENDURED, 0)

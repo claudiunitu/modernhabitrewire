@@ -130,9 +130,14 @@ public class MainActivity extends AppCompatActivity {
 
     private void setWatchers() {
         ((SwitchCompat) findViewById(R.id.uninstallGuardSwitch)).setOnCheckedChangeListener(
-                (v, checked) -> appPreferencesManager.setUninstallGuardEnabled(checked));
+                (v, checked) -> {
+                    if (!appPreferencesManager.getIsBlockerActive()) {
+                        appPreferencesManager.setUninstallGuardEnabled(checked);
+                    }
+                });
 
         ((EditText) findViewById(R.id.dailyBudgetInput)).addTextChangedListener(new SimpleWatcher(s -> {
+            if (appPreferencesManager.getIsBlockerActive()) return;
             try { 
                 int minutes = Math.max(0, Math.min(1440, Integer.parseInt(s)));
                 int allowanceSeconds = minutes * 60;
@@ -143,18 +148,25 @@ public class MainActivity extends AppCompatActivity {
             } catch (Exception ignored) {}
         }));
         ((EditText) findViewById(R.id.baseWaitInput)).addTextChangedListener(new SimpleWatcher(s -> {
+            if (appPreferencesManager.getIsBlockerActive()) return;
             try { appPreferencesManager.setBaseWaitTimeSeconds(Integer.parseInt(s)); } catch (Exception ignored) {}
         }));
         ((EditText) findViewById(R.id.reentryGrowthInput)).addTextChangedListener(new SimpleWatcher(s -> {
+            if (appPreferencesManager.getIsBlockerActive()) return;
             try { appPreferencesManager.setReentryGrowth(Float.parseFloat(s) / 100f); }
             catch (Exception ignored) {}
         }));
         ((EditText) findViewById(R.id.defaultSessionInput)).addTextChangedListener(new SimpleWatcher(s -> {
+            if (appPreferencesManager.getIsBlockerActive()) return;
             try { appPreferencesManager.setDefaultSessionSeconds(Integer.parseInt(s) * 60); }
             catch (Exception ignored) {}
         }));
         ((EditText) findViewById(R.id.functionalGoalInput)).addTextChangedListener(
-                new SimpleWatcher(appPreferencesManager::setFunctionalGoal));
+                new SimpleWatcher(s -> {
+                    if (!appPreferencesManager.getIsBlockerActive()) {
+                        appPreferencesManager.setFunctionalGoal(s);
+                    }
+                }));
 
         ((EditText) findViewById(R.id.deactivationKeySetterInputText)).addTextChangedListener(new SimpleWatcher(s -> refreshKeyButton()));
     }
@@ -176,7 +188,9 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.deactivationKeySetterInputLayout).setEnabled(!active);
         findViewById(R.id.deactivationKeySetterInputText).setEnabled(!active);
         findViewById(R.id.deactivationKeyButton).setEnabled(!active);
-        findViewById(R.id.button_reset_stats).setEnabled(!active);
+        View resetStatsButton = findViewById(R.id.button_reset_stats);
+        resetStatsButton.setEnabled(!active);
+        resetStatsButton.setAlpha(active ? 0.38f : 1f);
         findViewById(R.id.button_go_to_edit_urls).setEnabled(!active);
         findViewById(R.id.button_go_to_edit_packages).setEnabled(!active);
     }
@@ -243,7 +257,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onResetStatsClick(View v) {
-        budgetEngine.resetAllStats();
+        if (appPreferencesManager.getIsBlockerActive()) {
+            Toast.makeText(this, R.string.reset_stats_blocked, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        budgetEngine.resetTodayStatistics();
         initializeUI();
         Toast.makeText(this, getString(R.string.all_stats_reset), Toast.LENGTH_SHORT).show();
     }

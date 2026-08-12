@@ -128,16 +128,18 @@ public class AttentionBudgetEngineTest {
     }
 
     @Test
-    public void resetAllStatsRestoresCurrentAllowance() {
+    public void resetTodayStatisticsPreservesBudgetAndResetMarker() {
+        LocalDate marker = LocalDate.now().minusDays(2);
         preferences.setDailyAllowanceSeconds(300);
         preferences.setRemainingBudgetSeconds(10);
+        preferences.setLastBudgetResetEpochDay(marker.toEpochDay());
         preferences.setDailySessionCount(4);
         preferences.incrementFrictionAborted();
-        engine.resetAllStats();
-        assertEquals(300, preferences.getRemainingBudgetSeconds());
+        engine.resetTodayStatistics();
+        assertEquals(10, preferences.getRemainingBudgetSeconds());
         assertEquals(0, preferences.getDailySessionCount());
         assertEquals(0, preferences.getFrictionAbortedCount());
-        assertEquals(LocalDate.now().toEpochDay(), preferences.getLastBudgetResetEpochDay());
+        assertEquals(marker.toEpochDay(), preferences.getLastBudgetResetEpochDay());
     }
 
     private static void resetSingleton() throws Exception {
