@@ -37,7 +37,7 @@ public class UninstallGuardPolicyTest {
     }
 
     @Test
-    public void protectsDeviceAdminDeactivationAndAccessibilitySettings() {
+    public void protectsDeviceAdminDeactivationAndOnlyAccessibilityServiceDetails() {
         assertEquals(
                 UninstallGuardPolicy.GuardTarget.DEVICE_ADMIN,
                 UninstallGuardPolicy.classify(
@@ -51,11 +51,35 @@ public class UninstallGuardPolicyTest {
                         "com.android.settings.accessibility.AccessibilityDetailsSettings",
                         TARGET_ONLY));
         assertEquals(
-                UninstallGuardPolicy.GuardTarget.ACCESSIBILITY,
+                UninstallGuardPolicy.GuardTarget.NONE,
                 UninstallGuardPolicy.classify(
                         "com.android.settings",
                         "com.android.settings.Settings$AccessibilitySettingsActivity",
                         TARGET_ONLY));
+        assertEquals(
+                UninstallGuardPolicy.GuardTarget.NONE,
+                UninstallGuardPolicy.classify(
+                        "com.samsung.android.settings",
+                        "com.samsung.android.settings.accessibility.base.widget.AccessibilityDashboardActivity",
+                        TARGET_ONLY));
+        assertEquals(
+                UninstallGuardPolicy.GuardTarget.NONE,
+                UninstallGuardPolicy.classify(
+                        "com.android.settings",
+                        "com.android.settings.accessibility.ToggleAccessibilityServicePreferenceFragment",
+                        new UninstallGuardPolicy.ScreenEvidence(false, false, false, true)));
+    }
+
+    @Test
+    public void accessibilityProtectionDoesNotDependOnOptionalUninstallGuard() {
+        assertTrue(UninstallGuardPolicy.shouldBlock(
+                UninstallGuardPolicy.GuardTarget.ACCESSIBILITY, false));
+        assertFalse(UninstallGuardPolicy.shouldBlock(
+                UninstallGuardPolicy.GuardTarget.APP_CONTROLS, false));
+        assertFalse(UninstallGuardPolicy.shouldBlock(
+                UninstallGuardPolicy.GuardTarget.DEVICE_ADMIN, false));
+        assertTrue(UninstallGuardPolicy.shouldBlock(
+                UninstallGuardPolicy.GuardTarget.APP_CONTROLS, true));
     }
 
     @Test
@@ -87,12 +111,12 @@ public class UninstallGuardPolicyTest {
     }
 
     @Test
-    public void neverBlocksAnUnrelatedAppOrScreenWithoutVowardIdentity() {
+    public void neverBlocksUnrelatedAppControlsWithoutVowardIdentity() {
         assertEquals(
                 UninstallGuardPolicy.GuardTarget.NONE,
                 UninstallGuardPolicy.classify(
                         "com.android.settings",
-                        "com.android.settings.DeviceAdminAdd",
+                        "com.android.settings.applications.appinfo.AppInfoDashboardFragment",
                         new UninstallGuardPolicy.ScreenEvidence(false, true, true, true)));
         assertEquals(
                 UninstallGuardPolicy.GuardTarget.NONE,

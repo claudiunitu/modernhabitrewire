@@ -331,11 +331,11 @@ public class AttentionFirewallService extends AccessibilityService {
         }
 
         if (appPreferencesManager.getIsBlockerActive()
-                && appPreferencesManager.isUninstallGuardEnabled()
                 && UninstallGuardPolicy.isGuardHostPackage(packageName)) {
             UninstallGuardPolicy.GuardTarget guardTarget = classifyGuardScreen(
                     packageName, event.getWindowId());
-            if (guardTarget != UninstallGuardPolicy.GuardTarget.NONE) {
+            if (UninstallGuardPolicy.shouldBlock(
+                    guardTarget, appPreferencesManager.isUninstallGuardEnabled())) {
                 blockGuardedSystemScreen(guardTarget);
                 return;
             }
@@ -1096,7 +1096,8 @@ public class AttentionFirewallService extends AccessibilityService {
         boolean targetVisible;
         boolean appControlVisible;
         boolean deviceAdminControlVisible;
-        boolean accessibilityContextVisible;
+        boolean accessibilityServiceToggleVisible;
+        boolean targetAccessibilityToggleVisible;
         boolean checkableControlVisible;
     }
 
@@ -1131,7 +1132,9 @@ public class AttentionFirewallService extends AccessibilityService {
                     getString(R.string.accessibility_service_label).toLowerCase(Locale.ROOT),
                     "attention firewall service"
             );
-            scanGuardScreen(root, targetIdentifiers, scan, 0);
+            String accessibilityServiceLabel = getString(R.string.accessibility_service_label)
+                    .toLowerCase(Locale.ROOT);
+            scanGuardScreen(root, targetIdentifiers, accessibilityServiceLabel, scan, 0);
 
             return UninstallGuardPolicy.classify(
                     eventPackageName,
@@ -1140,7 +1143,10 @@ public class AttentionFirewallService extends AccessibilityService {
                             scan.targetVisible,
                             scan.appControlVisible,
                             scan.deviceAdminControlVisible,
-                            scan.accessibilityContextVisible && scan.checkableControlVisible));
+                            (scan.targetAccessibilityToggleVisible
+                                    || (scan.targetVisible
+                                    && scan.accessibilityServiceToggleVisible))
+                                    && scan.checkableControlVisible));
         } finally {
             root.recycle();
         }
@@ -1150,6 +1156,7 @@ public class AttentionFirewallService extends AccessibilityService {
     private void scanGuardScreen(
             AccessibilityNodeInfo node,
             List<String> targetIdentifiers,
+            String accessibilityServiceLabel,
             GuardScreenScan scan,
             int depth) {
         if (node == null || depth > 30) return;
@@ -1171,6 +1178,18 @@ public class AttentionFirewallService extends AccessibilityService {
             }
         }
 
+        String normalizedViewId = viewId.toLowerCase(Locale.ROOT);
+        if (!accessibilityServiceLabel.isEmpty()
+                && combined.contains(accessibilityServiceLabel)
+                && (normalizedViewId.contains("switch_text")
+                || combined.contains("use " + accessibilityServiceLabel))) {
+            // Android 14 hosts this page in a generic SubSettings activity. The
+            // service-specific "Use Voward protection service" switch label is the
+            // narrow evidence that distinguishes it from the general Accessibility
+            // list and from settings pages belonging to other services.
+            scan.targetAccessibilityToggleVisible = true;
+        }
+
         if (containsAnyGuardTerm(combined,
                 "uninstall", "delete app", "remove app", "force stop", "force_stop",
                 "clear data", "clear storage", "clear_data", "clear_storage")) {
@@ -1181,9 +1200,13 @@ public class AttentionFirewallService extends AccessibilityService {
                 "device_admin", "device admin")) {
             scan.deviceAdminControlVisible = true;
         }
+        // Some OEM service-detail pages are hosted by a generic SubSettings activity
+        // and never render the word "accessibility". Their service switch is commonly
+        // labelled "Use service" / "Use <service name>" instead.
         if (containsAnyGuardTerm(combined,
-                "accessibility", "accessibility service", "accessibility_service")) {
-            scan.accessibilityContextVisible = true;
+                "use service", "use_service", "service toggle", "service_toggle",
+                "installed service", "installed_service")) {
+            scan.accessibilityServiceToggleVisible = true;
         }
 
         CharSequence className = node.getClassName();
@@ -1193,7 +1216,7 @@ public class AttentionFirewallService extends AccessibilityService {
         if (node.isCheckable()
                 || normalizedClass.contains("switch")
                 || normalizedClass.contains("togglebutton")
-                || viewId.toLowerCase(Locale.ROOT).contains("switch")) {
+                || normalizedViewId.contains("switch")) {
             scan.checkableControlVisible = true;
         }
 
@@ -1201,7 +1224,8 @@ public class AttentionFirewallService extends AccessibilityService {
             AccessibilityNodeInfo child = node.getChild(i);
             if (child == null) continue;
             try {
-                scanGuardScreen(child, targetIdentifiers, scan, depth + 1);
+                scanGuardScreen(
+                        child, targetIdentifiers, accessibilityServiceLabel, scan, depth + 1);
             } finally {
                 child.recycle();
             }
@@ -1232,7 +1256,8 @@ public class AttentionFirewallService extends AccessibilityService {
             pendingGuardHomeAction = null;
             if (appPreferencesManager != null
                     && appPreferencesManager.getIsBlockerActive()
-                    && appPreferencesManager.isUninstallGuardEnabled()) {
+                    && UninstallGuardPolicy.shouldBlock(
+                            guardTarget, appPreferencesManager.isUninstallGuardEnabled())) {
                 performGlobalAction(GLOBAL_ACTION_HOME);
             }
         };

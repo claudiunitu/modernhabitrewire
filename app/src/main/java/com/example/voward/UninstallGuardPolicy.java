@@ -77,12 +77,10 @@ final class UninstallGuardPolicy {
             "deviceadminwarning"
     };
 
-    private static final String[] ACCESSIBILITY_CLASS_FRAGMENTS = {
-            "accessibilitysettings",
+    private static final String[] ACCESSIBILITY_DETAIL_CLASS_FRAGMENTS = {
             "accessibilitydetails",
             "toggleaccessibilityservice",
             "accessibilityservicewarning",
-            "accessibilityshortcut",
             "accessibilityservicedetails"
     };
 
@@ -114,7 +112,7 @@ final class UninstallGuardPolicy {
             String packageName,
             String className,
             ScreenEvidence evidence) {
-        if (!isGuardHostPackage(packageName) || evidence == null || !evidence.targetVisible) {
+        if (!isGuardHostPackage(packageName) || evidence == null) {
             return GuardTarget.NONE;
         }
 
@@ -122,7 +120,12 @@ final class UninstallGuardPolicy {
                 ? ""
                 : className.toLowerCase(Locale.ROOT);
 
-        if (containsAny(normalizedClass, ACCESSIBILITY_CLASS_FRAGMENTS)) {
+        if (!evidence.targetVisible) return GuardTarget.NONE;
+
+        // Only service-detail classes are intrinsically dangerous. A general
+        // AccessibilitySettings/Dashboard class may legitimately show Voward's row
+        // alongside every other service and must remain navigable.
+        if (containsAny(normalizedClass, ACCESSIBILITY_DETAIL_CLASS_FRAGMENTS)) {
             return GuardTarget.ACCESSIBILITY;
         }
         if (containsAny(normalizedClass, DEVICE_ADMIN_CLASS_FRAGMENTS)) {
@@ -139,6 +142,14 @@ final class UninstallGuardPolicy {
         if (evidence.deviceAdminControlVisible) return GuardTarget.DEVICE_ADMIN;
         if (evidence.appControlVisible) return GuardTarget.APP_CONTROLS;
         return GuardTarget.NONE;
+    }
+
+    static boolean shouldBlock(GuardTarget target, boolean uninstallGuardEnabled) {
+        if (target == null || target == GuardTarget.NONE) return false;
+        // The accessibility service is the enforcement mechanism, so its controls
+        // must remain protected whenever the blocker is active. The optional guard
+        // continues to control only uninstall/app-info and Device Admin friction.
+        return target == GuardTarget.ACCESSIBILITY || uninstallGuardEnabled;
     }
 
     private static boolean containsAny(String value, String[] fragments) {
