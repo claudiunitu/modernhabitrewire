@@ -114,6 +114,91 @@ public class AttentionFirewallService extends AccessibilityService {
     private final Map<String, BrowserSupport.Config> supportedBrowserByPackage = new HashMap<>();
     private StaticBlockPageServer blockPageServer;
 
+    private static final long BROWSER_URL_WATCHDOG_MS = 1000;
+
+    private final Handler browserWatchdogHandler =
+            new Handler(Looper.getMainLooper());
+
+    private BrowserSupport.Config watchedBrowser = null;
+
+    private final Runnable browserUrlWatchdog = new Runnable() {
+        @Override
+        public void run() {
+            if (destroyed
+                    || appPreferencesManager == null
+                    || !appPreferencesManager.getIsBlockerActive()
+                    || watchedBrowser == null) {
+                return;
+            }
+
+            BrowserSupport.Config config = watchedBrowser;
+
+            AccessibilityNodeInfo root = getRootInActiveWindow();
+
+            if (root == null) {
+                browserWatchdogHandler.postDelayed(
+                        this, BROWSER_URL_WATCHDOG_MS);
+                return;
+            }
+
+            boolean browserStillForeground;
+
+            try {
+                browserStillForeground =
+                        root.getPackageName() != null
+                                && config.packageName.equals(
+                                root.getPackageName().toString());
+            } finally {
+                root.recycle();
+            }
+
+            if (!browserStillForeground) {
+                watchedBrowser = null;
+                return;
+            }
+
+            /*
+             * Treat this as a committed-state inspection.
+             *
+             * We are not reacting to text being typed; checkBrowserUrl()
+             * still checks bar.isFocused() before accepting a restricted
+             * URL as committed.
+             */
+            checkBrowserUrl(
+                    config,
+                    AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED);
+
+            if (watchedBrowser != null) {
+                browserWatchdogHandler.postDelayed(
+                        this, BROWSER_URL_WATCHDOG_MS);
+            }
+        }
+    };
+
+    private void startBrowserUrlWatchdog(BrowserSupport.Config config) {
+        if (config == null) {
+            stopBrowserUrlWatchdog();
+            return;
+        }
+
+        if (watchedBrowser != null
+                && config.packageName.equals(watchedBrowser.packageName)) {
+            return;
+        }
+
+        browserWatchdogHandler.removeCallbacks(browserUrlWatchdog);
+
+        watchedBrowser = config;
+
+        // Check immediately, then periodically.
+        browserWatchdogHandler.post(browserUrlWatchdog);
+    }
+
+    private void stopBrowserUrlWatchdog() {
+        watchedBrowser = null;
+        browserWatchdogHandler.removeCallbacks(browserUrlWatchdog);
+    }
+
     private final Handler notificationHandler = new Handler(Looper.getMainLooper());
     private final Runnable notificationTicker = new Runnable() {
         @Override
@@ -417,7 +502,18 @@ public class AttentionFirewallService extends AccessibilityService {
     }
 
     private void onForegroundAppChanged(String packageName) {
-        if (isTransientSystemOverlay(packageName) || isLauncherPackage(packageName)) return;
+        BrowserSupport.Config browserConfig = findBrowserConfig(packageName);
+
+        if (browserConfig != null) {
+            startBrowserUrlWatchdog(browserConfig);
+        } else if (!isTransientSystemOverlay(packageName)) {
+            stopBrowserUrlWatchdog();
+        }
+
+        if (isTransientSystemOverlay(packageName)
+                || isLauncherPackage(packageName)) {
+            return;
+        }
 
         // Fire any pending browser address-bar clear now that the browser is actually
         // in the foreground. Refresh the cooldown so the URL check that runs immediately
@@ -624,6 +720,46 @@ public class AttentionFirewallService extends AccessibilityService {
         urlCheckHandler.postDelayed(check, URL_STABLE_MS);
     }
 
+    private void scheduleUrlRecheckAfterCooldown(
+            BrowserSupport.Config config,
+            long delayMs) {
+
+        Runnable existing = pendingUrlChecks.get(config.packageName);
+        if (existing != null) {
+            urlCheckHandler.removeCallbacks(existing);
+        }
+
+        Runnable check = () -> {
+            pendingUrlChecks.remove(config.packageName);
+
+            if (destroyed || appPreferencesManager == null) {
+                return;
+            }
+
+            AccessibilityNodeInfo root = getRootInActiveWindow();
+            if (root == null) {
+                return;
+            }
+
+            try {
+                if (root.getPackageName() == null ||
+                        !config.packageName.equals(root.getPackageName().toString())) {
+                    return;
+                }
+            } finally {
+                root.recycle();
+            }
+
+            // Re-read the CURRENT URL and run the normal enforcement path.
+            checkBrowserUrl(
+                    config,
+                    AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED);
+        };
+
+        pendingUrlChecks.put(config.packageName, check);
+        urlCheckHandler.postDelayed(check, delayMs);
+    }
+
     private void enforceCommittedRestrictedUrl(
             BrowserSupport.Config config,
             AccessibilityNodeInfo bar,
@@ -640,7 +776,14 @@ public class AttentionFirewallService extends AccessibilityService {
 
         // Prevent a second action while a gate is closing or an in-place redirect is
         // changing the omnibox.
-        if (SystemClock.elapsedRealtime() - lastDecisionGateTime < DECISION_COOLDOWN_MS) return;
+        long elapsed = SystemClock.elapsedRealtime() - lastDecisionGateTime;
+
+        if (elapsed < DECISION_COOLDOWN_MS) {
+            long remaining = DECISION_COOLDOWN_MS - elapsed;
+
+            scheduleUrlRecheckAfterCooldown(config, remaining + 100);
+            return;
+        }
 
         if (strict) {
             rememberBrowserInterception(config, matchedPattern);
