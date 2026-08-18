@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
+import java.text.Normalizer;
 
 /**
  * Pure policy used by the accessibility service to classify system screens that can
@@ -25,18 +26,46 @@ final class UninstallGuardPolicy {
         final boolean appControlVisible;
         final boolean deviceAdminControlVisible;
         final boolean accessibilityControlVisible;
+        final boolean appInfoActionLayoutVisible;
 
         ScreenEvidence(
                 boolean targetVisible,
                 boolean appControlVisible,
                 boolean deviceAdminControlVisible,
-                boolean accessibilityControlVisible) {
+                boolean accessibilityControlVisible,
+                boolean appInfoActionLayoutVisible) {
             this.targetVisible = targetVisible;
             this.appControlVisible = appControlVisible;
             this.deviceAdminControlVisible = deviceAdminControlVisible;
             this.accessibilityControlVisible = accessibilityControlVisible;
+            this.appInfoActionLayoutVisible = appInfoActionLayoutVisible;
         }
     }
+
+    private static final String[] APP_CONTROL_SIGNALS = {
+            // AOSP text and stable resource-id fragments.
+            "uninstall", "delete app", "remove app", "force stop", "force_stop",
+            "clear data", "clear storage", "clear_data", "clear_storage",
+            // Romanian Settings translations. Matching is accent-insensitive so these
+            // cover both OEM wording and devices configured without Romanian diacritics.
+            "dezinstal", "sterge aplicatia", "elimina aplicatia",
+            "oprire fortata", "opreste fortat", "fortati oprirea",
+            "sterge datele", "stergeti datele", "sterge spatiul de stocare",
+            "stergeti spatiul de stocare"
+    };
+
+    private static final String[] DEVICE_ADMIN_SIGNALS = {
+            "deactivate", "remove device admin", "device administrator",
+            "device_admin", "device admin", "dezactiv", "administrator dispozitiv",
+            "administratorul dispozitivului", "administrare a dispozitivului"
+    };
+
+    private static final String[] ACCESSIBILITY_SERVICE_SIGNALS = {
+            "use service", "use_service", "service toggle", "service_toggle",
+            "installed service", "installed_service", "foloseste serviciul",
+            "folositi serviciul", "utilizeaza serviciul", "utilizati serviciul",
+            "serviciu instalat"
+    };
 
     private static final Set<String> GUARD_HOST_PACKAGES = Collections.unmodifiableSet(
             new HashSet<>(Arrays.asList(
@@ -141,6 +170,11 @@ final class UninstallGuardPolicy {
         if (evidence.accessibilityControlVisible) return GuardTarget.ACCESSIBILITY;
         if (evidence.deviceAdminControlVisible) return GuardTarget.DEVICE_ADMIN;
         if (evidence.appControlVisible) return GuardTarget.APP_CONTROLS;
+        // Some OEM app-info pages use generic activity classes and generic button ids
+        // (button1/button2/button3), leaving translated button captions as the only text.
+        // A target header plus the characteristic multi-action layout is a conservative,
+        // language-independent fallback. A normal app list row does not expose this layout.
+        if (evidence.appInfoActionLayoutVisible) return GuardTarget.APP_CONTROLS;
         return GuardTarget.NONE;
     }
 
@@ -157,5 +191,25 @@ final class UninstallGuardPolicy {
             if (value.contains(fragment)) return true;
         }
         return false;
+    }
+
+    static boolean isAppControlSignal(String value) {
+        return containsNormalizedSignal(value, APP_CONTROL_SIGNALS);
+    }
+
+    static boolean isDeviceAdminSignal(String value) {
+        return containsNormalizedSignal(value, DEVICE_ADMIN_SIGNALS);
+    }
+
+    static boolean isAccessibilityServiceSignal(String value) {
+        return containsNormalizedSignal(value, ACCESSIBILITY_SERVICE_SIGNALS);
+    }
+
+    private static boolean containsNormalizedSignal(String value, String[] signals) {
+        if (value == null || value.isEmpty()) return false;
+        String normalized = Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toLowerCase(Locale.ROOT);
+        return containsAny(normalized, signals);
     }
 }

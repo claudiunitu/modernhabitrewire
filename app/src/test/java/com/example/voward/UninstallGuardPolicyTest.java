@@ -9,7 +9,7 @@ import static org.junit.Assert.assertTrue;
 public class UninstallGuardPolicyTest {
 
     private static final UninstallGuardPolicy.ScreenEvidence TARGET_ONLY =
-            new UninstallGuardPolicy.ScreenEvidence(true, false, false, false);
+            new UninstallGuardPolicy.ScreenEvidence(true, false, false, false, false);
 
     @Test
     public void recognizesAndroidAndOemGuardHostsButRejectsThirdPartyImpostors() {
@@ -67,7 +67,7 @@ public class UninstallGuardPolicyTest {
                 UninstallGuardPolicy.classify(
                         "com.android.settings",
                         "com.android.settings.accessibility.ToggleAccessibilityServicePreferenceFragment",
-                        new UninstallGuardPolicy.ScreenEvidence(false, false, false, true)));
+                        new UninstallGuardPolicy.ScreenEvidence(false, false, false, true, false)));
     }
 
     @Test
@@ -95,19 +95,48 @@ public class UninstallGuardPolicyTest {
                 UninstallGuardPolicy.classify(
                         "com.android.settings",
                         genericClass,
-                        new UninstallGuardPolicy.ScreenEvidence(true, true, false, false)));
+                        new UninstallGuardPolicy.ScreenEvidence(true, true, false, false, false)));
         assertEquals(
                 UninstallGuardPolicy.GuardTarget.DEVICE_ADMIN,
                 UninstallGuardPolicy.classify(
                         "com.android.settings",
                         genericClass,
-                        new UninstallGuardPolicy.ScreenEvidence(true, false, true, false)));
+                        new UninstallGuardPolicy.ScreenEvidence(true, false, true, false, false)));
         assertEquals(
                 UninstallGuardPolicy.GuardTarget.ACCESSIBILITY,
                 UninstallGuardPolicy.classify(
                         "com.android.settings",
                         genericClass,
-                        new UninstallGuardPolicy.ScreenEvidence(true, false, false, true)));
+                        new UninstallGuardPolicy.ScreenEvidence(true, false, false, true, false)));
+    }
+
+    @Test
+    public void recognizesRomanianGuardLabelsWithOrWithoutDiacritics() {
+        assertTrue(UninstallGuardPolicy.isAppControlSignal("Dezinstalați"));
+        assertTrue(UninstallGuardPolicy.isAppControlSignal("Oprește forțat"));
+        assertTrue(UninstallGuardPolicy.isAppControlSignal("Stergeti datele"));
+        assertTrue(UninstallGuardPolicy.isDeviceAdminSignal(
+                "Dezactivați administratorul dispozitivului"));
+        assertTrue(UninstallGuardPolicy.isAccessibilityServiceSignal(
+                "Folosiți serviciul"));
+    }
+
+    @Test
+    public void genericLocalizedAppInfoCanUseLanguageIndependentActionLayout() {
+        assertEquals(
+                UninstallGuardPolicy.GuardTarget.APP_CONTROLS,
+                UninstallGuardPolicy.classify(
+                        "com.android.settings",
+                        "com.android.settings.SubSettings",
+                        new UninstallGuardPolicy.ScreenEvidence(
+                                true, false, false, false, true)));
+        assertEquals(
+                UninstallGuardPolicy.GuardTarget.NONE,
+                UninstallGuardPolicy.classify(
+                        "com.android.settings",
+                        "com.android.settings.SubSettings",
+                        new UninstallGuardPolicy.ScreenEvidence(
+                                false, false, false, false, true)));
     }
 
     @Test
@@ -117,7 +146,7 @@ public class UninstallGuardPolicyTest {
                 UninstallGuardPolicy.classify(
                         "com.android.settings",
                         "com.android.settings.applications.appinfo.AppInfoDashboardFragment",
-                        new UninstallGuardPolicy.ScreenEvidence(false, true, true, true)));
+                        new UninstallGuardPolicy.ScreenEvidence(false, true, true, true, true)));
         assertEquals(
                 UninstallGuardPolicy.GuardTarget.NONE,
                 UninstallGuardPolicy.classify(

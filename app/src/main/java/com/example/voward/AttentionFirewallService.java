@@ -1361,6 +1361,7 @@ public class AttentionFirewallService extends AccessibilityService {
         boolean accessibilityServiceToggleVisible;
         boolean targetAccessibilityToggleVisible;
         boolean checkableControlVisible;
+        int actionButtonCount;
     }
 
     private UninstallGuardPolicy.GuardTarget classifyGuardScreen(
@@ -1408,7 +1409,8 @@ public class AttentionFirewallService extends AccessibilityService {
                             (scan.targetAccessibilityToggleVisible
                                     || (scan.targetVisible
                                     && scan.accessibilityServiceToggleVisible))
-                                    && scan.checkableControlVisible));
+                                    && scan.checkableControlVisible,
+                            scan.actionButtonCount >= 2));
         } finally {
             root.recycle();
         }
@@ -1444,6 +1446,9 @@ public class AttentionFirewallService extends AccessibilityService {
         if (!accessibilityServiceLabel.isEmpty()
                 && combined.contains(accessibilityServiceLabel)
                 && (normalizedViewId.contains("switch_text")
+                || normalizedViewId.contains("switch_widget")
+                || normalizedViewId.contains("service_switch")
+                || normalizedViewId.contains("toggle_service")
                 || combined.contains("use " + accessibilityServiceLabel))) {
             // Android 14 hosts this page in a generic SubSettings activity. The
             // service-specific "Use Voward protection service" switch label is the
@@ -1452,22 +1457,16 @@ public class AttentionFirewallService extends AccessibilityService {
             scan.targetAccessibilityToggleVisible = true;
         }
 
-        if (containsAnyGuardTerm(combined,
-                "uninstall", "delete app", "remove app", "force stop", "force_stop",
-                "clear data", "clear storage", "clear_data", "clear_storage")) {
+        if (UninstallGuardPolicy.isAppControlSignal(combined)) {
             scan.appControlVisible = true;
         }
-        if (containsAnyGuardTerm(combined,
-                "deactivate", "remove device admin", "device administrator",
-                "device_admin", "device admin")) {
+        if (UninstallGuardPolicy.isDeviceAdminSignal(combined)) {
             scan.deviceAdminControlVisible = true;
         }
         // Some OEM service-detail pages are hosted by a generic SubSettings activity
         // and never render the word "accessibility". Their service switch is commonly
         // labelled "Use service" / "Use <service name>" instead.
-        if (containsAnyGuardTerm(combined,
-                "use service", "use_service", "service toggle", "service_toggle",
-                "installed service", "installed_service")) {
+        if (UninstallGuardPolicy.isAccessibilityServiceSignal(combined)) {
             scan.accessibilityServiceToggleVisible = true;
         }
 
@@ -1482,6 +1481,18 @@ public class AttentionFirewallService extends AccessibilityService {
             scan.checkableControlVisible = true;
         }
 
+        // App-info pages normally expose at least Open/Uninstall/Force stop as real
+        // buttons. Count semantic button widgets as a fallback for OEMs that report a
+        // generic Settings activity and translate every visible caption.
+        boolean semanticButton = normalizedClass.endsWith(".button")
+                || normalizedClass.contains("materialbutton");
+        boolean genericActionButtonId = normalizedViewId.endsWith(":id/button1")
+                || normalizedViewId.endsWith(":id/button2")
+                || normalizedViewId.endsWith(":id/button3");
+        if (!node.isCheckable() && (semanticButton || genericActionButtonId)) {
+            scan.actionButtonCount++;
+        }
+
         for (int i = 0; i < node.getChildCount(); i++) {
             AccessibilityNodeInfo child = node.getChild(i);
             if (child == null) continue;
@@ -1492,13 +1503,6 @@ public class AttentionFirewallService extends AccessibilityService {
                 child.recycle();
             }
         }
-    }
-
-    private boolean containsAnyGuardTerm(String value, String... terms) {
-        for (String term : terms) {
-            if (value.contains(term)) return true;
-        }
-        return false;
     }
 
     private void blockGuardedSystemScreen(UninstallGuardPolicy.GuardTarget guardTarget) {
