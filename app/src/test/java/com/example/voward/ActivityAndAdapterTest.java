@@ -7,10 +7,10 @@ import android.os.Looper;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.Spinner;
 import android.widget.TextView;
 
 import com.google.android.material.checkbox.MaterialCheckBox;
+import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.android.material.textfield.TextInputLayout;
 
 import org.junit.Before;
@@ -240,17 +240,19 @@ public class ActivityAndAdapterTest {
                 Robolectric.buildActivity(SetupActivity.class).setup();
         assertEquals("20", ((EditText) setup.get().findViewById(
                 R.id.setupBudgetInput)).getText().toString());
-        Spinner setupCooldown = setup.get().findViewById(
+        MaterialAutoCompleteTextView setupCooldown = setup.get().findViewById(
                 R.id.setupDeactivationCooldownSpinner);
-        Spinner setupWindow = setup.get().findViewById(
+        MaterialAutoCompleteTextView setupWindow = setup.get().findViewById(
                 R.id.setupDeactivationWindowSpinner);
-        assertEquals(5, setupCooldown.getSelectedItemPosition());
-        assertEquals(2, setupWindow.getSelectedItemPosition());
-        setupCooldown.setSelection(0);
+        assertEquals(setupCooldown.getAdapter().getItem(5).toString(),
+                setupCooldown.getText().toString());
+        assertEquals(setupWindow.getAdapter().getItem(2).toString(),
+                setupWindow.getText().toString());
+        setupCooldown.getOnItemClickListener().onItemClick(null, null, 0, 0);
         Shadows.shadowOf(Looper.getMainLooper()).idle();
         assertEquals(0, preferences.getDeactivationCooldownMinutes());
         assertFalse(setupWindow.isEnabled());
-        setupCooldown.setSelection(1);
+        setupCooldown.getOnItemClickListener().onItemClick(null, null, 1, 1);
         Shadows.shadowOf(Looper.getMainLooper()).idle();
         assertEquals(1, preferences.getDeactivationCooldownMinutes());
         assertTrue(setupWindow.isEnabled());
@@ -279,6 +281,8 @@ public class ActivityAndAdapterTest {
         navigation.setSelectedItemId(R.id.navigation_progress);
         assertEquals(View.VISIBLE, main.get().findViewById(R.id.progressScreen).getVisibility());
         assertEquals(View.GONE, main.get().findViewById(R.id.todayScreen).getVisibility());
+        assertEquals(View.VISIBLE, main.get().findViewById(R.id.progressEmptyState).getVisibility());
+        assertEquals(View.GONE, main.get().findViewById(R.id.progressDataCard).getVisibility());
         main.destroy();
 
         ActivityController<DecisionGateActivity> gate =
@@ -289,6 +293,14 @@ public class ActivityAndAdapterTest {
                 R.id.replacementWater)).getText().toString());
         assertEquals("Write one sentence", ((TextView) gate.get().findViewById(
                 R.id.replacementTask)).getText().toString());
+        assertEquals(View.GONE, gate.get().findViewById(
+                R.id.planned_minutes_input_layout).getVisibility());
+        gate.get().findViewById(R.id.durationCustom).performClick();
+        assertEquals(View.VISIBLE, gate.get().findViewById(
+                R.id.planned_minutes_input_layout).getVisibility());
+        gate.get().findViewById(R.id.duration5).performClick();
+        assertEquals(View.GONE, gate.get().findViewById(
+                R.id.planned_minutes_input_layout).getVisibility());
         gate.get().findViewById(R.id.replacementWater).performClick();
         assertEquals(1, preferences.getDailyAlternativeChoiceCounts()[1]);
         gate.destroy();

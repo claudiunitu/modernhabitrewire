@@ -9,13 +9,14 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.View;
-import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.transition.AutoTransition;
+import android.transition.TransitionManager;
+import android.view.ViewGroup;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
@@ -25,6 +26,7 @@ import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
 
 import com.google.android.material.progressindicator.LinearProgressIndicator;
+import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.android.material.textfield.TextInputLayout;
 
 import java.util.Locale;
@@ -101,16 +103,17 @@ public class SetupActivity extends AppCompatActivity {
                 preferences.getDailyAllowanceSeconds() / 60));
         ((EditText) findViewById(R.id.setupSessionInput)).setText(String.valueOf(
                 preferences.getDefaultSessionSeconds() / 60));
-        ((Spinner) findViewById(R.id.setupDeactivationCooldownSpinner)).setSelection(
-                indexOf(COOLDOWN_MINUTES, preferences.getDeactivationCooldownMinutes()));
-        ((Spinner) findViewById(R.id.setupDeactivationWindowSpinner)).setSelection(
-                indexOf(WINDOW_HOURS, preferences.getDeactivationWindowHours()));
+        MaterialAutoCompleteTextView cooldown = findViewById(R.id.setupDeactivationCooldownSpinner);
+        MaterialAutoCompleteTextView window = findViewById(R.id.setupDeactivationWindowSpinner);
+        cooldown.setText(formatCooldownChoice(preferences.getDeactivationCooldownMinutes()), false);
+        window.setText(getString(R.string.window_hours_choice,
+                preferences.getDeactivationWindowHours()), false);
         refreshDeactivationTimingControls();
     }
 
     private void setupDeactivationTimingSelectors() {
-        Spinner cooldown = findViewById(R.id.setupDeactivationCooldownSpinner);
-        Spinner window = findViewById(R.id.setupDeactivationWindowSpinner);
+        MaterialAutoCompleteTextView cooldown = findViewById(R.id.setupDeactivationCooldownSpinner);
+        MaterialAutoCompleteTextView window = findViewById(R.id.setupDeactivationWindowSpinner);
         String[] cooldownLabels = new String[COOLDOWN_MINUTES.length];
         for (int i = 0; i < COOLDOWN_MINUTES.length; i++) {
             cooldownLabels[i] = formatCooldownChoice(COOLDOWN_MINUTES[i]);
@@ -120,28 +123,19 @@ public class SetupActivity extends AppCompatActivity {
             windowLabels[i] = getString(R.string.window_hours_choice, WINDOW_HOURS[i]);
         }
         cooldown.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_dropdown_item, cooldownLabels));
+                android.R.layout.simple_dropdown_item_1line, cooldownLabels));
         window.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_dropdown_item, windowLabels));
-        cooldown.setSelection(indexOf(COOLDOWN_MINUTES,
-                preferences.getDeactivationCooldownMinutes()));
-        window.setSelection(indexOf(WINDOW_HOURS,
-                preferences.getDeactivationWindowHours()));
-        cooldown.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(AdapterView<?> parent, View view,
-                                                 int position, long id) {
-                preferences.setDeactivationCooldownMinutes(COOLDOWN_MINUTES[position]);
-                refreshDeactivationTimingControls();
-            }
-            @Override public void onNothingSelected(AdapterView<?> parent) { }
+                android.R.layout.simple_dropdown_item_1line, windowLabels));
+        cooldown.setText(cooldownLabels[indexOf(COOLDOWN_MINUTES,
+                preferences.getDeactivationCooldownMinutes())], false);
+        window.setText(windowLabels[indexOf(WINDOW_HOURS,
+                preferences.getDeactivationWindowHours())], false);
+        cooldown.setOnItemClickListener((parent, view, position, id) -> {
+            preferences.setDeactivationCooldownMinutes(COOLDOWN_MINUTES[position]);
+            refreshDeactivationTimingControls();
         });
-        window.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(AdapterView<?> parent, View view,
-                                                 int position, long id) {
-                preferences.setDeactivationWindowHours(WINDOW_HOURS[position]);
-            }
-            @Override public void onNothingSelected(AdapterView<?> parent) { }
-        });
+        window.setOnItemClickListener((parent, view, position, id) ->
+                preferences.setDeactivationWindowHours(WINDOW_HOURS[position]));
     }
 
     private void refreshDeactivationTimingControls() {
@@ -169,6 +163,9 @@ public class SetupActivity extends AppCompatActivity {
 
     private void showStep(int nextStep) {
         step = Math.max(0, Math.min(STEP_COUNT - 1, nextStep));
+        TransitionManager.beginDelayedTransition(
+                (ViewGroup) findViewById(R.id.setupScroll),
+                new AutoTransition().setDuration(180));
         for (int i = 0; i < stepViews.length; i++) {
             findViewById(stepViews[i]).setVisibility(i == step ? View.VISIBLE : View.GONE);
         }

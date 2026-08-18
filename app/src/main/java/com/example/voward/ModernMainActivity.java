@@ -14,13 +14,15 @@ import android.os.SystemClock;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.transition.AutoTransition;
+import android.transition.TransitionManager;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
-import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -37,6 +39,7 @@ import androidx.core.widget.NestedScrollView;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.android.material.textfield.TextInputLayout;
 
 import org.json.JSONObject;
@@ -118,6 +121,9 @@ public class ModernMainActivity extends AppCompatActivity {
         BottomNavigationView navigation = findViewById(R.id.bottomNavigation);
         navigation.setOnItemSelectedListener(item -> {
             int id = item.getItemId();
+            TransitionManager.beginDelayedTransition(
+                    (ViewGroup) findViewById(R.id.mainContent),
+                    new AutoTransition().setDuration(180));
             findViewById(R.id.todayScreen).setVisibility(id == R.id.navigation_today ? View.VISIBLE : View.GONE);
             findViewById(R.id.rulesScreen).setVisibility(id == R.id.navigation_rules ? View.VISIBLE : View.GONE);
             findViewById(R.id.progressScreen).setVisibility(id == R.id.navigation_progress ? View.VISIBLE : View.GONE);
@@ -135,6 +141,8 @@ public class ModernMainActivity extends AppCompatActivity {
         findViewById(R.id.resumeSetupButton).setOnClickListener(v -> openSetup());
         findViewById(R.id.rerunSetupButton).setOnClickListener(v -> openSetup());
         findViewById(R.id.editIntentionButton).setOnClickListener(v -> openSettingsAtIntention());
+        findViewById(R.id.rulesAppsCard).setOnClickListener(this::onEditAppPackagesListClick);
+        findViewById(R.id.rulesWebsitesCard).setOnClickListener(this::onEditUrlListClick);
         findViewById(R.id.heroActionButton).setOnClickListener(v -> {
             if (preferences.getIsBlockerActive()) {
                 ((BottomNavigationView) findViewById(R.id.bottomNavigation))
@@ -156,8 +164,8 @@ public class ModernMainActivity extends AppCompatActivity {
     }
 
     private void setupDeactivationTimingSelectors() {
-        Spinner cooldown = findViewById(R.id.deactivationCooldownSpinner);
-        Spinner window = findViewById(R.id.deactivationWindowSpinner);
+        MaterialAutoCompleteTextView cooldown = findViewById(R.id.deactivationCooldownSpinner);
+        MaterialAutoCompleteTextView window = findViewById(R.id.deactivationWindowSpinner);
         String[] cooldownLabels = new String[COOLDOWN_MINUTES.length];
         for (int i = 0; i < COOLDOWN_MINUTES.length; i++) {
             cooldownLabels[i] = formatCooldownChoice(COOLDOWN_MINUTES[i]);
@@ -167,24 +175,24 @@ public class ModernMainActivity extends AppCompatActivity {
             windowLabels[i] = getString(R.string.window_hours_choice, WINDOW_HOURS[i]);
         }
         cooldown.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_dropdown_item, cooldownLabels));
+                android.R.layout.simple_dropdown_item_1line, cooldownLabels));
         window.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_dropdown_item, windowLabels));
-        cooldown.setSelection(indexOf(COOLDOWN_MINUTES,
-                preferences.getDeactivationCooldownMinutes()));
-        window.setSelection(indexOf(WINDOW_HOURS,
-                preferences.getDeactivationWindowHours()));
-        cooldown.setOnItemSelectedListener(new SimpleItemSelectedListener(position -> {
+                android.R.layout.simple_dropdown_item_1line, windowLabels));
+        cooldown.setText(cooldownLabels[indexOf(COOLDOWN_MINUTES,
+                preferences.getDeactivationCooldownMinutes())], false);
+        window.setText(windowLabels[indexOf(WINDOW_HOURS,
+                preferences.getDeactivationWindowHours())], false);
+        cooldown.setOnItemClickListener((parent, view, position, id) -> {
             if (!updatingFields && !preferences.getIsBlockerActive()) {
                 preferences.setDeactivationCooldownMinutes(COOLDOWN_MINUTES[position]);
                 refreshCooldownControls();
             }
-        }));
-        window.setOnItemSelectedListener(new SimpleItemSelectedListener(position -> {
+        });
+        window.setOnItemClickListener((parent, view, position, id) -> {
             if (!updatingFields && !preferences.getIsBlockerActive()) {
                 preferences.setDeactivationWindowHours(WINDOW_HOURS[position]);
             }
-        }));
+        });
     }
 
     private void openSetup() {
@@ -211,10 +219,11 @@ public class ModernMainActivity extends AppCompatActivity {
         ((EditText) findViewById(R.id.replacementThreeInput)).setText(preferences.getReplacementTask());
         ((SwitchCompat) findViewById(R.id.uninstallGuardSwitch)).setChecked(
                 preferences.isUninstallGuardEnabled());
-        ((Spinner) findViewById(R.id.deactivationCooldownSpinner)).setSelection(
-                indexOf(COOLDOWN_MINUTES, preferences.getDeactivationCooldownMinutes()));
-        ((Spinner) findViewById(R.id.deactivationWindowSpinner)).setSelection(
-                indexOf(WINDOW_HOURS, preferences.getDeactivationWindowHours()));
+        MaterialAutoCompleteTextView cooldown = findViewById(R.id.deactivationCooldownSpinner);
+        MaterialAutoCompleteTextView window = findViewById(R.id.deactivationWindowSpinner);
+        cooldown.setText(formatCooldownChoice(preferences.getDeactivationCooldownMinutes()), false);
+        window.setText(getString(R.string.window_hours_choice,
+                preferences.getDeactivationWindowHours()), false);
         updatingFields = false;
         refreshCooldownControls();
     }
@@ -381,13 +390,6 @@ public class ModernMainActivity extends AppCompatActivity {
                 ? getString(R.string.no_sites_protected)
                 : getResources().getQuantityString(R.plurals.protected_sites_summary, urlCount, urlCount));
         findViewById(R.id.rulesLockBanner).setVisibility(active ? View.VISIBLE : View.GONE);
-        MaterialButton appsButton = findViewById(R.id.button_go_to_edit_packages);
-        MaterialButton sitesButton = findViewById(R.id.button_go_to_edit_urls);
-        appsButton.setText(active ? R.string.view_locked_apps : R.string.manage_apps);
-        sitesButton.setText(active ? R.string.view_locked_websites : R.string.manage_websites);
-        appsButton.setIconResource(active ? R.drawable.ic_lock : 0);
-        sitesButton.setIconResource(active ? R.drawable.ic_lock : 0);
-
         int missing = 0;
         if (!firewallReady) missing++;
         if (ruleCount == 0) missing++;
@@ -474,6 +476,11 @@ public class ModernMainActivity extends AppCompatActivity {
         }
         long weekSeconds = 0;
         for (long value : usageSeconds) weekSeconds += value;
+
+        findViewById(R.id.progressEmptyState).setVisibility(
+                weekSeconds == 0 ? View.VISIBLE : View.GONE);
+        findViewById(R.id.progressDataCard).setVisibility(
+                weekSeconds == 0 ? View.GONE : View.VISIBLE);
 
         ((TextView) findViewById(R.id.progressTodayUsage)).setText(formatCompactDuration(todaySeconds));
         ((TextView) findViewById(R.id.progressWeekUsage)).setText(formatCompactDuration(weekSeconds));
@@ -941,16 +948,6 @@ public class ModernMainActivity extends AppCompatActivity {
     private String formatCooldownDuration(int minutes) {
         return minutes == 1 ? getString(R.string.one_minute)
                 : getString(R.string.hours_duration, minutes / 60);
-    }
-
-    private interface ItemSelection { void selected(int position); }
-    private static final class SimpleItemSelectedListener
-            implements android.widget.AdapterView.OnItemSelectedListener {
-        private final ItemSelection listener;
-        SimpleItemSelectedListener(ItemSelection listener) { this.listener = listener; }
-        @Override public void onItemSelected(android.widget.AdapterView<?> parent, View view,
-                                             int position, long id) { listener.selected(position); }
-        @Override public void onNothingSelected(android.widget.AdapterView<?> parent) { }
     }
 
     private static String formatCompactDuration(long seconds) {

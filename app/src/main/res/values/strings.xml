@@ -148,7 +148,13 @@
         <string name="allowance_available">Allowance available</string>
         <string name="progress_intro">Measured activity from Voward’s protected sessions. Everything stays on this device.</string>
         <string name="last_seven_days">This week</string>
-        <string name="restricted_use_chart_description">Restricted-use time for the last seven days</string>
+    <string name="restricted_use_chart_description">Restricted-use time for the last seven days</string>
+    <string name="progress_empty_title">Your first pattern starts here</string>
+    <string name="progress_empty_body">Protected sessions will appear here after you use a restricted app or website.</string>
+    <string name="weekly_usage_label">Used this week</string>
+    <string name="settings_intention_section">Intention and alternatives</string>
+    <string name="settings_allowance_section">Allowance and pauses</string>
+    <string name="custom_duration_action">Set a custom duration</string>
         <string name="today_usage">Used today</string>
         <string name="week_usage">Used this week</string>
         <string name="week_sessions">Sessions this week</string>

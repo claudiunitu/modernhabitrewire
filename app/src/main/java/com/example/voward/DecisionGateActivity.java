@@ -5,7 +5,10 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.transition.AutoTransition;
+import android.transition.TransitionManager;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -89,9 +92,9 @@ public class DecisionGateActivity extends AppCompatActivity {
             ((TextView) findViewById(R.id.replacement_prompt)).setText(getString(
                     R.string.gate_replacement_with_goal, functionalGoal));
         }
-        ((Button) findViewById(R.id.replacementWalk)).setText(appPreferencesManager.getReplacementWalk());
-        ((Button) findViewById(R.id.replacementWater)).setText(appPreferencesManager.getReplacementWater());
-        ((Button) findViewById(R.id.replacementTask)).setText(appPreferencesManager.getReplacementTask());
+        ((TextView) findViewById(R.id.replacementWalk)).setText(appPreferencesManager.getReplacementWalk());
+        ((TextView) findViewById(R.id.replacementWater)).setText(appPreferencesManager.getReplacementWater());
+        ((TextView) findViewById(R.id.replacementTask)).setText(appPreferencesManager.getReplacementTask());
 
         if (savedInstanceState == null) {
             plannedMinutesInput.setText(String.valueOf(
@@ -105,14 +108,32 @@ public class DecisionGateActivity extends AppCompatActivity {
         }
 
         MaterialButtonToggleGroup durations = findViewById(R.id.durationChips);
-        findViewById(R.id.duration5).setOnClickListener(v -> plannedMinutesInput.setText(R.string.duration_value_5));
-        findViewById(R.id.duration10).setOnClickListener(v -> plannedMinutesInput.setText(R.string.duration_value_10));
-        findViewById(R.id.duration15).setOnClickListener(v -> plannedMinutesInput.setText(R.string.duration_value_15));
+        TextInputLayout customDuration = findViewById(R.id.planned_minutes_input_layout);
+        findViewById(R.id.duration5).setOnClickListener(v -> {
+            plannedMinutesInput.setText(R.string.duration_value_5);
+            customDuration.setVisibility(View.GONE);
+        });
+        findViewById(R.id.duration10).setOnClickListener(v -> {
+            plannedMinutesInput.setText(R.string.duration_value_10);
+            customDuration.setVisibility(View.GONE);
+        });
+        findViewById(R.id.duration15).setOnClickListener(v -> {
+            plannedMinutesInput.setText(R.string.duration_value_15);
+            customDuration.setVisibility(View.GONE);
+        });
+        findViewById(R.id.durationCustom).setOnClickListener(v -> {
+            customDuration.setVisibility(View.VISIBLE);
+            plannedMinutesInput.requestFocus();
+            plannedMinutesInput.setSelection(plannedMinutesInput.length());
+        });
         int initialMinutes = appPreferencesManager.getDefaultSessionSeconds() / 60;
         if (initialMinutes == 5) durations.check(R.id.duration5);
         else if (initialMinutes == 10) durations.check(R.id.duration10);
         else if (initialMinutes == 15) durations.check(R.id.duration15);
-        else durations.clearChecked();
+        else {
+            durations.clearChecked();
+            customDuration.setVisibility(View.VISIBLE);
+        }
 
         updateAwarenessMirror();
 
@@ -198,6 +219,9 @@ public class DecisionGateActivity extends AppCompatActivity {
     }
 
     private void renderStage() {
+        TransitionManager.beginDelayedTransition(
+                (ViewGroup) findViewById(R.id.rootLayout),
+                new AutoTransition().setDuration(180));
         if (strictBlocked) {
             renderStrictBlock();
             return;

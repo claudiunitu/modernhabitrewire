@@ -8,9 +8,9 @@ Voward is not medical treatment, a diagnostic device, or a validated measure of 
 
 <p align="center">
   <img src="docs/screenshots/voward-today.png" alt="Voward Today dashboard showing active protection and the remaining daily allowance" width="23%" />
-  <img src="docs/screenshots/voward-rules.png" alt="Voward Rules screen showing protected apps and websites" width="23%" />
-  <img src="docs/screenshots/voward-progress.png" alt="Voward Progress screen showing measured weekly protected use" width="23%" />
-  <img src="docs/screenshots/voward-gate.png" alt="Voward decision gate asking for an intention and session length before opening YouTube" width="23%" />
+  <img src="docs/screenshots/voward-rules.png" alt="Voward Rules screen showing additive editing while protection is active" width="23%" />
+  <img src="docs/screenshots/voward-progress.png" alt="Voward Progress screen showing weekly metrics and its empty state" width="23%" />
+  <img src="docs/screenshots/voward-gate.png" alt="Voward decision gate asking for an intention and planned session length" width="23%" />
 </p>
 
 <p align="center"><sub>Daily status &middot; Protected rules &middot; Local progress &middot; Intentional-use decision gate</sub></p>

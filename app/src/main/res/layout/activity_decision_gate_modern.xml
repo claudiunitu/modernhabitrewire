@@ -35,12 +35,12 @@
                 app:layout_constraintWidth_max="@dimen/content_max_width">
 
                 <TextView android:id="@+id/gateStageLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:background="@drawable/bg_status_attention" android:text="@string/gate_stage_plan" android:textAppearance="?attr/textAppearanceLabelLarge" android:textColor="@color/status_warning" />
-                <TextView android:id="@+id/gateTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_md" android:text="@string/gate_plan_title" android:textAppearance="?attr/textAppearanceHeadlineLarge" />
+                <TextView android:id="@+id/gateTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_md" android:text="@string/gate_plan_title" android:textAppearance="?attr/textAppearanceHeadlineMedium" />
                 <TextView android:id="@+id/gateTarget" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs" android:text="@string/attention_firewall" android:textAppearance="?attr/textAppearanceBodyLarge" android:textColor="?attr/colorOnSurfaceVariant" />
 
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/statsCard"
-                    style="@style/Widget.ModernHabit.Card"
+                    style="@style/Widget.ModernHabit.Card.Compact"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/spacing_lg"
@@ -49,9 +49,9 @@
                         android:id="@+id/awareness_mirror_stats"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:padding="@dimen/spacing_lg"
+                        android:padding="@dimen/spacing_md"
                         android:text="@string/system_state_initial"
-                        android:textAppearance="?attr/textAppearanceTitleMedium"
+                        android:textAppearance="?attr/textAppearanceBodyLarge"
                         android:textColor="?attr/colorOnPrimaryContainer" />
                 </com.google.android.material.card.MaterialCardView>
 
@@ -85,6 +85,8 @@
                         <com.google.android.material.button.MaterialButton android:id="@+id/duration15" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/duration_15" />
                     </com.google.android.material.button.MaterialButtonToggleGroup>
 
+                    <com.google.android.material.button.MaterialButton android:id="@+id/durationCustom" style="@style/Widget.Material3.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="end" android:text="@string/custom_duration_action" />
+
                     <com.google.android.material.textfield.TextInputLayout
                         android:id="@+id/planned_minutes_input_layout"
                         style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
@@ -92,6 +94,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/spacing_sm"
                         android:hint="@string/custom_duration"
+                        android:visibility="gone"
                         app:suffixText="@string/minutes_short">
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/planned_minutes_input"
@@ -106,13 +109,13 @@
                 <TextView android:id="@+id/gatePlanSummary" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_lg" android:background="@drawable/bg_status_active" android:padding="@dimen/spacing_md" android:textAppearance="?attr/textAppearanceTitleMedium" android:visibility="gone" />
                 <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_lg" android:text="@string/healthy_next_step" android:textAppearance="?attr/textAppearanceTitleMedium" />
                 <TextView android:id="@+id/replacement_prompt" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs" android:text="@string/gate_replacement_prompt" android:textAppearance="?attr/textAppearanceBodyMedium" android:textColor="?attr/colorOnSurfaceVariant" />
-                <LinearLayout android:id="@+id/replacementActions" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" android:orientation="vertical">
-                    <com.google.android.material.button.MaterialButton android:id="@+id/replacementWalk" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/replacement_walk" />
-                    <com.google.android.material.button.MaterialButton android:id="@+id/replacementWater" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs" android:text="@string/replacement_water" />
-                    <com.google.android.material.button.MaterialButton android:id="@+id/replacementTask" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs" android:text="@string/replacement_task" />
-                </LinearLayout>
+                <com.google.android.material.chip.ChipGroup android:id="@+id/replacementActions" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" app:chipSpacingHorizontal="@dimen/spacing_sm" app:chipSpacingVertical="@dimen/spacing_xs" app:singleLine="false">
+                    <com.google.android.material.chip.Chip android:id="@+id/replacementWalk" style="@style/Widget.Material3.Chip.Assist" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/replacement_walk" />
+                    <com.google.android.material.chip.Chip android:id="@+id/replacementWater" style="@style/Widget.Material3.Chip.Assist" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/replacement_water" />
+                    <com.google.android.material.chip.Chip android:id="@+id/replacementTask" style="@style/Widget.Material3.Chip.Assist" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/replacement_task" />
+                </com.google.android.material.chip.ChipGroup>
                 <TextView android:id="@+id/session_terms" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_md" android:text="@string/gate_terms_before_plan" android:textAppearance="?attr/textAppearanceBodyMedium" android:textColor="?attr/colorOnSurfaceVariant" />
-                <FrameLayout android:id="@+id/pauseVisual" android:layout_width="184dp" android:layout_height="184dp" android:layout_gravity="center_horizontal" android:layout_marginTop="@dimen/spacing_lg" android:visibility="gone">
+                <FrameLayout android:id="@+id/pauseVisual" android:layout_width="160dp" android:layout_height="160dp" android:layout_gravity="center_horizontal" android:layout_marginTop="@dimen/spacing_lg" android:visibility="gone">
                     <com.example.voward.AllowanceRingView android:id="@+id/pauseRing" android:layout_width="match_parent" android:layout_height="match_parent" android:contentDescription="@string/pause_countdown_description" />
                     <TextView android:id="@+id/friction_status" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:padding="28dp" android:textAppearance="?attr/textAppearanceTitleMedium" android:textColor="?attr/colorPrimary" />
                 </FrameLayout>
@@ -125,6 +128,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:background="?attr/colorSurface"
+        android:elevation="8dp"
         android:orientation="horizontal"
         android:paddingStart="@dimen/content_horizontal_padding"
         android:paddingEnd="@dimen/content_horizontal_padding"
@@ -133,7 +137,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
-        <com.google.android.material.button.MaterialButton android:id="@+id/cancel_button" style="@style/Widget.ModernHabit.Button.Pill" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/gate_not_now" />
-        <com.google.android.material.button.MaterialButton android:id="@+id/proceed_button" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="@dimen/spacing_sm" android:layout_weight="1" android:text="@string/gate_start_pause" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/cancel_button" style="@style/Widget.Material3.Button.TextButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/gate_not_now" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/proceed_button" style="@style/Widget.ModernHabit.Button.Pill" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="@dimen/spacing_sm" android:layout_weight="1" android:text="@string/gate_start_pause" />
     </LinearLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -43,14 +43,22 @@
     </style>
 
     <style name="Widget.Voward.Card" parent="Widget.Material3.CardView.Elevated">
-        <item name="cardCornerRadius">@dimen/card_corner_radius_large</item>
+        <item name="cardCornerRadius">@dimen/card_corner_radius</item>
         <item name="cardElevation">0dp</item>
         <item name="strokeWidth">0dp</item>
     </style>
 
+    <style name="Widget.Voward.Card.Hero" parent="Widget.Voward.Card">
+        <item name="cardCornerRadius">@dimen/card_corner_radius_large</item>
+    </style>
+
+    <style name="Widget.Voward.Card.Compact" parent="Widget.Voward.Card">
+        <item name="cardCornerRadius">@dimen/card_corner_radius_compact</item>
+    </style>
+
     <style name="Widget.Voward.Button.Pill" parent="Widget.Material3.Button">
-        <item name="cornerRadius">30dp</item>
-        <item name="android:minHeight">56dp</item>
+        <item name="cornerRadius">26dp</item>
+        <item name="android:minHeight">52dp</item>
         <item name="android:textStyle">bold</item>
     </style>
 
@@ -59,6 +67,8 @@
     <style name="ShapeAppearance.ModernHabit.Medium" parent="@style/ShapeAppearance.Voward.Medium" />
     <style name="ShapeAppearance.ModernHabit.Large" parent="@style/ShapeAppearance.Voward.Large" />
     <style name="Widget.ModernHabit.Card" parent="@style/Widget.Voward.Card" />
+    <style name="Widget.ModernHabit.Card.Hero" parent="@style/Widget.Voward.Card.Hero" />
+    <style name="Widget.ModernHabit.Card.Compact" parent="@style/Widget.Voward.Card.Compact" />
     <style name="Widget.ModernHabit.Button.Pill" parent="@style/Widget.Voward.Button.Pill" />
 
     <!-- Kept for backward compatibility: base theme is already NoActionBar -->

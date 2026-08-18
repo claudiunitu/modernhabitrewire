@@ -7,12 +7,13 @@
     <dimen name="spacing_lg">24dp</dimen>
     <dimen name="spacing_xl">32dp</dimen>
     <!-- Component tokens -->
-    <dimen name="card_corner_radius">12dp</dimen>
-    <dimen name="card_corner_radius_large">32dp</dimen>
+    <dimen name="card_corner_radius">18dp</dimen>
+    <dimen name="card_corner_radius_compact">14dp</dimen>
+    <dimen name="card_corner_radius_large">28dp</dimen>
     <dimen name="touch_target_min">48dp</dimen>
     <dimen name="content_max_width">720dp</dimen>
-    <dimen name="content_horizontal_padding">22dp</dimen>
-    <dimen name="section_gap">20dp</dimen>
-    <dimen name="hero_padding">24dp</dimen>
+    <dimen name="content_horizontal_padding">20dp</dimen>
+    <dimen name="section_gap">18dp</dimen>
+    <dimen name="hero_padding">20dp</dimen>
     <dimen name="bottom_navigation_height">80dp</dimen>
 </resources>
