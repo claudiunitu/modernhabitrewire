@@ -7,7 +7,9 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
+import android.content.BroadcastReceiver;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.os.Build;
@@ -42,6 +44,14 @@ public class AttentionFirewallService extends AccessibilityService {
     private AppPreferencesManagerSingleton appPreferencesManager;
     private AttentionBudgetEngine attentionBudgetEngine;
     private GrayscaleController grayscaleController;
+    private boolean timeChangeReceiverRegistered;
+    private final BroadcastReceiver timeChangeReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            if (appPreferencesManager != null) {
+                DeactivationRequestValidator.validate(context, appPreferencesManager);
+            }
+        }
+    };
     
     // Sticky Session State
     private String activeStickyPackage = null;
@@ -81,6 +91,81 @@ public class AttentionFirewallService extends AccessibilityService {
     private final Map<String, Runnable> pendingUrlChecks = new HashMap<>();
     private final Map<String, Integer> browserRedirectAttempts = new HashMap<>();
     private static final int MAX_BROWSER_REDIRECT_ATTEMPTS = 4;
+
+    // A single accessibility action is not guaranteed to be accepted by the foreground
+    // app. Keep verifying an exhausted target until it has actually left the screen. For
+    // browsers we first preserve the tab by navigating it to the local block page, then
+    // fall back to Home if the browser does not commit that navigation promptly.
+    private final Handler forcedEvictionHandler = new Handler(Looper.getMainLooper());
+    private static final long FORCED_EVICTION_RECHECK_MS = 350;
+    private static final long BROWSER_REDIRECT_FALLBACK_MS = 4000;
+    private String forcedEvictionPackage = null;
+    private long forcedEvictionStartedAt = 0;
+
+    private final Runnable forcedEvictionCheck = new Runnable() {
+        @Override
+        public void run() {
+            if (destroyed || forcedEvictionPackage == null
+                    || appPreferencesManager == null
+                    || !appPreferencesManager.getIsBlockerActive()) {
+                clearForcedEviction();
+                return;
+            }
+
+            AccessibilityNodeInfo root = getRootInActiveWindow();
+            if (root == null || root.getPackageName() == null) {
+                if (root != null) root.recycle();
+                forcedEvictionHandler.postDelayed(this, FORCED_EVICTION_RECHECK_MS);
+                return;
+            }
+
+            String foregroundPackage = root.getPackageName().toString();
+            if (!forcedEvictionPackage.equals(foregroundPackage)) {
+                root.recycle();
+                if (isTransientSystemOverlay(foregroundPackage)) {
+                    forcedEvictionHandler.postDelayed(this, FORCED_EVICTION_RECHECK_MS);
+                } else {
+                    clearForcedEviction();
+                }
+                return;
+            }
+
+            BrowserSupport.Config browser = findBrowserConfig(forcedEvictionPackage);
+            if (browser == null) {
+                root.recycle();
+                performGlobalAction(GLOBAL_ACTION_HOME);
+                forcedEvictionHandler.postDelayed(this, FORCED_EVICTION_RECHECK_MS);
+                return;
+            }
+
+            AccessibilityNodeInfo bar = findAddressBar(root, browser);
+            boolean committedToBlockPage = bar != null
+                    && bar.getText() != null
+                    && !bar.isFocused()
+                    && BrowserSupport.isConfiguredSafeAddress(
+                            browser, bar.getText().toString());
+            if (bar != null) bar.recycle();
+            root.recycle();
+
+            if (committedToBlockPage) {
+                clearForcedEviction();
+                return;
+            }
+
+            if (SystemClock.elapsedRealtime() - forcedEvictionStartedAt
+                    >= BROWSER_REDIRECT_FALLBACK_MS) {
+                // Do not leave the forbidden page usable when a browser version refuses
+                // accessibility-based omnibox submission.
+                performGlobalAction(GLOBAL_ACTION_HOME);
+            } else if (!browserRedirectAttempts.containsKey(browser.packageName)) {
+                // The previous bounded redirect sequence either finished inserting text or
+                // exhausted its retries. Restart it while verification still says the page
+                // has not navigated.
+                beginBrowserRedirect(browser);
+            }
+            forcedEvictionHandler.postDelayed(this, FORCED_EVICTION_RECHECK_MS);
+        }
+    };
 
     // Uninstall guard navigation is isolated from browser callbacks so one feature can
     // never cancel the other's pending work.
@@ -263,6 +348,8 @@ public class AttentionFirewallService extends AccessibilityService {
         super.onServiceConnected();
         instance = this;
         appPreferencesManager = AppPreferencesManagerSingleton.getInstance(this);
+        registerReceiver(timeChangeReceiver, new IntentFilter(Intent.ACTION_TIME_CHANGED));
+        timeChangeReceiverRegistered = true;
         // CRITICAL-01: Clear any stale temp-allow flag that survived a process death so a
         // previous gate approval can never silently bypass enforcement after restart.
         appPreferencesManager.setTempAllowAppLaunch(false);
@@ -334,9 +421,8 @@ public class AttentionFirewallService extends AccessibilityService {
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle(status)
                 .setContentText(stats)
-                // Android tints notification icons from their alpha channel. This wrapper
-                // only frames the canonical artwork more tightly; it does not redraw it.
-                .setSmallIcon(R.drawable.ic_notification_voward)
+                // Native-density masks preserve the Voward mark's antialiased alpha edge.
+                .setSmallIcon(R.mipmap.ic_notification_voward)
                 .setColor(getColor(R.color.md_primary_container))
                 .setOngoing(true)
                 .setContentIntent(pendingIntent)
@@ -394,6 +480,7 @@ public class AttentionFirewallService extends AccessibilityService {
         // Guard: managers are initialised in onServiceConnected; ignore any events
         // that arrive before that callback completes.
         if (appPreferencesManager == null || attentionBudgetEngine == null) return;
+        DeactivationRequestValidator.validate(this, appPreferencesManager);
         if (event.getPackageName() == null) return;
         String packageName = event.getPackageName().toString();
         int eventType = event.getEventType();
@@ -553,7 +640,7 @@ public class AttentionFirewallService extends AccessibilityService {
             }
             attentionBudgetEngine.resetBudgetIfNeeded();
             if (attentionBudgetEngine.getRemainingBudget() <= 0) {
-                performGlobalAction(GLOBAL_ACTION_HOME);
+                beginForcedEviction(packageName, null);
                 return;
             }
             triggerDecisionGate();
@@ -603,7 +690,8 @@ public class AttentionFirewallService extends AccessibilityService {
 
         // The local block page is always safe, even if the user has added a broad
         // loopback/localhost pattern to the restricted list. Browsers may hide the scheme.
-        if (BrowserSupport.isConfiguredSafeAddress(config, currentUrl)) {
+        if (BrowserSupport.isConfiguredSafeAddress(config, currentUrl)
+                && !bar.isFocused()) {
             lastObservedUrls.put(config.packageName, currentUrl);
             confirmSafeState(config.packageName);
             bar.recycle();
@@ -794,8 +882,8 @@ public class AttentionFirewallService extends AccessibilityService {
         attentionBudgetEngine.resetBudgetIfNeeded();
         if (attentionBudgetEngine.getRemainingBudget() <= 0) {
             rememberBrowserInterception(config, matchedPattern);
-            beginBrowserRedirect(config, bar);
             lastDecisionGateTime = SystemClock.elapsedRealtime();
+            beginForcedEviction(config.packageName, bar);
             showSessionCompleteRedirectMessage();
             return;
         }
@@ -934,11 +1022,6 @@ public class AttentionFirewallService extends AccessibilityService {
             Log.w(TAG, "Browser rejected the in-place address replacement");
             return false;
         }
-
-        // Update detection state only after the browser confirms that its actual address
-        // editor accepted the replacement.
-        lastObservedUrls.put(config.packageName, safeUrl);
-        lastUrlChangeTimes.put(config.packageName, SystemClock.elapsedRealtime());
 
         boolean submitted = false;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -1085,13 +1168,40 @@ public class AttentionFirewallService extends AccessibilityService {
             }
             endStickySession();
             if (isBrowserPackage(exhaustedPackage)) {
-                BrowserSupport.Config browser = findBrowserConfig(exhaustedPackage);
-                if (browser != null) beginBrowserRedirect(browser);
+                beginForcedEviction(exhaustedPackage, null);
                 showSessionCompleteRedirectMessage();
             } else {
-                performGlobalAction(GLOBAL_ACTION_HOME);
+                beginForcedEviction(exhaustedPackage, null);
             }
         }
+    }
+
+    private void beginForcedEviction(
+            String packageName, AccessibilityNodeInfo currentBrowserBar) {
+        forcedEvictionHandler.removeCallbacks(forcedEvictionCheck);
+        forcedEvictionPackage = packageName;
+        forcedEvictionStartedAt = SystemClock.elapsedRealtime();
+
+        BrowserSupport.Config browser = findBrowserConfig(packageName);
+        if (browser != null) {
+            if (currentBrowserBar == null) beginBrowserRedirect(browser);
+            else beginBrowserRedirect(browser, currentBrowserBar);
+            // Keep the verifier from restarting a redirect while a browser-reported
+            // submission is still navigating. Failed submission retries update/remove
+            // this marker; otherwise the verifier either observes the block page or uses
+            // the timed Home fallback.
+            browserRedirectAttempts.putIfAbsent(packageName, 0);
+        } else {
+            performGlobalAction(GLOBAL_ACTION_HOME);
+        }
+        forcedEvictionHandler.postDelayed(
+                forcedEvictionCheck, FORCED_EVICTION_RECHECK_MS);
+    }
+
+    private void clearForcedEviction() {
+        forcedEvictionHandler.removeCallbacks(forcedEvictionCheck);
+        forcedEvictionPackage = null;
+        forcedEvictionStartedAt = 0;
     }
 
     private void startStickySession(String packageName) {
@@ -1100,7 +1210,7 @@ public class AttentionFirewallService extends AccessibilityService {
                 appPreferencesManager.getPendingQuotedSessionSeconds());
         if (sessionLimitSeconds <= 0) {
             isBudgetLockedOut = true;
-            performGlobalAction(GLOBAL_ACTION_HOME);
+            beginForcedEviction(packageName, null);
             return;
         }
         sessionLimitReached = false;
@@ -1441,9 +1551,15 @@ public class AttentionFirewallService extends AccessibilityService {
 
     @Override public void onDestroy() {
         destroyed = true;
+        if (timeChangeReceiverRegistered) {
+            unregisterReceiver(timeChangeReceiver);
+            timeChangeReceiverRegistered = false;
+        }
         notificationHandler.removeCallbacksAndMessages(null);
         urlCheckHandler.removeCallbacksAndMessages(null);
         uninstallGuardHandler.removeCallbacksAndMessages(null);
+        forcedEvictionHandler.removeCallbacksAndMessages(null);
+        forcedEvictionPackage = null;
         pendingGuardHomeAction = null;
         pendingUrlChecks.clear();
         browserRedirectAttempts.clear();

@@ -76,13 +76,13 @@
     <string name="help_intro_content">Voward adds a planning pause and clear time limits before selected apps and websites. It is a private self-management tool—not medical treatment or a diagnostic device. If digital use causes significant distress, sleep loss, unsafe behavior, or loss of control, consider seeking help from a qualified mental-health professional.</string>
     
     <string name="help_guide_title">How to Rewire Your Habits</string>
-    <string name="help_guide_content">1. Review the disclosure, then grant only the permissions you accept.\n2. Choose restricted apps from the installed-app picker and add domain/path rules for sites.\n3. Set a daily allowance in minutes and a default planned session.\n4. Set a deactivation key. At each gate, write a purpose, choose a duration, wait, and confirm again.\n5. Review whether sessions ended early or reached their limit; adjust gradually.</string>
+    <string name="help_guide_content">1. Review the disclosure, then grant only the permissions you accept.\n2. Choose restricted apps from the installed-app picker and add domain/path rules for sites.\n3. Set a daily allowance in minutes and a default planned session.\n4. Create a recovery key, then choose the deactivation cooldown and how long you will have to confirm deactivation afterward.\n5. At each gate, write a purpose, choose a duration, wait, and confirm again.\n6. Review whether sessions ended early or reached their limit; adjust gradually.</string>
 
     <string name="help_model_title">Transparent model and URL rules</string>
     <string name="help_model_content">One allowance second always buys one second of restricted use. The balance carries at most one daily allowance and can never fall below zero or borrow from a future day. When today’s allowance is depleted, no new restricted session can start. The re-entry pause grows logarithmically with sessions; it never changes a quoted session cap. Domain rules match the domain and subdomains. A path matches only that path and its subtree; a configured query must match exactly. Use keyword:text only when broad text matching is intentional.</string>
 
     <string name="help_security_title">Security &amp; Friction</string>
-    <string name="help_security_content">The recovery key is the only in-app way to deactivate active protection. There is no timer or charging bypass. For stronger commitment, have someone you trust create and keep the key. The optional uninstall guard adds friction but cannot turn a normal Android installation into an unbreakable kiosk. Accessibility can observe foreground app/window content and supported browser address text. Data stays on-device unless you explicitly export it.</string>
+    <string name="help_security_content">The recovery key is the only in-app way to deactivate active protection. With a positive cooldown, enter it once to request deactivation and again during the deactivation confirmation period. Protection remains active while waiting. The optional uninstall guard adds friction but cannot turn a normal Android installation into an unbreakable kiosk. Accessibility can observe foreground app/window content and supported browser address text. Data stays on-device unless you explicitly export it.</string>
 
         <!-- UI section titles -->
         <string name="blocked_content_section_title">Blocked Content</string>
@@ -94,6 +94,7 @@
         <!-- Adapter toast -->
         <string name="blocker_active_cannot_remove">Blocker is active. Cannot remove item.</string>
         <string name="blocker_active_cannot_change">Blocker is active. Configuration cannot be changed.</string>
+        <string name="blocker_active_cannot_relax">Protection is active. A strict rule cannot be made less restrictive.</string>
         <string name="export_configuration">Export configuration</string>
         <string name="import_configuration">Import configuration</string>
         <string name="configuration_exported">Configuration exported</string>
@@ -165,10 +166,10 @@
         <string name="no_apps_protected">No apps selected yet.</string>
         <string name="no_sites_protected">No website rules added yet.</string>
         <string name="manage_apps">Manage apps</string>
-        <string name="view_locked_apps">View apps</string>
+        <string name="view_locked_apps">Add or strengthen apps</string>
         <string name="manage_websites">Manage websites</string>
-        <string name="view_locked_websites">View websites</string>
-        <string name="rules_locked_read_only">Protection is active. You can review rules, but editing stays locked until you deactivate.</string>
+        <string name="view_locked_websites">Add or strengthen websites</string>
+        <string name="rules_locked_read_only">Protection is active. You can add rules or make existing rules strict. Removing rules or making them less restrictive requires deactivation.</string>
         <string name="rules_privacy_note">Rules and usage records stay on this device. App names and website rules are not sent to an analytics service.</string>
         <string name="settings_locked_title">Settings are protected</string>
         <string name="settings_locked_body">Deactivate protection to change the goal, timing, or optional recovery behavior. Your current values remain visible here.</string>
@@ -196,7 +197,7 @@
         <string name="configure_optional_protection">Configure optional protection</string>
         <string name="allow_notifications">Allow notifications</string>
         <string name="protection_and_recovery">Protection &amp; recovery</string>
-        <string name="recovery_explanation">Your recovery key is the only in-app deactivation method. There is no timer or charging bypass. For stronger commitment, let someone you trust create and keep it.</string>
+        <string name="recovery_explanation">Your recovery key is the only in-app deactivation method. A positive cooldown requires the key twice and keeps protection active while you wait. For stronger commitment, let someone you trust create and keep the key.</string>
         <string name="create_recovery_key">Create a recovery key</string>
         <string name="enter_recovery_key">Enter recovery key to deactivate</string>
         <string name="set_recovery_key">Set recovery key</string>
@@ -229,7 +230,7 @@
         <string name="setup_permissions_title">Enable only what you choose</string>
         <string name="setup_permissions_body">Attention Firewall is required. Uninstall protection and notifications are optional and are requested separately.</string>
         <string name="setup_key_title">Create a recovery path</string>
-        <string name="setup_key_body">Choose a key you can retrieve when needed. It is stored only as a salted, slow password hash.</string>
+        <string name="setup_key_body">Choose a key you can retrieve when needed, then choose how long deactivation must wait and how much time you will have to confirm it afterward. The key is stored only as a salted, slow password hash.</string>
         <string name="setup_review_title">Review and activate</string>
         <string name="setup_review_body">Protection activates only when the firewall permission, a rule, a positive allowance, and a recovery key are ready.</string>
         <string name="setup_back">Back</string>
@@ -281,7 +282,7 @@
         <string name="url_rule_keyword">Broad keyword match</string>
         <string name="no_apps_found">No matching installed apps</string>
         <string name="help_quick_start_title">Quick start</string>
-        <string name="help_quick_start_content">1. Set a daily allowance, a default session length, and a real-life goal.\n2. Choose at least one protected app or website.\n3. Enable the required Attention Firewall accessibility service. Device Admin and notifications are optional.\n4. Create a recovery key, review the setup summary, and activate protection.</string>
+        <string name="help_quick_start_content">1. Set a daily allowance, a default session length, and a real-life goal.\n2. Choose at least one protected app or website.\n3. Enable the required Attention Firewall accessibility service. Device Admin uninstall protection and notifications are optional.\n4. Create a recovery key, then choose the deactivation cooldown and how long you will have to confirm deactivation afterward.\n5. Review the setup summary and activate protection.</string>
         <string name="help_pause_title">How the intentional pause works</string>
         <string name="help_pause_content">At the gate, name a specific purpose and choose 1–60 minutes. Start the circular pause, then review the plan and explicitly choose Open intentionally or Not now. Finishing the timer never opens protected content automatically. You can configure three alternatives in Settings; choosing one leaves the protected content, returns you Home, and is counted in Progress.</string>
         <string name="help_budget_title">Allowance and session limits</string>
@@ -289,15 +290,15 @@
         <string name="help_progress_title">Progress and local history</string>
         <string name="help_progress_content">The Progress tab shows measured protected-use time, sessions, early exits, limits reached, the most common session start time, and the most frequently chosen alternative for the current week. Completed daily summaries are kept locally for up to 14 days. Voward does not estimate time saved or infer wellbeing, urges, or health outcomes.</string>
         <string name="help_rules_title">App and website rules</string>
-        <string name="help_rules_content">Choose apps from the installed-app picker. For websites, example.com covers that domain and subdomains; example.com/news covers that path and its subtree; and a configured query must match exactly. Use keyword:shorts only for an intentionally broad match. A strict rule stays blocked regardless of remaining allowance. Deactivate protection before editing any rule.</string>
+        <string name="help_rules_content">Choose apps from the installed-app picker. For websites, example.com covers that domain and subdomains; example.com/news covers that path and its subtree; and a configured query must match exactly. Use keyword:shorts only for an intentionally broad match. A strict rule stays blocked regardless of remaining allowance. While protection is active, rules can only become more restrictive: you may add new rules or mark existing rules strict, but you cannot remove rules or turn strict mode off.</string>
         <string name="help_privacy_title">Privacy and permissions</string>
-        <string name="help_privacy_content">The Attention Firewall accessibility service observes foreground apps, window content, and supported browser address text so it can enforce your rules. Device Admin uninstall friction and notifications are optional. Rules, settings, and usage counters stay on-device. Configuration export creates a JSON file you choose and excludes the recovery key, active-protection state, current allowance balance, usage counters, and temporary approvals. Purpose text entered at the gate is not stored.</string>
+        <string name="help_privacy_content">The Attention Firewall accessibility service observes foreground apps, window content, and supported browser address text so it can enforce your rules. Device Admin uninstall friction and notifications are optional. Rules, settings, and usage counters stay on-device. Configuration export includes the configured cooldown and deactivation-confirmation-period durations, but excludes the recovery key, active-protection state, pending deactivation request and timestamps, current allowance balance, usage counters, and temporary approvals. Import is unavailable while protection is active and cannot restore a pending request. Purpose text entered at the gate is not stored.</string>
         <string name="help_recovery_title">Safety and recovery</string>
-        <string name="help_recovery_content">The recovery key is the only in-app way to deactivate protection; it cannot be displayed or recovered, and there is no timed or charging bypass. For stronger commitment, let someone you trust create and keep it. Critical emergency and device-recovery apps cannot be selected for protection. Android accessibility is not kiosk mode, so optional uninstall protection adds friction rather than an absolute guarantee.</string>
+        <string name="help_recovery_content">The default deactivation policy is a 24-hour cooldown followed by a 1-hour confirmation period. Cooldown choices are 0, 1 minute, 6 hours, 12 hours, 24 hours, 48 hours, or 72 hours; confirmation-period choices are 1, 2, 3, 6, 12, or 24 hours. These settings can be changed only while protection is inactive. With a positive cooldown, enter the recovery key once to request deactivation. Protection and uninstall friction remain active while waiting. You can cancel the request immediately without the key. The confirmation period begins and expires silently: there is no notification, sound, vibration, badge, background polling, or automatic deactivation. During this period, enter the key again, press Deactivate protection, and accept the final confirmation. Incorrect keys do not change the deadline. If the confirmation period expires, the complete process must be restarted. Eligibility uses monotonic device time; a detected clock shift over two minutes or a reboot invalidates the request. With cooldown 0, one correct key, an explicit button press, and final confirmation deactivate without creating a request. Critical emergency and device-recovery apps cannot be selected for protection. Optional Device Admin and accessibility-based uninstall protection add friction, not kiosk-mode guarantees.</string>
         <string name="strict_rule_checkbox">Strictly forbid this entry</string>
         <string name="strict_rule_helper">Strict rules ignore the remaining allowance. Access stays blocked until you deactivate protection.</string>
         <string name="strict_rule_row_label">Strict rule · allowance cannot unlock</string>
-        <string name="strict_rule_locked_label">Strict rule · locked during protection</string>
+        <string name="strict_rule_locked_label">Strict rule · cannot relax during protection</string>
         <string name="strict_badge">STRICT</string>
         <string name="strict_gate_stage">STRICT RULE</string>
         <string name="strict_gate_title">Access blocked</string>
@@ -307,4 +308,30 @@
         <string name="daily_allowance_error">Enter 0 to 1440 minutes</string>
         <string name="base_pause_error">Enter 1 to 3600 seconds</string>
         <string name="reentry_growth_error">Enter 0 to 100 percent</string>
+    <string name="deactivation_timing_title">Deactivation timing</string>
+    <string name="deactivation_timing_helper">A shorter confirmation period provides stronger protection against impulsive deactivation.</string>
+    <string name="deactivation_cooldown_label">Deactivation cooldown</string>
+    <string name="deactivation_window_label">Time allowed to confirm deactivation</string>
+    <string name="cooldown_zero_choice">Cooldown: 0</string>
+    <string name="cooldown_one_minute_choice">Cooldown: 1 minute</string>
+    <string name="cooldown_hours_choice">Cooldown: %1$d hours</string>
+    <string name="one_minute">1 minute</string>
+    <string name="hours_duration">%1$d hours</string>
+    <string name="window_hours_choice">Confirm deactivation within: %1$d hours</string>
+    <string name="request_deactivation">Request deactivation</string>
+    <string name="cancel_deactivation_request">Cancel request</string>
+    <string name="deactivation_no_request">Protection is active. Enter your recovery key to begin the deactivation cooldown.</string>
+    <string name="deactivation_cooldown_pending">Deactivation requested. Protection remains active. About %1$s remains before you can confirm deactivation.</string>
+    <string name="deactivation_window_open">You have about %1$s left to confirm deactivation. Protection remains active until you finish.</string>
+    <string name="deactivation_expired">The time allowed to confirm deactivation expired. Start a new request if you still want to deactivate protection.</string>
+    <string name="deactivation_invalidated">The request was invalidated because the device time changed or the device restarted. Protection remains active.</string>
+    <string name="deactivation_request_created">Deactivation requested. Protection remains active.</string>
+    <string name="deactivation_request_cancelled">Deactivation request cancelled.</string>
+    <string name="deactivate_confirmation_title">Deactivate protection now?</string>
+    <string name="deactivate_confirmation_message">Your rules and settings will become editable.</string>
+    <string name="deactivate_now">Deactivate protection</string>
+    <string name="activation_confirmation_title">Activate protection?</string>
+    <string name="activation_delayed_summary">Deactivation requires your recovery key, a %1$s cooldown, then your recovery key again within a %2$d-hour confirmation period.</string>
+    <string name="activation_immediate_summary">Cooldown is 0. Your recovery key can deactivate protection immediately.</string>
+    <string name="deactivation_window_closed">The time allowed to confirm deactivation has ended. Protection remains active.</string>
     </resources>

@@ -26,7 +26,7 @@ public class AppPreferencesManagerSingleton {
     private static final String PREF_NAME = "global_preferences";
     private static final String PORTABLE_PREF_NAME = "portable_preferences";
     private static final String KEY_PORTABLE_MIGRATION_COMPLETE = "portable_migration_complete_v1";
-    public static final int PORTABLE_SCHEMA_VERSION = 4;
+    public static final int PORTABLE_SCHEMA_VERSION = 6;
     private static final String KEY_RESTRICTED_URL_LIST = "restricted_url_list";
     private static final String KEY_RESTRICTED_APP_LIST = "restricted_app_list";
     private static final String KEY_STRICT_URL_LIST = "strict_restricted_url_list";
@@ -59,6 +59,15 @@ public class AppPreferencesManagerSingleton {
 
     private static final String KEY_DEACTIVATION_HASH = "deactivation_hash";
     private static final String KEY_UNINSTALL_GUARD_ENABLED = "uninstall_guard_enabled";
+    private static final String KEY_DEACTIVATION_COOLDOWN_HOURS = "deactivation_cooldown_hours";
+    private static final String KEY_DEACTIVATION_COOLDOWN_MINUTES = "deactivation_cooldown_minutes";
+    private static final String KEY_DEACTIVATION_WINDOW_HOURS = "deactivation_window_hours";
+    private static final String KEY_PENDING_DEACTIVATION = "pending_deactivation_v1";
+    private static final String KEY_DEACTIVATION_TERMINAL_STATE = "deactivation_terminal_state_v1";
+    public static final int DEFAULT_DEACTIVATION_COOLDOWN_MINUTES = 24 * 60;
+    public static final int DEFAULT_DEACTIVATION_WINDOW_HOURS = 1;
+    private static final int[] ALLOWED_COOLDOWN_MINUTES = {0, 1, 360, 720, 1440, 2880, 4320};
+    private static final int[] ALLOWED_WINDOW_HOURS = {1, 2, 3, 6, 12, 24};
 
     private static final String KEY_DAILY_RESTRICTED_TIME_MS = "daily_restricted_time_ms";
 
@@ -209,7 +218,90 @@ public class AppPreferencesManagerSingleton {
     }
 
     public void setIsBlockerActive(Boolean flag) {
-        prefs.edit().putBoolean(KEY_IS_BLOCKER_ACTIVE, flag).apply();
+        SharedPreferences.Editor editor = prefs.edit().putBoolean(KEY_IS_BLOCKER_ACTIVE, flag);
+        // Activation and successful deactivation both atomically discard stale local requests.
+        editor.remove(KEY_PENDING_DEACTIVATION)
+                .remove(KEY_DEACTIVATION_TERMINAL_STATE).commit();
+    }
+
+    public int getDeactivationCooldownMinutes() {
+        if (portablePrefs.contains(KEY_DEACTIVATION_COOLDOWN_MINUTES)) {
+            return portablePrefs.getInt(KEY_DEACTIVATION_COOLDOWN_MINUTES,
+                    DEFAULT_DEACTIVATION_COOLDOWN_MINUTES);
+        }
+        // Schema 5 and existing installs stored this policy in whole hours.
+        return portablePrefs.getInt(KEY_DEACTIVATION_COOLDOWN_HOURS, 24) * 60;
+    }
+
+    public void setDeactivationCooldownMinutes(int minutes) {
+        requireAllowed(minutes, ALLOWED_COOLDOWN_MINUTES, "cooldown");
+        portablePrefs.edit().putInt(KEY_DEACTIVATION_COOLDOWN_MINUTES, minutes)
+                .remove(KEY_DEACTIVATION_COOLDOWN_HOURS).apply();
+    }
+
+    public int getDeactivationWindowHours() {
+        return portablePrefs.getInt(KEY_DEACTIVATION_WINDOW_HOURS,
+                DEFAULT_DEACTIVATION_WINDOW_HOURS);
+    }
+
+    public void setDeactivationWindowHours(int hours) {
+        requireAllowed(hours, ALLOWED_WINDOW_HOURS, "window");
+        portablePrefs.edit().putInt(KEY_DEACTIVATION_WINDOW_HOURS, hours).apply();
+    }
+
+    public synchronized void savePendingDeactivation(DeactivationPolicyEngine.Request request) {
+        if (request == null) { clearPendingDeactivation(); return; }
+        try {
+            JSONObject value = new JSONObject()
+                    .put("id", request.id).put("wallTimeMs", request.wallTimeMs)
+                    .put("elapsedRealtimeMs", request.elapsedRealtimeMs)
+                    .put("bootCount", request.bootCount).put("cooldownMs", request.cooldownMs)
+                    .put("windowMs", request.windowMs);
+            prefs.edit().putString(KEY_PENDING_DEACTIVATION, value.toString())
+                    .remove(KEY_DEACTIVATION_TERMINAL_STATE).commit();
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    public synchronized DeactivationPolicyEngine.Request getPendingDeactivation() {
+        String raw = prefs.getString(KEY_PENDING_DEACTIVATION, null);
+        if (raw == null) return null;
+        try {
+            JSONObject value = new JSONObject(raw);
+            return new DeactivationPolicyEngine.Request(value.getString("id"),
+                    value.getLong("wallTimeMs"), value.getLong("elapsedRealtimeMs"),
+                    value.getInt("bootCount"), value.getLong("cooldownMs"),
+                    value.getLong("windowMs"));
+        } catch (JSONException | RuntimeException corrupted) {
+            clearPendingDeactivation();
+            return null;
+        }
+    }
+
+    public synchronized void clearPendingDeactivation() {
+        prefs.edit().remove(KEY_PENDING_DEACTIVATION)
+                .remove(KEY_DEACTIVATION_TERMINAL_STATE).commit();
+    }
+
+    public synchronized void finishPendingDeactivation(DeactivationPolicyEngine.State state) {
+        if (state != DeactivationPolicyEngine.State.EXPIRED
+                && state != DeactivationPolicyEngine.State.INVALIDATED) {
+            throw new IllegalArgumentException("Not a terminal request state: " + state);
+        }
+        prefs.edit().remove(KEY_PENDING_DEACTIVATION)
+                .putString(KEY_DEACTIVATION_TERMINAL_STATE, state.name()).commit();
+    }
+
+    public DeactivationPolicyEngine.State getDeactivationTerminalState() {
+        String value = prefs.getString(KEY_DEACTIVATION_TERMINAL_STATE, null);
+        if (value == null) return null;
+        try {
+            return DeactivationPolicyEngine.State.valueOf(value);
+        } catch (IllegalArgumentException corrupted) {
+            prefs.edit().remove(KEY_DEACTIVATION_TERMINAL_STATE).apply();
+            return null;
+        }
     }
 
     public Boolean getIsBlockerActive() {
@@ -304,7 +396,13 @@ public class AppPreferencesManagerSingleton {
     }
 
     public synchronized void setRestrictedUrls(List<String> urls) {
-        restrictedUrlsCache = immutableList(sanitizeList(urls));
+        List<String> updated = sanitizeList(urls);
+        if (getIsBlockerActive()) {
+            for (String existing : getRestrictedUrls()) {
+                if (!containsIgnoreCase(updated, existing)) updated.add(existing);
+            }
+        }
+        restrictedUrlsCache = immutableList(updated);
         List<String> strict = getStrictRestrictedUrls();
         strict.removeIf(value -> !containsIgnoreCase(restrictedUrlsCache, value));
         strictUrlsCache = immutableList(strict);
@@ -350,6 +448,7 @@ public class AppPreferencesManagerSingleton {
     }
 
     public void removeUrl(String url) {
+        if (getIsBlockerActive()) return;
         List<String> urls = getRestrictedUrls();
         urls.removeIf(value -> value.equalsIgnoreCase(url));
         setRestrictedUrls(urls);
@@ -381,6 +480,7 @@ public class AppPreferencesManagerSingleton {
     }
 
     public synchronized void setRestrictedUrlStrict(String url, boolean strict) {
+        if (getIsBlockerActive() && !strict) return;
         String clean = sanitizeItem(url);
         if (!containsIgnoreCase(getRestrictedUrls(), clean)) return;
         List<String> strictUrls = getStrictRestrictedUrls();
@@ -406,7 +506,13 @@ public class AppPreferencesManagerSingleton {
     }
 
     public synchronized void setRestrictedApps(List<String> apps) {
-        restrictedAppsCache = immutableList(sanitizeList(apps));
+        List<String> updated = sanitizeList(apps);
+        if (getIsBlockerActive()) {
+            for (String existing : getRestrictedAppPackages()) {
+                if (!updated.contains(existing)) updated.add(existing);
+            }
+        }
+        restrictedAppsCache = immutableList(updated);
         List<String> strict = getStrictRestrictedAppPackages();
         strict.removeIf(value -> !restrictedAppsCache.contains(value));
         strictAppsCache = immutableList(strict);
@@ -449,6 +555,7 @@ public class AppPreferencesManagerSingleton {
     }
 
     public void removeRestrictedAppPackage(String appPackage) {
+        if (getIsBlockerActive()) return;
         List<String> apps = getRestrictedAppPackages();
         apps.remove(appPackage);
         setRestrictedApps(apps);
@@ -476,6 +583,7 @@ public class AppPreferencesManagerSingleton {
     }
 
     public synchronized void setRestrictedAppStrict(String packageName, boolean strict) {
+        if (getIsBlockerActive() && !strict) return;
         String clean = sanitizeItem(packageName);
         if (!getRestrictedAppPackages().contains(clean)) return;
         List<String> strictApps = getStrictRestrictedAppPackages();
@@ -906,7 +1014,9 @@ public class AppPreferencesManagerSingleton {
                 .put("defaultSessionSeconds", getDefaultSessionSeconds())
                 .put("carryoverCapDays", getCarryoverCapDays())
                 .put("launchFrictionEnabled", getLaunchFrictionEnabled())
-                .put("uninstallGuardEnabled", isUninstallGuardEnabled());
+                .put("uninstallGuardEnabled", isUninstallGuardEnabled())
+                .put("deactivationCooldownMinutes", getDeactivationCooldownMinutes())
+                .put("deactivationWindowHours", getDeactivationWindowHours());
     }
 
     public synchronized void importPortableState(JSONObject data) throws JSONException {
@@ -936,6 +1046,14 @@ public class AppPreferencesManagerSingleton {
                 ? data.optInt("defaultSessionSeconds", 600) : 600;
         float carryCap = version >= 2
                 ? (float) data.optDouble("carryoverCapDays", 1.0) : 1.0f;
+        int cooldownMinutes = version >= 6 ? data.getInt("deactivationCooldownMinutes")
+                : version >= 5 ? Math.multiplyExact(data.getInt("deactivationCooldownHours"), 60)
+                : DEFAULT_DEACTIVATION_COOLDOWN_MINUTES;
+        int windowHours = version >= 5 ? data.getInt("deactivationWindowHours")
+                : DEFAULT_DEACTIVATION_WINDOW_HOURS;
+        requireAllowedJson(cooldownMinutes, ALLOWED_COOLDOWN_MINUTES,
+                "deactivationCooldownMinutes");
+        requireAllowedJson(windowHours, ALLOWED_WINDOW_HOURS, "deactivationWindowHours");
         portablePrefs.edit()
                 .putString(KEY_RESTRICTED_URL_LIST, new JSONArray(urls).toString())
                 .putString(KEY_RESTRICTED_APP_LIST, new JSONArray(apps).toString())
@@ -951,6 +1069,9 @@ public class AppPreferencesManagerSingleton {
                 .putBoolean(KEY_UNINSTALL_GUARD_ENABLED, version >= 3
                         ? data.optBoolean("uninstallGuardEnabled", false)
                         : data.optBoolean("settingsLockEnabled", false))
+                .putInt(KEY_DEACTIVATION_COOLDOWN_MINUTES, cooldownMinutes)
+                .remove(KEY_DEACTIVATION_COOLDOWN_HOURS)
+                .putInt(KEY_DEACTIVATION_WINDOW_HOURS, windowHours)
                 .putBoolean(KEY_PORTABLE_MIGRATION_COMPLETE, true)
                 .apply();
         restrictedUrlsCache = immutableList(urls);
@@ -1012,6 +1133,17 @@ public class AppPreferencesManagerSingleton {
 
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private static void requireAllowed(int value, int[] allowed, String name) {
+        for (int candidate : allowed) if (candidate == value) return;
+        throw new IllegalArgumentException("Unsupported deactivation " + name + ": " + value);
+    }
+
+    private static void requireAllowedJson(int value, int[] allowed, String name)
+            throws JSONException {
+        for (int candidate : allowed) if (candidate == value) return;
+        throw new JSONException("Unsupported " + name + ": " + value);
     }
 
     private static float clampFinite(float value, float min, float max) {

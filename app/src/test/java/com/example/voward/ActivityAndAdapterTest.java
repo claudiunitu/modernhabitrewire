@@ -7,6 +7,7 @@ import android.os.Looper;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import com.google.android.material.checkbox.MaterialCheckBox;
@@ -91,13 +92,38 @@ public class ActivityAndAdapterTest {
     }
 
     @Test
-    public void editorsHideMutationControlsWhileProtectionIsActive() {
+    public void editorsAllowAdditiveChangesWhileProtectionIsActive() {
         preferences.setIsBlockerActive(true);
         ActivityController<UrlListEditorActivity> controller =
                 Robolectric.buildActivity(UrlListEditorActivity.class).setup();
         UrlListEditorActivity activity = controller.get();
         assertEquals(View.VISIBLE, activity.findViewById(R.id.lockedBanner).getVisibility());
-        assertEquals(View.GONE, activity.findViewById(R.id.editorComposer).getVisibility());
+        assertEquals(View.VISIBLE, activity.findViewById(R.id.editorComposer).getVisibility());
+        EditText input = activity.findViewById(R.id.urlEditText);
+        input.setText("new.example");
+        activity.findViewById(R.id.addButton).performClick();
+        assertEquals(List.of("new.example"), preferences.getRestrictedUrls());
+        controller.destroy();
+    }
+
+    @Test
+    public void activeProtectionAllowsRegularRuleToBecomeStrictButNotRelaxAgain() {
+        preferences.setRestrictedUrls(List.of("example.com"));
+        preferences.setIsBlockerActive(true);
+        UrlListRecyclerAdapter adapter = new UrlListRecyclerAdapter(
+                preferences.getRestrictedUrls(), preferences::removeUrl,
+                preferences::setRestrictedUrlStrict);
+        ActivityController<UrlListEditorActivity> controller =
+                Robolectric.buildActivity(UrlListEditorActivity.class).setup();
+        UrlViewHolder holder = adapter.onCreateViewHolder(new FrameLayout(controller.get()), 0);
+
+        adapter.onBindViewHolder(holder, 0);
+        assertTrue(holder.strictRuleCheckbox.isEnabled());
+        holder.strictRuleCheckbox.setChecked(true);
+        assertTrue(preferences.isStrictRestrictedUrlPattern("example.com"));
+        adapter.onBindViewHolder(holder, 0);
+        assertFalse(holder.strictRuleCheckbox.isEnabled());
+        assertTrue(holder.strictRuleCheckbox.isChecked());
         controller.destroy();
     }
 
@@ -208,10 +234,26 @@ public class ActivityAndAdapterTest {
         preferences.setSetupSeen(true);
         preferences.setDailyAllowanceSeconds(1_200);
         preferences.setDefaultSessionSeconds(600);
+        preferences.setDeactivationCooldownMinutes(48 * 60);
+        preferences.setDeactivationWindowHours(3);
         ActivityController<SetupActivity> setup =
                 Robolectric.buildActivity(SetupActivity.class).setup();
         assertEquals("20", ((EditText) setup.get().findViewById(
                 R.id.setupBudgetInput)).getText().toString());
+        Spinner setupCooldown = setup.get().findViewById(
+                R.id.setupDeactivationCooldownSpinner);
+        Spinner setupWindow = setup.get().findViewById(
+                R.id.setupDeactivationWindowSpinner);
+        assertEquals(5, setupCooldown.getSelectedItemPosition());
+        assertEquals(2, setupWindow.getSelectedItemPosition());
+        setupCooldown.setSelection(0);
+        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        assertEquals(0, preferences.getDeactivationCooldownMinutes());
+        assertFalse(setupWindow.isEnabled());
+        setupCooldown.setSelection(1);
+        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        assertEquals(1, preferences.getDeactivationCooldownMinutes());
+        assertTrue(setupWindow.isEnabled());
         setup.destroy();
 
         ActivityController<ModernMainActivity> main =

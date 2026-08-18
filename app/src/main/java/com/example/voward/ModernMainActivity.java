@@ -4,10 +4,13 @@ import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.BroadcastReceiver;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -15,7 +18,9 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -53,6 +58,14 @@ public class ModernMainActivity extends AppCompatActivity {
     private AttentionBudgetEngine budgetEngine;
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
     private boolean updatingFields;
+    private final DeactivationPolicyEngine deactivationEngine = new DeactivationPolicyEngine();
+    private DeactivationPolicyEngine.State deactivationNoticeState;
+    private boolean timeReceiverRegistered;
+    private static final int[] COOLDOWN_MINUTES = {0, 1, 360, 720, 1440, 2880, 4320};
+    private static final int[] WINDOW_HOURS = {1, 2, 3, 6, 12, 24};
+    private final BroadcastReceiver timeChangedReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) { refreshAll(); }
+    };
 
     private final ActivityResultLauncher<Intent> setupFlowLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(), result -> {
@@ -81,6 +94,7 @@ public class ModernMainActivity extends AppCompatActivity {
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         setupNavigation(toolbar);
+        setupDeactivationTimingSelectors();
         populateEditableFields();
         setupWatchers();
         setupActions();
@@ -132,6 +146,45 @@ public class ModernMainActivity extends AppCompatActivity {
         findViewById(R.id.firewallPermissionButton).setOnClickListener(v -> openAccessibilitySettings());
         findViewById(R.id.guardPermissionButton).setOnClickListener(v -> configureOptionalGuard());
         findViewById(R.id.notificationPermissionButton).setOnClickListener(v -> requestNotifications());
+        findViewById(R.id.cancelDeactivationRequestButton).setOnClickListener(v -> {
+            preferences.clearPendingDeactivation();
+            deactivationNoticeState = null;
+            ((EditText) findViewById(R.id.deactivationKeyUnblockerInputText)).setText("");
+            Toast.makeText(this, R.string.deactivation_request_cancelled, Toast.LENGTH_SHORT).show();
+            refreshAll();
+        });
+    }
+
+    private void setupDeactivationTimingSelectors() {
+        Spinner cooldown = findViewById(R.id.deactivationCooldownSpinner);
+        Spinner window = findViewById(R.id.deactivationWindowSpinner);
+        String[] cooldownLabels = new String[COOLDOWN_MINUTES.length];
+        for (int i = 0; i < COOLDOWN_MINUTES.length; i++) {
+            cooldownLabels[i] = formatCooldownChoice(COOLDOWN_MINUTES[i]);
+        }
+        String[] windowLabels = new String[WINDOW_HOURS.length];
+        for (int i = 0; i < WINDOW_HOURS.length; i++) {
+            windowLabels[i] = getString(R.string.window_hours_choice, WINDOW_HOURS[i]);
+        }
+        cooldown.setAdapter(new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, cooldownLabels));
+        window.setAdapter(new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, windowLabels));
+        cooldown.setSelection(indexOf(COOLDOWN_MINUTES,
+                preferences.getDeactivationCooldownMinutes()));
+        window.setSelection(indexOf(WINDOW_HOURS,
+                preferences.getDeactivationWindowHours()));
+        cooldown.setOnItemSelectedListener(new SimpleItemSelectedListener(position -> {
+            if (!updatingFields && !preferences.getIsBlockerActive()) {
+                preferences.setDeactivationCooldownMinutes(COOLDOWN_MINUTES[position]);
+                refreshCooldownControls();
+            }
+        }));
+        window.setOnItemSelectedListener(new SimpleItemSelectedListener(position -> {
+            if (!updatingFields && !preferences.getIsBlockerActive()) {
+                preferences.setDeactivationWindowHours(WINDOW_HOURS[position]);
+            }
+        }));
     }
 
     private void openSetup() {
@@ -158,7 +211,18 @@ public class ModernMainActivity extends AppCompatActivity {
         ((EditText) findViewById(R.id.replacementThreeInput)).setText(preferences.getReplacementTask());
         ((SwitchCompat) findViewById(R.id.uninstallGuardSwitch)).setChecked(
                 preferences.isUninstallGuardEnabled());
+        ((Spinner) findViewById(R.id.deactivationCooldownSpinner)).setSelection(
+                indexOf(COOLDOWN_MINUTES, preferences.getDeactivationCooldownMinutes()));
+        ((Spinner) findViewById(R.id.deactivationWindowSpinner)).setSelection(
+                indexOf(WINDOW_HOURS, preferences.getDeactivationWindowHours()));
         updatingFields = false;
+        refreshCooldownControls();
+    }
+
+    private void refreshCooldownControls() {
+        boolean immediate = preferences.getDeactivationCooldownMinutes() == 0;
+        findViewById(R.id.deactivationWindowSpinner).setEnabled(!immediate);
+        findViewById(R.id.deactivationWindowSpinner).setAlpha(immediate ? 0.38f : 1f);
     }
 
     private void setupWatchers() {
@@ -456,10 +520,52 @@ public class ModernMainActivity extends AppCompatActivity {
                 !active && !hasKey ? View.VISIBLE : View.GONE);
         findViewById(R.id.deactivationKeyButton).setVisibility(
                 !active ? View.VISIBLE : View.GONE);
-        findViewById(R.id.deactivationKeyUnblockerInputLayout).setVisibility(
-                active ? View.VISIBLE : View.GONE);
-        ((Button) findViewById(R.id.button_blocker_activate)).setText(active
-                ? R.string.ButtonBlockerDeactivateLabel : R.string.activate_protection);
+        TextView status = findViewById(R.id.deactivationRequestStatus);
+        View keyInput = findViewById(R.id.deactivationKeyUnblockerInputLayout);
+        Button action = findViewById(R.id.button_blocker_activate);
+        View cancel = findViewById(R.id.cancelDeactivationRequestButton);
+        if (!active) {
+            status.setVisibility(View.GONE);
+            keyInput.setVisibility(View.GONE);
+            cancel.setVisibility(View.GONE);
+            action.setVisibility(View.VISIBLE);
+            action.setText(R.string.activate_protection);
+        } else if (preferences.getDeactivationCooldownMinutes() == 0) {
+            status.setText(R.string.activation_immediate_summary);
+            status.setVisibility(View.VISIBLE);
+            keyInput.setVisibility(View.VISIBLE);
+            cancel.setVisibility(View.GONE);
+            action.setVisibility(View.VISIBLE);
+            action.setText(R.string.deactivate_now);
+        } else {
+            DeactivationPolicyEngine.Evaluation evaluation = evaluatePendingRequest(true);
+            status.setVisibility(View.VISIBLE);
+            if (evaluation.state == DeactivationPolicyEngine.State.COOLDOWN_PENDING) {
+                status.setText(getString(R.string.deactivation_cooldown_pending,
+                        formatApproximateDuration(evaluation.remainingMs)));
+                keyInput.setVisibility(View.GONE);
+                action.setVisibility(View.GONE);
+                cancel.setVisibility(View.VISIBLE);
+            } else if (evaluation.state == DeactivationPolicyEngine.State.WINDOW_OPEN) {
+                status.setText(getString(R.string.deactivation_window_open,
+                        formatApproximateDuration(evaluation.remainingMs)));
+                keyInput.setVisibility(View.VISIBLE);
+                action.setVisibility(View.VISIBLE);
+                action.setText(R.string.deactivate_now);
+                cancel.setVisibility(View.VISIBLE);
+            } else {
+                DeactivationPolicyEngine.State notice = deactivationNoticeState != null
+                        ? deactivationNoticeState : preferences.getDeactivationTerminalState();
+                status.setText(notice == DeactivationPolicyEngine.State.EXPIRED
+                        ? R.string.deactivation_expired
+                        : notice == DeactivationPolicyEngine.State.INVALIDATED
+                        ? R.string.deactivation_invalidated : R.string.deactivation_no_request);
+                keyInput.setVisibility(View.VISIBLE);
+                action.setVisibility(View.VISIBLE);
+                action.setText(R.string.request_deactivation);
+                cancel.setVisibility(View.GONE);
+            }
+        }
         refreshKeyButton();
     }
 
@@ -488,6 +594,10 @@ public class ModernMainActivity extends AppCompatActivity {
             attemptActivation();
             return;
         }
+        if (preferences.getDeactivationCooldownMinutes() > 0) {
+            DeactivationPolicyEngine.Evaluation evaluation = evaluatePendingRequest(true);
+            if (evaluation.state == DeactivationPolicyEngine.State.COOLDOWN_PENDING) return;
+        }
         EditText input = findViewById(R.id.deactivationKeyUnblockerInputText);
         String candidate = input.getText() == null ? "" : input.getText().toString();
         view.setEnabled(false);
@@ -496,7 +606,7 @@ public class ModernMainActivity extends AppCompatActivity {
             runOnUiThread(() -> {
                 if (isDestroyed()) return;
                 view.setEnabled(true);
-                if (valid) deactivateBlocker(input);
+                if (valid) handleVerifiedDeactivationKey(input);
                 else Toast.makeText(this, R.string.incorrect_key, Toast.LENGTH_SHORT).show();
             });
         });
@@ -523,15 +633,91 @@ public class ModernMainActivity extends AppCompatActivity {
             ((BottomNavigationView) findViewById(R.id.bottomNavigation)).setSelectedItemId(R.id.navigation_settings);
             return;
         }
-        preferences.setIsBlockerActive(true);
-        refreshAll();
+        int cooldown = preferences.getDeactivationCooldownMinutes();
+        String summary = cooldown == 0 ? getString(R.string.activation_immediate_summary)
+                : getString(R.string.activation_delayed_summary,
+                formatCooldownDuration(cooldown),
+                preferences.getDeactivationWindowHours());
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.activation_confirmation_title)
+                .setMessage(summary)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.activate_protection, (dialog, which) -> {
+                    preferences.clearPendingDeactivation();
+                    preferences.setIsBlockerActive(true);
+                    deactivationNoticeState = null;
+                    refreshAll();
+                }).show();
     }
 
-    private void deactivateBlocker(EditText input) {
+    private void handleVerifiedDeactivationKey(EditText input) {
         input.setText("");
-        preferences.setIsBlockerActive(false);
-        populateEditableFields();
-        refreshAll();
+        if (preferences.getDeactivationCooldownMinutes() > 0) {
+            DeactivationPolicyEngine.Evaluation evaluation = evaluatePendingRequest(true);
+            if (evaluation.state == DeactivationPolicyEngine.State.NO_REQUEST) {
+                DeactivationPolicyEngine.Request request = deactivationEngine.createRequest(
+                        System.currentTimeMillis(), SystemClock.elapsedRealtime(), currentBootCount(),
+                        preferences.getDeactivationCooldownMinutes() * 60L * 1000L,
+                        preferences.getDeactivationWindowHours() * 60L * 60L * 1000L);
+                if (request == null) {
+                    deactivationNoticeState = DeactivationPolicyEngine.State.INVALIDATED;
+                } else {
+                    preferences.savePendingDeactivation(request);
+                    deactivationNoticeState = null;
+                    Toast.makeText(this, R.string.deactivation_request_created,
+                            Toast.LENGTH_SHORT).show();
+                }
+                refreshAll();
+                return;
+            }
+            if (evaluation.state != DeactivationPolicyEngine.State.WINDOW_OPEN) {
+                refreshAll();
+                return;
+            }
+        }
+        showFinalDeactivationConfirmation();
+    }
+
+    private void showFinalDeactivationConfirmation() {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.deactivate_confirmation_title)
+                .setMessage(R.string.deactivate_confirmation_message)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.deactivate_now, (dialog, which) -> {
+                    if (preferences.getDeactivationCooldownMinutes() > 0
+                            && evaluatePendingRequest(true).state
+                            != DeactivationPolicyEngine.State.WINDOW_OPEN) {
+                        Toast.makeText(this, R.string.deactivation_window_closed,
+                                Toast.LENGTH_LONG).show();
+                        refreshAll();
+                        return;
+                    }
+                    preferences.clearPendingDeactivation();
+                    preferences.setIsBlockerActive(false);
+                    deactivationNoticeState = null;
+                    populateEditableFields();
+                    refreshAll();
+                }).show();
+    }
+
+    private DeactivationPolicyEngine.Evaluation evaluatePendingRequest(boolean clearTerminal) {
+        DeactivationPolicyEngine.Evaluation result = deactivationEngine.evaluateRequest(
+                preferences.getPendingDeactivation(), System.currentTimeMillis(),
+                SystemClock.elapsedRealtime(), currentBootCount());
+        if (clearTerminal && (result.state == DeactivationPolicyEngine.State.EXPIRED
+                || result.state == DeactivationPolicyEngine.State.INVALIDATED)) {
+            deactivationNoticeState = result.state;
+            preferences.finishPendingDeactivation(result.state);
+        }
+        return result;
+    }
+
+    private int currentBootCount() {
+        try {
+            return Settings.Global.getInt(getContentResolver(), Settings.Global.BOOT_COUNT);
+        } catch (Settings.SettingNotFoundException | RuntimeException unavailable) {
+            return -1;
+        }
     }
 
     public void onDeactivationKeyButtonClick(View view) {
@@ -706,6 +892,22 @@ public class ModernMainActivity extends AppCompatActivity {
         refreshAll();
     }
 
+    @Override protected void onStart() {
+        super.onStart();
+        if (!timeReceiverRegistered) {
+            registerReceiver(timeChangedReceiver, new IntentFilter(Intent.ACTION_TIME_CHANGED));
+            timeReceiverRegistered = true;
+        }
+    }
+
+    @Override protected void onStop() {
+        if (timeReceiverRegistered) {
+            unregisterReceiver(timeChangedReceiver);
+            timeReceiverRegistered = false;
+        }
+        super.onStop();
+    }
+
     @Override protected void onDestroy() {
         ioExecutor.shutdownNow();
         super.onDestroy();
@@ -716,6 +918,39 @@ public class ModernMainActivity extends AppCompatActivity {
         long safe = seconds == Long.MIN_VALUE ? Long.MAX_VALUE : Math.abs(seconds);
         String value = String.format(Locale.getDefault(), "%d:%02d", safe / 60, safe % 60);
         return negative ? "-" + value : value;
+    }
+
+    private static String formatApproximateDuration(long milliseconds) {
+        long minutes = Math.max(1, (milliseconds + 59_999) / 60_000);
+        if (minutes < 60) return minutes + " min";
+        long hours = (minutes + 59) / 60;
+        return hours + (hours == 1 ? " hour" : " hours");
+    }
+
+    private static int indexOf(int[] values, int target) {
+        for (int i = 0; i < values.length; i++) if (values[i] == target) return i;
+        return 0;
+    }
+
+    private String formatCooldownChoice(int minutes) {
+        if (minutes == 0) return getString(R.string.cooldown_zero_choice);
+        if (minutes == 1) return getString(R.string.cooldown_one_minute_choice);
+        return getString(R.string.cooldown_hours_choice, minutes / 60);
+    }
+
+    private String formatCooldownDuration(int minutes) {
+        return minutes == 1 ? getString(R.string.one_minute)
+                : getString(R.string.hours_duration, minutes / 60);
+    }
+
+    private interface ItemSelection { void selected(int position); }
+    private static final class SimpleItemSelectedListener
+            implements android.widget.AdapterView.OnItemSelectedListener {
+        private final ItemSelection listener;
+        SimpleItemSelectedListener(ItemSelection listener) { this.listener = listener; }
+        @Override public void onItemSelected(android.widget.AdapterView<?> parent, View view,
+                                             int position, long id) { listener.selected(position); }
+        @Override public void onNothingSelected(android.widget.AdapterView<?> parent) { }
     }
 
     private static String formatCompactDuration(long seconds) {

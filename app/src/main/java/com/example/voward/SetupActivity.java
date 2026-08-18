@@ -9,8 +9,11 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -31,6 +34,8 @@ import java.util.concurrent.Executors;
 /** Explicit, progressive setup that separates required and optional authority. */
 public class SetupActivity extends AppCompatActivity {
     private static final int STEP_COUNT = 6;
+    private static final int[] COOLDOWN_MINUTES = {0, 1, 360, 720, 1440, 2880, 4320};
+    private static final int[] WINDOW_HOURS = {1, 2, 3, 6, 12, 24};
     private final int[] stepViews = {
             R.id.setupWelcomeStep, R.id.setupGoalStep, R.id.setupRulesStep,
             R.id.setupPermissionsStep, R.id.setupKeyStep, R.id.setupReviewStep
@@ -68,6 +73,7 @@ public class SetupActivity extends AppCompatActivity {
         budgetEngine = new AttentionBudgetEngine(this);
         step = savedInstanceState == null ? 0 : savedInstanceState.getInt("setup_step", 0);
 
+        setupDeactivationTimingSelectors();
         populateValues();
         findViewById(R.id.setupSkipButton).setOnClickListener(v -> finishSetup(false));
         findViewById(R.id.setupBackButton).setOnClickListener(v -> showStep(Math.max(0, step - 1)));
@@ -95,6 +101,70 @@ public class SetupActivity extends AppCompatActivity {
                 preferences.getDailyAllowanceSeconds() / 60));
         ((EditText) findViewById(R.id.setupSessionInput)).setText(String.valueOf(
                 preferences.getDefaultSessionSeconds() / 60));
+        ((Spinner) findViewById(R.id.setupDeactivationCooldownSpinner)).setSelection(
+                indexOf(COOLDOWN_MINUTES, preferences.getDeactivationCooldownMinutes()));
+        ((Spinner) findViewById(R.id.setupDeactivationWindowSpinner)).setSelection(
+                indexOf(WINDOW_HOURS, preferences.getDeactivationWindowHours()));
+        refreshDeactivationTimingControls();
+    }
+
+    private void setupDeactivationTimingSelectors() {
+        Spinner cooldown = findViewById(R.id.setupDeactivationCooldownSpinner);
+        Spinner window = findViewById(R.id.setupDeactivationWindowSpinner);
+        String[] cooldownLabels = new String[COOLDOWN_MINUTES.length];
+        for (int i = 0; i < COOLDOWN_MINUTES.length; i++) {
+            cooldownLabels[i] = formatCooldownChoice(COOLDOWN_MINUTES[i]);
+        }
+        String[] windowLabels = new String[WINDOW_HOURS.length];
+        for (int i = 0; i < WINDOW_HOURS.length; i++) {
+            windowLabels[i] = getString(R.string.window_hours_choice, WINDOW_HOURS[i]);
+        }
+        cooldown.setAdapter(new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, cooldownLabels));
+        window.setAdapter(new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, windowLabels));
+        cooldown.setSelection(indexOf(COOLDOWN_MINUTES,
+                preferences.getDeactivationCooldownMinutes()));
+        window.setSelection(indexOf(WINDOW_HOURS,
+                preferences.getDeactivationWindowHours()));
+        cooldown.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view,
+                                                 int position, long id) {
+                preferences.setDeactivationCooldownMinutes(COOLDOWN_MINUTES[position]);
+                refreshDeactivationTimingControls();
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) { }
+        });
+        window.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view,
+                                                 int position, long id) {
+                preferences.setDeactivationWindowHours(WINDOW_HOURS[position]);
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) { }
+        });
+    }
+
+    private void refreshDeactivationTimingControls() {
+        boolean immediate = preferences.getDeactivationCooldownMinutes() == 0;
+        View window = findViewById(R.id.setupDeactivationWindowSpinner);
+        window.setEnabled(!immediate);
+        window.setAlpha(immediate ? 0.38f : 1f);
+    }
+
+    private static int indexOf(int[] values, int target) {
+        for (int i = 0; i < values.length; i++) if (values[i] == target) return i;
+        return 0;
+    }
+
+    private String formatCooldownChoice(int minutes) {
+        if (minutes == 0) return getString(R.string.cooldown_zero_choice);
+        if (minutes == 1) return getString(R.string.cooldown_one_minute_choice);
+        return getString(R.string.cooldown_hours_choice, minutes / 60);
+    }
+
+    private String formatCooldownDuration(int minutes) {
+        return minutes == 1 ? getString(R.string.one_minute)
+                : getString(R.string.hours_duration, minutes / 60);
     }
 
     private void showStep(int nextStep) {
@@ -150,7 +220,12 @@ public class SetupActivity extends AppCompatActivity {
         ((TextView) findViewById(R.id.setupReviewSummary)).setText(getString(
                 R.string.setup_review_summary, goal,
                 preferences.getDailyAllowanceSeconds() / 60,
-                preferences.getDefaultSessionSeconds() / 60, apps, sites));
+                preferences.getDefaultSessionSeconds() / 60, apps, sites)
+                + "\n\n" + (preferences.getDeactivationCooldownMinutes() == 0
+                ? getString(R.string.activation_immediate_summary)
+                : getString(R.string.activation_delayed_summary,
+                formatCooldownDuration(preferences.getDeactivationCooldownMinutes()),
+                preferences.getDeactivationWindowHours())));
         int missing = 0;
         if (!firewall) missing++;
         if (apps + sites == 0) missing++;

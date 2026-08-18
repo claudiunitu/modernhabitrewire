@@ -34,11 +34,6 @@ class AppPackagesViewHolder extends RecyclerView.ViewHolder {
         strictRuleCheckbox = itemView.findViewById(R.id.strict_rule_checkbox);
         strictBadge = itemView.findViewById(R.id.strict_badge);
         deleteButton.setVisibility(isLocked ? View.GONE : View.VISIBLE);
-        strictRuleCheckbox.setEnabled(!isLocked);
-        strictRuleCheckbox.setClickable(!isLocked);
-        strictRuleCheckbox.setFocusable(!isLocked);
-        if (isLocked) strictRuleCheckbox.setText(R.string.strict_rule_locked_label);
-
     }
 }
 public class AppPackagesListRecyclerAdapter extends RecyclerView.Adapter<AppPackagesViewHolder> {
@@ -92,19 +87,30 @@ public class AppPackagesListRecyclerAdapter extends RecyclerView.Adapter<AppPack
             holder.appIcon.setImageResource(android.R.drawable.sym_def_app_icon);
         }
         holder.strictRuleCheckbox.setOnCheckedChangeListener(null);
-        holder.strictRuleCheckbox.setChecked(
-                appPreferencesManagerSingleton.isStrictRestrictedApp(appPackage));
+        boolean protectionActive = appPreferencesManagerSingleton.getIsBlockerActive();
+        boolean strict = appPreferencesManagerSingleton.isStrictRestrictedApp(appPackage);
+        holder.strictRuleCheckbox.setChecked(strict);
+        holder.strictRuleCheckbox.setEnabled(!protectionActive || !strict);
+        holder.strictRuleCheckbox.setClickable(!protectionActive || !strict);
+        holder.strictRuleCheckbox.setFocusable(!protectionActive || !strict);
+        holder.strictRuleCheckbox.setText(protectionActive && strict
+                ? R.string.strict_rule_locked_label : R.string.strict_rule_row_label);
         holder.strictBadge.setVisibility(holder.strictRuleCheckbox.isChecked()
                 ? View.VISIBLE : View.GONE);
         holder.strictRuleCheckbox.setOnCheckedChangeListener((button, checked) -> {
-            if (appPreferencesManagerSingleton.getIsBlockerActive()) {
-                Toast.makeText(context, R.string.blocker_active_cannot_change,
+            if (appPreferencesManagerSingleton.getIsBlockerActive() && !checked) {
+                Toast.makeText(context, R.string.blocker_active_cannot_relax,
                         Toast.LENGTH_SHORT).show();
                 int adapterPosition = holder.getBindingAdapterPosition();
                 if (adapterPosition != RecyclerView.NO_POSITION) notifyItemChanged(adapterPosition);
                 return;
             }
             strictChangedListener.onStrictChanged(appPackage, checked);
+            holder.strictBadge.setVisibility(checked ? View.VISIBLE : View.GONE);
+            if (appPreferencesManagerSingleton.getIsBlockerActive() && checked) {
+                int adapterPosition = holder.getBindingAdapterPosition();
+                if (adapterPosition != RecyclerView.NO_POSITION) notifyItemChanged(adapterPosition);
+            }
         });
         holder.deleteButton.setOnClickListener(v -> {
             if(!appPreferencesManagerSingleton.getIsBlockerActive()){

@@ -1,7 +1,6 @@
 package com.example.voward;
 import android.os.Bundle;
 import android.widget.Button;
-import android.widget.Toast;
 import android.view.View;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.view.WindowCompat;
@@ -44,14 +43,10 @@ public class UrlListEditorActivity extends AppCompatActivity {
         recyclerView.setAdapter(adapter);
         boolean locked = appPreferencesManagerSingleton.getIsBlockerActive();
         findViewById(R.id.lockedBanner).setVisibility(locked ? View.VISIBLE : View.GONE);
-        findViewById(R.id.editorComposer).setVisibility(locked ? View.GONE : View.VISIBLE);
+        findViewById(R.id.editorComposer).setVisibility(View.VISIBLE);
         refreshList();
 
         addButton.setOnClickListener(v -> {
-            if (appPreferencesManagerSingleton.getIsBlockerActive()) {
-                Toast.makeText(this, R.string.blocker_active_cannot_change, Toast.LENGTH_SHORT).show();
-                return;
-            }
             String newUrl = urlEditText.getText() != null
                     ? urlEditText.getText().toString().trim() : "";
             if (!newUrl.isEmpty()) {

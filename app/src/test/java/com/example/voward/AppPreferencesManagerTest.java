@@ -181,6 +181,37 @@ public class AppPreferencesManagerTest {
     }
 
     @Test
+    public void activeProtectionPermitsOnlyAdditiveRuleChanges() {
+        preferences.setRestrictedUrls(List.of("keep.example", "strict.example"));
+        preferences.setRestrictedUrlStrict("strict.example", true);
+        preferences.setRestrictedApps(List.of("app.keep", "app.strict"));
+        preferences.setRestrictedAppStrict("app.strict", true);
+        preferences.setIsBlockerActive(true);
+
+        preferences.removeUrl("keep.example");
+        preferences.setRestrictedUrls(List.of("replacement.example"));
+        preferences.setRestrictedUrlStrict("strict.example", false);
+        preferences.setRestrictedUrlStrict("keep.example", true);
+        preferences.addRestrictedUrl("added.example", false);
+
+        assertTrue(preferences.getRestrictedUrls().containsAll(List.of(
+                "keep.example", "strict.example", "replacement.example", "added.example")));
+        assertTrue(preferences.isStrictRestrictedUrlPattern("strict.example"));
+        assertTrue(preferences.isStrictRestrictedUrlPattern("keep.example"));
+
+        preferences.removeRestrictedAppPackage("app.keep");
+        preferences.setRestrictedApps(List.of("app.replacement"));
+        preferences.setRestrictedAppStrict("app.strict", false);
+        preferences.setRestrictedAppStrict("app.keep", true);
+        preferences.addRestrictedAppPackage("app.added", false);
+
+        assertTrue(preferences.getRestrictedAppPackages().containsAll(List.of(
+                "app.keep", "app.strict", "app.replacement", "app.added")));
+        assertTrue(preferences.isStrictRestrictedApp("app.strict"));
+        assertTrue(preferences.isStrictRestrictedApp("app.keep"));
+    }
+
+    @Test
     public void recoveryKeyUsesSaltedHashAndRejectsInvalidInput() {
         preferences.setDeactivationKey("correct horse");
         String firstHash = preferences.getDeactivationKey();
@@ -250,6 +281,8 @@ public class AppPreferencesManagerTest {
         preferences.setCarryoverCapDays(.5f);
         preferences.setLaunchFrictionEnabled(false);
         preferences.setUninstallGuardEnabled(true);
+        preferences.setDeactivationCooldownMinutes(48 * 60);
+        preferences.setDeactivationWindowHours(3);
         preferences.setIsBlockerActive(true);
         preferences.setRemainingBudgetSeconds(123);
         preferences.setDeactivationKey("secret");
@@ -260,6 +293,9 @@ public class AppPreferencesManagerTest {
         assertFalse(exported.has("remainingBudgetSeconds"));
         assertFalse(exported.has("deactivationKey"));
         assertFalse(exported.has("isBlockerActive"));
+        assertFalse(exported.has("pendingDeactivation"));
+        assertEquals(48 * 60, exported.getInt("deactivationCooldownMinutes"));
+        assertEquals(3, exported.getInt("deactivationWindowHours"));
 
         preferences.setRestrictedUrls(List.of("changed.test"));
         preferences.importPortableState(exported);
@@ -272,6 +308,8 @@ public class AppPreferencesManagerTest {
         assertEquals(.8f, preferences.getReentryGrowth(), .0001f);
         assertEquals(123, preferences.getRemainingBudgetSeconds());
         assertTrue(preferences.getIsBlockerActive());
+        assertEquals(48 * 60, preferences.getDeactivationCooldownMinutes());
+        assertEquals(3, preferences.getDeactivationWindowHours());
     }
 
     @Test
@@ -294,6 +332,43 @@ public class AppPreferencesManagerTest {
                 new JSONObject().put("schemaVersion", 0)));
         assertThrows(JSONException.class, () -> preferences.importPortableState(
                 new JSONObject().put("schemaVersion", 99)));
+        JSONObject invalidTiming = preferences.exportPortableState()
+                .put("deactivationCooldownMinutes", 5);
+        assertThrows(JSONException.class, () -> preferences.importPortableState(invalidTiming));
+    }
+
+    @Test
+    public void pendingDeactivationIsLocalPersistentAndClearedByActivation() throws Exception {
+        DeactivationPolicyEngine.Request request = new DeactivationPolicyEngine.Request(
+                "request-id", 1000, 2000, 3, 6000, 1000);
+        preferences.savePendingDeactivation(request);
+        DeactivationPolicyEngine.Request restored = preferences.getPendingDeactivation();
+        assertEquals("request-id", restored.id);
+        assertEquals(6000, restored.cooldownMs);
+        assertFalse(preferences.exportPortableState().has("pendingDeactivation"));
+        preferences.finishPendingDeactivation(DeactivationPolicyEngine.State.INVALIDATED);
+        assertEquals(DeactivationPolicyEngine.State.INVALIDATED,
+                preferences.getDeactivationTerminalState());
+        preferences.savePendingDeactivation(request);
+        assertEquals(null, preferences.getDeactivationTerminalState());
+        preferences.setIsBlockerActive(true);
+        assertEquals(null, preferences.getPendingDeactivation());
+    }
+
+    @Test
+    public void deactivationTimingDefaultsAndValidationAreFailClosed() {
+        assertEquals(24 * 60, preferences.getDeactivationCooldownMinutes());
+        assertEquals(1, preferences.getDeactivationWindowHours());
+        preferences.setDeactivationCooldownMinutes(0);
+        preferences.setDeactivationWindowHours(24);
+        assertEquals(0, preferences.getDeactivationCooldownMinutes());
+        preferences.setDeactivationCooldownMinutes(1);
+        assertEquals(1, preferences.getDeactivationCooldownMinutes());
+        assertEquals(24, preferences.getDeactivationWindowHours());
+        assertThrows(IllegalArgumentException.class,
+                () -> preferences.setDeactivationCooldownMinutes(5));
+        assertThrows(IllegalArgumentException.class,
+                () -> preferences.setDeactivationWindowHours(0));
     }
 
     @Test

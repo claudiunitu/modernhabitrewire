@@ -27,7 +27,7 @@ Voward is not medical treatment, a diagnostic device, or a validated measure of 
 - Mark individual app or website rules as strict. Strict rules cannot be opened while protection is active.
 - Show the remaining allowance, next pause, protected-rule count, sessions, sessions ended early, and limits reached.
 - Keep up to 14 completed daily summaries on-device and show current-week protected-use time, sessions, outcomes, and common session start time.
-- Keep rules and settings read-only while protection is active.
+- While protection is active, allow only additive rule changes: add new rules or make existing rules strict; removal and strict-to-regular changes stay locked.
 - Import and export portable configuration as JSON.
 - Optionally show allowance notifications, enable Device Admin uninstall friction, and use system grayscale during approved sessions.
 
@@ -48,12 +48,29 @@ The app is intended for direct/private installation. Its accessibility and unins
 3. Add at least one protected app or website rule. Mark a rule strict only if it should remain unavailable while protection is active.
 4. Enable the **Attention Firewall** accessibility service.
 5. Optionally enable Device Admin uninstall protection and notifications.
-6. Create a recovery key.
+6. Create a recovery key, select the deactivation cooldown, and choose how long you will have to confirm deactivation afterward.
 7. Review the setup summary and activate protection.
 
-Activation requires the accessibility service, at least one rule, a positive daily allowance, and a recovery key. While protection is active, rules and timing settings are locked. Enter the recovery key on the Settings tab to deactivate protection.
+Activation requires the accessibility service, at least one rule, a positive daily allowance, and a recovery key. While protection is active, rules may only be tightened: new rules can be added and existing rules can be made strict, but rules cannot be removed or changed from strict to regular. Timing and other protection settings remain locked. By default, deactivation requires entering the recovery key once to start a 24-hour cooldown, then entering it again during a silent 1-hour confirmation period and accepting a final confirmation. The cooldown and confirmation period can be configured while protection is inactive.
 
-The recovery key is stored as a salted PBKDF2-HMAC-SHA256 hash and cannot be displayed or recovered. There is no timed or charging bypass. Device Admin and accessibility add friction, but they do not turn a normal Android installation into kiosk mode.
+The recovery key is stored as a salted PBKDF2-HMAC-SHA256 hash and cannot be displayed or recovered. Protection remains fully active during a pending deactivation request. Eligibility uses Android monotonic time; a detected wall-clock change beyond two minutes or a reboot invalidates the request. The confirmation period begins and expires without a notification, badge, sound, background poll, or automatic action. With cooldown 0, the recovery key can deactivate protection immediately after explicit confirmation. Device Admin and accessibility add friction, but they do not turn a normal Android installation into kiosk mode.
+
+### Deactivation policy
+
+The cooldown can be set to **0**, **1 minute**, **6 hours**, **12 hours**, **24 hours**, **48 hours**, or **72 hours**. The time allowed to confirm deactivation afterward can be **1**, **2**, **3**, **6**, **12**, or **24 hours**. The defaults are 24 hours and a 1-hour confirmation period. Both values are selectable during initial setup and in Settings, and can be changed only while protection is inactive. A shorter confirmation period provides stronger protection against impulsive deactivation.
+
+With a positive cooldown:
+
+1. Open Settings, enter the correct recovery key, and explicitly request deactivation.
+2. Protection, strict rules, and uninstall friction remain active during the cooldown. The request can be cancelled immediately without entering the key again.
+3. After the cooldown, the confirmation period begins silently. Voward sends no notification or reminder and does not navigate to the deactivation screen.
+4. During that period, enter the recovery key again, press **Deactivate protection**, and accept the final confirmation.
+
+Incorrect key attempts do not restart or extend a request. Missing the confirmation period deletes the request and requires starting the complete process again. Changing the wall clock cannot accelerate eligibility; a detected shift beyond two minutes invalidates the request. Rebooting also invalidates it. Time-zone changes do not affect epoch progression and therefore do not invalidate a request.
+
+When cooldown **0** is selected, no request or confirmation period is created. A correct recovery key, an explicit **Deactivate protection** press, and final confirmation deactivate protection immediately.
+
+Optional uninstall protection combines Device Administrator uninstall friction with accessibility-based guarding of relevant app-info, uninstall, and service-detail screens while protection is active. It is a deterrent against impulsive removal, not kiosk mode or an absolute security guarantee.
 
 ## Allowance and sessions
 
@@ -89,7 +106,7 @@ Ambiguous single-word and malformed rules are rejected. URL enforcement depends 
 - The accessibility service can observe foreground apps, window content, and supported browser address text. It can show the decision gate, navigate Home, replace a blocked browser tab, and—when optional uninstall protection is enabled—guard relevant app-info and uninstall screens.
 - Rules, preferences, and usage counters remain on the device. Voward has no analytics SDK or external network client.
 - The `INTERNET` manifest permission is used by a loopback-only server that serves the local browser block page.
-- Configuration export writes only the selected JSON file. It excludes the recovery key, active-protection state, current allowance balance, usage counters, and temporary approvals.
+- Configuration export writes only the selected JSON file. It includes the configured deactivation cooldown and confirmation-period durations, but excludes the recovery key, active-protection state, pending deactivation requests and timestamps, current allowance balance, usage counters, and temporary approvals.
 - Purpose text entered at the gate is not stored.
 - Android backup and data extraction are disabled.
 - Voward prevents known emergency, dialer, Settings, System UI, permission-controller, and Voward packages from being selected as protected apps.

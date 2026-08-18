@@ -75,14 +75,10 @@ public class AppPackagesListEditorActivity extends AppCompatActivity {
         recyclerView.setAdapter(adapter);
         boolean locked = appPreferencesManagerSingleton.getIsBlockerActive();
         findViewById(R.id.lockedBanner).setVisibility(locked ? View.VISIBLE : View.GONE);
-        findViewById(R.id.editorComposer).setVisibility(locked ? View.GONE : View.VISIBLE);
+        findViewById(R.id.editorComposer).setVisibility(View.VISIBLE);
         refreshList();
 
         addButton.setOnClickListener(v -> {
-            if (appPreferencesManagerSingleton.getIsBlockerActive()) {
-                Toast.makeText(this, R.string.blocker_active_cannot_change, Toast.LENGTH_SHORT).show();
-                return;
-            }
             String newAppPackage = packageNameEditText.getText() != null
                     ? packageNameEditText.getText().toString().trim() : "";
             if (!newAppPackage.isEmpty()) {
@@ -129,10 +125,6 @@ public class AppPackagesListEditorActivity extends AppCompatActivity {
     }
 
     private void showInstalledAppPicker() {
-        if (appPreferencesManagerSingleton.getIsBlockerActive()) {
-            Toast.makeText(this, R.string.blocker_active_cannot_change, Toast.LENGTH_SHORT).show();
-            return;
-        }
         Intent launcherIntent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
         List<ResolveInfo> resolved = getPackageManager().queryIntentActivities(launcherIntent, 0);
         List<AppChoice> choices = new ArrayList<>();
