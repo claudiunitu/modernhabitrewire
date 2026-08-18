@@ -60,13 +60,6 @@ final class UninstallGuardPolicy {
             "administratorul dispozitivului", "administrare a dispozitivului"
     };
 
-    private static final String[] ACCESSIBILITY_SERVICE_SIGNALS = {
-            "use service", "use_service", "service toggle", "service_toggle",
-            "installed service", "installed_service", "foloseste serviciul",
-            "folositi serviciul", "utilizeaza serviciul", "utilizati serviciul",
-            "serviciu instalat"
-    };
-
     private static final Set<String> GUARD_HOST_PACKAGES = Collections.unmodifiableSet(
             new HashSet<>(Arrays.asList(
                     "com.android.settings",
@@ -199,10 +192,6 @@ final class UninstallGuardPolicy {
 
     static boolean isDeviceAdminSignal(String value) {
         return containsNormalizedSignal(value, DEVICE_ADMIN_SIGNALS);
-    }
-
-    static boolean isAccessibilityServiceSignal(String value) {
-        return containsNormalizedSignal(value, ACCESSIBILITY_SERVICE_SIGNALS);
     }
 
     private static boolean containsNormalizedSignal(String value, String[] signals) {

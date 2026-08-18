@@ -1358,7 +1358,6 @@ public class AttentionFirewallService extends AccessibilityService {
         boolean targetVisible;
         boolean appControlVisible;
         boolean deviceAdminControlVisible;
-        boolean accessibilityServiceToggleVisible;
         boolean targetAccessibilityToggleVisible;
         boolean checkableControlVisible;
         int actionButtonCount;
@@ -1406,9 +1405,7 @@ public class AttentionFirewallService extends AccessibilityService {
                             scan.targetVisible,
                             scan.appControlVisible,
                             scan.deviceAdminControlVisible,
-                            (scan.targetAccessibilityToggleVisible
-                                    || (scan.targetVisible
-                                    && scan.accessibilityServiceToggleVisible))
+                            scan.targetAccessibilityToggleVisible
                                     && scan.checkableControlVisible,
                             scan.actionButtonCount >= 2));
         } finally {
@@ -1463,13 +1460,6 @@ public class AttentionFirewallService extends AccessibilityService {
         if (UninstallGuardPolicy.isDeviceAdminSignal(combined)) {
             scan.deviceAdminControlVisible = true;
         }
-        // Some OEM service-detail pages are hosted by a generic SubSettings activity
-        // and never render the word "accessibility". Their service switch is commonly
-        // labelled "Use service" / "Use <service name>" instead.
-        if (UninstallGuardPolicy.isAccessibilityServiceSignal(combined)) {
-            scan.accessibilityServiceToggleVisible = true;
-        }
-
         CharSequence className = node.getClassName();
         String normalizedClass = className == null
                 ? ""

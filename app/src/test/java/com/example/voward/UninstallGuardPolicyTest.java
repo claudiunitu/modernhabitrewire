@@ -117,8 +117,6 @@ public class UninstallGuardPolicyTest {
         assertTrue(UninstallGuardPolicy.isAppControlSignal("Stergeti datele"));
         assertTrue(UninstallGuardPolicy.isDeviceAdminSignal(
                 "Dezactivați administratorul dispozitivului"));
-        assertTrue(UninstallGuardPolicy.isAccessibilityServiceSignal(
-                "Folosiți serviciul"));
     }
 
     @Test
