@@ -113,17 +113,30 @@ Ambiguous single-word and malformed rules are rejected. URL enforcement depends 
 
 ## Optional grayscale
 
-On a development or privately managed device, grant grayscale access with ADB:
+Grayscale is automatic during approved sessions in regular restricted apps and websites once its optional system permission is available; there is no separate in-app switch. Strict rules never open, so grayscale does not apply to them. The rest of Voward works without this permission.
+
+To enable grayscale on a development or privately managed Android device:
+
+1. Install [Android SDK Platform Tools](https://developer.android.com/tools/releases/platform-tools) on a computer.
+2. Enable **Developer options** and **USB debugging** on the Android device.
+3. Connect the device to the computer and approve its USB-debugging prompt.
+4. From the Platform Tools directory, run:
 
 ```shell
-adb shell pm grant com.example.modernhabitrewire android.permission.WRITE_SECURE_SETTINGS
+adb shell pm grant com.example.voward android.permission.WRITE_SECURE_SETTINGS
 ```
 
-Voward reports whether this permission is available and restores the previous Android color-correction state when an approved session ends. The rest of the app works without this permission.
+5. Open Voward and check **Settings → Advanced and data**. It should say **Grayscale reminder available**.
+
+Voward turns the display grayscale when an approved restricted session starts and restores the previous Android color-correction state when that session ends. To revoke access, run:
+
+```shell
+adb shell pm revoke com.example.voward android.permission.WRITE_SECURE_SETTINGS
+```
 
 ## Build and test
 
-The project uses the checked-in Gradle wrapper, Java 17, compile/target SDK 36, application ID `com.example.modernhabitrewire`, and Java namespace `com.example.voward`.
+The project uses the checked-in Gradle wrapper, Java 17, compile/target SDK 36, application ID `com.example.voward`, and Java namespace `com.example.voward`.
 
 On Windows:
 

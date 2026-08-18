@@ -4,6 +4,8 @@ import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Looper;
+import android.os.SystemClock;
+import android.provider.Settings;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -28,6 +30,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -63,6 +66,12 @@ public class ActivityAndAdapterTest {
         int initial = content.getVisibility();
         activity.findViewById(R.id.helpQuickStartButton).performClick();
         assertEquals(initial == View.VISIBLE ? View.GONE : View.VISIBLE, content.getVisibility());
+
+        View grayscaleContent = activity.findViewById(R.id.helpGrayscaleContent);
+        assertEquals(View.GONE, grayscaleContent.getVisibility());
+        activity.findViewById(R.id.helpGrayscaleButton).performClick();
+        assertEquals(View.VISIBLE, grayscaleContent.getVisibility());
+
         assertTrue(activity.onSupportNavigateUp());
         assertTrue(activity.isFinishing());
         controller.destroy();
@@ -364,6 +373,43 @@ public class ActivityAndAdapterTest {
         assertTrue(setupController.get().isFinishing());
         assertEquals(600, preferences.getDailyAllowanceSeconds());
         setupController.destroy();
+    }
+
+    @Test
+    public void visibleSettingsRefreshWhenDeactivationWindowOpens() {
+        preferences.setSetupSeen(true);
+        preferences.setDeactivationKey("secret");
+        preferences.setDeactivationCooldownMinutes(1);
+        preferences.setDeactivationWindowHours(1);
+        preferences.setIsBlockerActive(true);
+        Settings.Global.putInt(application.getContentResolver(), Settings.Global.BOOT_COUNT, 7);
+        long boundaryDelayMs = 10_000;
+        long elapsed = SystemClock.elapsedRealtime();
+        long wall = System.currentTimeMillis();
+        preferences.savePendingDeactivation(new DeactivationPolicyEngine.Request(
+                "visible-settings", wall - 60_000 + boundaryDelayMs,
+                elapsed - 60_000 + boundaryDelayMs, 7, 60_000, 3_600_000));
+
+        ActivityController<ModernMainActivity> controller =
+                Robolectric.buildActivity(ModernMainActivity.class).setup();
+        ModernMainActivity activity = controller.get();
+        ((com.google.android.material.bottomnavigation.BottomNavigationView)
+                activity.findViewById(R.id.bottomNavigation))
+                .setSelectedItemId(R.id.navigation_settings);
+        TextView status = activity.findViewById(R.id.deactivationRequestStatus);
+        View action = activity.findViewById(R.id.button_blocker_activate);
+        assertEquals(View.VISIBLE, activity.findViewById(R.id.settingsScreen).getVisibility());
+        assertEquals(View.GONE, action.getVisibility());
+        assertEquals(application.getString(R.string.deactivation_cooldown_pending, "1 min"),
+                status.getText().toString());
+
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(11, TimeUnit.SECONDS);
+
+        assertEquals(View.VISIBLE, action.getVisibility());
+        assertEquals(application.getString(R.string.deactivate_now),
+                ((TextView) action).getText().toString());
+        assertTrue(status.getText().toString().contains("left to confirm"));
+        controller.destroy();
     }
 
     private static void resetSingleton() throws Exception {

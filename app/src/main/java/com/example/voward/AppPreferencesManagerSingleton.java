@@ -2,6 +2,7 @@ package com.example.voward;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -87,14 +88,20 @@ public class AppPreferencesManagerSingleton {
 
     private final SharedPreferences prefs;
     private final SharedPreferences portablePrefs;
+    private final Context appContext;
     private volatile List<String> restrictedUrlsCache;
     private volatile List<String> restrictedAppsCache;
     private volatile List<String> strictUrlsCache;
     private volatile List<String> strictAppsCache;
+    private volatile boolean restrictedUrlsStorageCorrupt;
+    private volatile boolean restrictedAppsStorageCorrupt;
+    private volatile boolean strictUrlsStorageCorrupt;
+    private volatile boolean strictAppsStorageCorrupt;
 
     private AppPreferencesManagerSingleton(Context context) {
         // Use application context to avoid leaking Activity/Service contexts
         Context appContext = context.getApplicationContext();
+        this.appContext = appContext;
         prefs = appContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
         portablePrefs = appContext.getSharedPreferences(PORTABLE_PREF_NAME, Context.MODE_PRIVATE);
         migratePortablePreferencesIfNeeded();
@@ -381,8 +388,10 @@ public class AppPreferencesManagerSingleton {
         if (cached == null) {
             synchronized (this) {
                 if (restrictedUrlsCache == null) {
-                    restrictedUrlsCache = immutableList(decodeStringList(
-                            portablePrefs.getString(KEY_RESTRICTED_URL_LIST, "")));
+                    DecodedStringList decoded = requireValidUrlRules(
+                            readStringList(KEY_RESTRICTED_URL_LIST, ""));
+                    restrictedUrlsCache = immutableList(decoded.values);
+                    restrictedUrlsStorageCorrupt = decoded.corrupt;
                 }
                 cached = restrictedUrlsCache;
             }
@@ -392,10 +401,14 @@ public class AppPreferencesManagerSingleton {
 
     public List<String> getRestrictedUrlsSnapshot() {
         getRestrictedUrls();
+        if (getIsBlockerActive() && restrictedUrlsStorageCorrupt) {
+            return Collections.singletonList(UrlPatternMatcher.FAIL_CLOSED_PATTERN);
+        }
         return restrictedUrlsCache;
     }
 
     public synchronized void setRestrictedUrls(List<String> urls) {
+        if (getIsBlockerActive() && restrictedUrlsStorageCorrupt) return;
         List<String> updated = sanitizeList(urls);
         if (getIsBlockerActive()) {
             for (String existing : getRestrictedUrls()) {
@@ -403,6 +416,7 @@ public class AppPreferencesManagerSingleton {
             }
         }
         restrictedUrlsCache = immutableList(updated);
+        restrictedUrlsStorageCorrupt = false;
         List<String> strict = getStrictRestrictedUrls();
         strict.removeIf(value -> !containsIgnoreCase(restrictedUrlsCache, value));
         strictUrlsCache = immutableList(strict);
@@ -416,8 +430,7 @@ public class AppPreferencesManagerSingleton {
 
     /** Hot-path matcher that does not allocate a defensive copy for each accessibility event. */
     public String findRestrictedUrlPattern(String url) {
-        getRestrictedUrls(); // Populate the volatile cache once.
-        for (String pattern : restrictedUrlsCache) {
+        for (String pattern : getRestrictedUrlsSnapshot()) {
             if (UrlPatternMatcher.matches(url, pattern)) return pattern;
         }
         return null;
@@ -433,6 +446,7 @@ public class AppPreferencesManagerSingleton {
     }
 
     public synchronized void addRestrictedUrl(String url, boolean strict) {
+        if (getIsBlockerActive() && restrictedUrlsStorageCorrupt) return;
         String clean = sanitizeItem(url);
         if (clean.isEmpty()) return;
         List<String> urls = getRestrictedUrls();
@@ -459,8 +473,10 @@ public class AppPreferencesManagerSingleton {
         if (cached == null) {
             synchronized (this) {
                 if (strictUrlsCache == null) {
-                    List<String> strict = decodeStringList(
-                            portablePrefs.getString(KEY_STRICT_URL_LIST, ""));
+                    DecodedStringList decoded = requireValidUrlRules(
+                            readStringList(KEY_STRICT_URL_LIST, ""));
+                    List<String> strict = decoded.values;
+                    strictUrlsStorageCorrupt = decoded.corrupt;
                     strict.removeIf(value -> !containsIgnoreCase(getRestrictedUrls(), value));
                     strictUrlsCache = immutableList(strict);
                 }
@@ -471,7 +487,14 @@ public class AppPreferencesManagerSingleton {
     }
 
     public List<String> getStrictRestrictedUrlsSnapshot() {
+        getRestrictedUrls();
         getStrictRestrictedUrls();
+        if (getIsBlockerActive()) {
+            if (restrictedUrlsStorageCorrupt) {
+                return Collections.singletonList(UrlPatternMatcher.FAIL_CLOSED_PATTERN);
+            }
+            if (strictUrlsStorageCorrupt) return restrictedUrlsCache;
+        }
         return strictUrlsCache;
     }
 
@@ -480,6 +503,7 @@ public class AppPreferencesManagerSingleton {
     }
 
     public synchronized void setRestrictedUrlStrict(String url, boolean strict) {
+        if (getIsBlockerActive() && strictUrlsStorageCorrupt) return;
         if (getIsBlockerActive() && !strict) return;
         String clean = sanitizeItem(url);
         if (!containsIgnoreCase(getRestrictedUrls(), clean)) return;
@@ -487,6 +511,7 @@ public class AppPreferencesManagerSingleton {
         strictUrls.removeIf(value -> value.equalsIgnoreCase(clean));
         if (strict) strictUrls.add(clean);
         strictUrlsCache = immutableList(strictUrls);
+        strictUrlsStorageCorrupt = false;
         portablePrefs.edit().putString(KEY_STRICT_URL_LIST,
                 new JSONArray(strictUrlsCache).toString()).apply();
     }
@@ -496,8 +521,10 @@ public class AppPreferencesManagerSingleton {
         if (cached == null) {
             synchronized (this) {
                 if (restrictedAppsCache == null) {
-                    restrictedAppsCache = immutableList(decodeStringList(portablePrefs.getString(
-                            KEY_RESTRICTED_APP_LIST, "com.google.android.youtube")));
+                    DecodedStringList decoded = requireValidAppRules(readStringList(
+                            KEY_RESTRICTED_APP_LIST, "com.google.android.youtube"));
+                    restrictedAppsCache = immutableList(decoded.values);
+                    restrictedAppsStorageCorrupt = decoded.corrupt;
                 }
                 cached = restrictedAppsCache;
             }
@@ -506,6 +533,7 @@ public class AppPreferencesManagerSingleton {
     }
 
     public synchronized void setRestrictedApps(List<String> apps) {
+        if (getIsBlockerActive() && restrictedAppsStorageCorrupt) return;
         List<String> updated = sanitizeList(apps);
         if (getIsBlockerActive()) {
             for (String existing : getRestrictedAppPackages()) {
@@ -513,6 +541,7 @@ public class AppPreferencesManagerSingleton {
             }
         }
         restrictedAppsCache = immutableList(updated);
+        restrictedAppsStorageCorrupt = false;
         List<String> strict = getStrictRestrictedAppPackages();
         strict.removeIf(value -> !restrictedAppsCache.contains(value));
         strictAppsCache = immutableList(strict);
@@ -527,6 +556,9 @@ public class AppPreferencesManagerSingleton {
     /** Allocation-free membership check for the accessibility-event hot path. */
     public boolean isRestrictedApp(String packageName) {
         getRestrictedAppPackages(); // Populate the volatile cache once.
+        if (getIsBlockerActive() && restrictedAppsStorageCorrupt) {
+            return !SafetyPolicy.isCriticalPackage(packageName, appContext.getPackageName());
+        }
         return restrictedAppsCache.contains(packageName);
     }
 
@@ -540,6 +572,7 @@ public class AppPreferencesManagerSingleton {
     }
 
     public synchronized void addRestrictedAppPackage(String appPackage, boolean strict) {
+        if (getIsBlockerActive() && restrictedAppsStorageCorrupt) return;
         String clean = sanitizeItem(appPackage);
         if (clean.isEmpty()) return;
         List<String> apps = getRestrictedAppPackages();
@@ -566,8 +599,10 @@ public class AppPreferencesManagerSingleton {
         if (cached == null) {
             synchronized (this) {
                 if (strictAppsCache == null) {
-                    List<String> strict = decodeStringList(
-                            portablePrefs.getString(KEY_STRICT_APP_LIST, ""));
+                    DecodedStringList decoded = requireValidAppRules(
+                            readStringList(KEY_STRICT_APP_LIST, ""));
+                    List<String> strict = decoded.values;
+                    strictAppsStorageCorrupt = decoded.corrupt;
                     strict.removeIf(value -> !getRestrictedAppPackages().contains(value));
                     strictAppsCache = immutableList(strict);
                 }
@@ -578,11 +613,17 @@ public class AppPreferencesManagerSingleton {
     }
 
     public boolean isStrictRestrictedApp(String packageName) {
+        getRestrictedAppPackages();
         getStrictRestrictedAppPackages();
+        if (getIsBlockerActive()
+                && (restrictedAppsStorageCorrupt || strictAppsStorageCorrupt)) {
+            return isRestrictedApp(packageName);
+        }
         return strictAppsCache.contains(packageName);
     }
 
     public synchronized void setRestrictedAppStrict(String packageName, boolean strict) {
+        if (getIsBlockerActive() && strictAppsStorageCorrupt) return;
         if (getIsBlockerActive() && !strict) return;
         String clean = sanitizeItem(packageName);
         if (!getRestrictedAppPackages().contains(clean)) return;
@@ -590,6 +631,7 @@ public class AppPreferencesManagerSingleton {
         strictApps.remove(clean);
         if (strict) strictApps.add(clean);
         strictAppsCache = immutableList(strictApps);
+        strictAppsStorageCorrupt = false;
         portablePrefs.edit().putString(KEY_STRICT_APP_LIST,
                 new JSONArray(strictAppsCache).toString()).apply();
     }
@@ -1036,6 +1078,8 @@ public class AppPreferencesManagerSingleton {
                 ? jsonArrayToList(data.optJSONArray("strictRestrictedApps") == null
                         ? new JSONArray() : data.getJSONArray("strictRestrictedApps"))
                 : new ArrayList<>();
+        validateImportedUrls(urls);
+        validateImportedApps(apps);
         strictUrls.removeIf(value -> !containsIgnoreCase(urls, value));
         strictApps.removeIf(value -> !apps.contains(value));
         int allowance = version >= 2
@@ -1078,22 +1122,111 @@ public class AppPreferencesManagerSingleton {
         restrictedAppsCache = immutableList(apps);
         strictUrlsCache = immutableList(strictUrls);
         strictAppsCache = immutableList(strictApps);
+        restrictedUrlsStorageCorrupt = false;
+        restrictedAppsStorageCorrupt = false;
+        strictUrlsStorageCorrupt = false;
+        strictAppsStorageCorrupt = false;
     }
 
-    private static List<String> decodeStringList(String raw) {
+    private void validateImportedUrls(List<String> urls) throws JSONException {
+        for (String url : urls) {
+            if (!UrlPatternMatcher.isValidPattern(url)) {
+                throw new JSONException("Invalid restricted URL rule: " + url);
+            }
+        }
+    }
+
+    private void validateImportedApps(List<String> apps) throws JSONException {
+        PackageManager packageManager = appContext.getPackageManager();
+        for (String appPackage : apps) {
+            if (SafetyPolicy.isCriticalPackage(appPackage, appContext.getPackageName())) {
+                throw new JSONException("Critical package cannot be restricted: " + appPackage);
+            }
+            try {
+                packageManager.getApplicationInfo(appPackage, 0);
+            } catch (PackageManager.NameNotFoundException missing) {
+                throw new JSONException("Restricted app is not installed: " + appPackage);
+            }
+        }
+    }
+
+    private DecodedStringList readStringList(String key, String defaultValue) {
+        try {
+            return decodeStringList(portablePrefs.getString(key, defaultValue));
+        } catch (ClassCastException corrupted) {
+            return DecodedStringList.corrupt();
+        }
+    }
+
+    private static DecodedStringList requireValidUrlRules(DecodedStringList decoded) {
+        if (decoded.corrupt) return decoded;
+        for (String value : decoded.values) {
+            if (!UrlPatternMatcher.isValidPattern(value)) return DecodedStringList.corrupt();
+        }
+        return decoded;
+    }
+
+    private static DecodedStringList requireValidAppRules(DecodedStringList decoded) {
+        if (decoded.corrupt) return decoded;
+        for (String value : decoded.values) {
+            if (!isPlausiblePackageName(value)) return DecodedStringList.corrupt();
+        }
+        return decoded;
+    }
+
+    private static boolean isPlausiblePackageName(String value) {
+        if (value == null || value.length() > 255 || value.startsWith(".")
+                || value.endsWith(".") || !value.contains(".")) return false;
+        boolean previousDot = false;
+        for (int i = 0; i < value.length(); i++) {
+            char character = value.charAt(i);
+            if (character == '.') {
+                if (previousDot) return false;
+                previousDot = true;
+            } else {
+                if (!Character.isLetterOrDigit(character) && character != '_') return false;
+                previousDot = false;
+            }
+        }
+        return true;
+    }
+
+    private static DecodedStringList decodeStringList(String raw) {
         List<String> result = new ArrayList<>();
-        if (raw == null || raw.trim().isEmpty()) return result;
+        if (raw == null || raw.trim().isEmpty()) return DecodedStringList.valid(result);
         try {
             if (raw.trim().startsWith("[")) {
-                JSONArray array = new JSONArray(raw);
+                String encoded = raw.trim();
+                JSONArray array = new JSONArray(encoded);
+                // Android's JSON parser accepts malformed forms such as [rule. Persisted
+                // lists are always written canonically, so any non-canonical array is unsafe.
+                if (!array.toString().equals(encoded)) return DecodedStringList.corrupt();
                 for (int i = 0; i < array.length(); i++) result.add(array.getString(i));
             } else {
                 for (String item : raw.split(",")) result.add(item); // Previous CSV format.
             }
-        } catch (JSONException ignored) {
-            // Corrupted configuration fails closed to an empty list instead of crashing.
+        } catch (JSONException | RuntimeException corrupted) {
+            return DecodedStringList.corrupt();
         }
-        return sanitizeList(result);
+        return DecodedStringList.valid(sanitizeList(result));
+    }
+
+    private static final class DecodedStringList {
+        final List<String> values;
+        final boolean corrupt;
+
+        private DecodedStringList(List<String> values, boolean corrupt) {
+            this.values = values;
+            this.corrupt = corrupt;
+        }
+
+        static DecodedStringList valid(List<String> values) {
+            return new DecodedStringList(values, false);
+        }
+
+        static DecodedStringList corrupt() {
+            return new DecodedStringList(new ArrayList<>(), true);
+        }
     }
 
     private static List<String> jsonArrayToList(JSONArray array) throws JSONException {

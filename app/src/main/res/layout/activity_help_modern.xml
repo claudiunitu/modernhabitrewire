@@ -43,6 +43,12 @@
                 </com.google.android.material.card.MaterialCardView>
                 <com.google.android.material.card.MaterialCardView style="@style/Widget.ModernHabit.Card" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" app:cardBackgroundColor="?attr/colorSurfaceVariant">
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="@dimen/spacing_sm">
+                        <com.google.android.material.button.MaterialButton android:id="@+id/helpGrayscaleButton" style="@style/Widget.Material3.Button.TextButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="start|center_vertical" android:text="@string/help_grayscale_title" />
+                        <TextView android:id="@+id/helpGrayscaleContent" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="@dimen/spacing_md" android:text="@string/help_grayscale_content" android:textAppearance="?attr/textAppearanceBodyMedium" android:visibility="gone" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+                <com.google.android.material.card.MaterialCardView style="@style/Widget.ModernHabit.Card" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" app:cardBackgroundColor="?attr/colorSurfaceVariant">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="@dimen/spacing_sm">
                         <com.google.android.material.button.MaterialButton android:id="@+id/helpPrivacyButton" style="@style/Widget.Material3.Button.TextButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="start|center_vertical" android:text="@string/help_privacy_title" />
                         <TextView android:id="@+id/helpPrivacyContent" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="@dimen/spacing_md" android:text="@string/help_privacy_content" android:textAppearance="?attr/textAppearanceBodyMedium" android:visibility="gone" />
                     </LinearLayout>

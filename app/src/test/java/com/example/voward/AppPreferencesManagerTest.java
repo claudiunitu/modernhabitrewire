@@ -3,6 +3,8 @@ package com.example.voward;
 import android.app.Application;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -12,6 +14,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
+import org.robolectric.Shadows;
 import org.robolectric.annotation.Config;
 
 import java.lang.reflect.Field;
@@ -38,6 +41,8 @@ public class AppPreferencesManagerTest {
     public void setUp() throws Exception {
         application = RuntimeEnvironment.getApplication();
         clearAllPreferences();
+        installPackage("app.one");
+        installPackage("legacy.app");
         resetSingleton();
         preferences = AppPreferencesManagerSingleton.getInstance(application);
     }
@@ -338,6 +343,85 @@ public class AppPreferencesManagerTest {
     }
 
     @Test
+    public void portableImportRejectsIneffectiveRulesWithoutChangingExistingState() throws Exception {
+        preferences.setRestrictedUrls(List.of("keep.example"));
+        preferences.setRestrictedApps(List.of());
+
+        JSONObject invalidUrl = preferences.exportPortableState()
+                .put("restrictedUrls", new JSONArray(List.of("not-a-domain")));
+        assertThrows(JSONException.class, () -> preferences.importPortableState(invalidUrl));
+        assertEquals(List.of("keep.example"), preferences.getRestrictedUrls());
+
+        JSONObject criticalApp = preferences.exportPortableState()
+                .put("restrictedApps", new JSONArray(List.of("com.android.settings")));
+        assertThrows(JSONException.class, () -> preferences.importPortableState(criticalApp));
+        assertEquals(List.of(), preferences.getRestrictedAppPackages());
+
+        JSONObject missingApp = preferences.exportPortableState()
+                .put("restrictedApps", new JSONArray(List.of("missing.app")));
+        assertThrows(JSONException.class, () -> preferences.importPortableState(missingApp));
+        assertEquals(List.of(), preferences.getRestrictedAppPackages());
+    }
+
+    @Test
+    public void corruptPrimaryRuleStorageFailsClosedWhileBlockerIsActive() throws Exception {
+        preferences.setRestrictedUrls(List.of("blocked.example"));
+        preferences.setRestrictedApps(List.of("app.one"));
+        preferences.setIsBlockerActive(true);
+        portable().edit()
+                .putString("restricted_url_list", "corrupt bytes")
+                .putString("restricted_app_list", "corrupt bytes")
+                .commit();
+        resetSingleton();
+        preferences = AppPreferencesManagerSingleton.getInstance(application);
+
+        assertTrue(preferences.isRestrictedApp("com.example.unlisted"));
+        assertTrue(preferences.isStrictRestrictedApp("com.example.unlisted"));
+        assertFalse(preferences.isRestrictedApp("com.android.settings"));
+        String failClosedPattern = preferences.findRestrictedUrlPattern(
+                "https://unlisted.example/page");
+        assertTrue(UrlPatternMatcher.matches(
+                "https://unlisted.example/page", failClosedPattern));
+
+        // Active-mode edits cannot silently replace the fail-safe state.
+        preferences.setRestrictedApps(List.of("app.one"));
+        preferences.setRestrictedUrls(List.of("blocked.example"));
+        assertTrue(preferences.isRestrictedApp("com.example.unlisted"));
+
+        // Once legitimately deactivated, saving valid rules repairs the storage.
+        preferences.setIsBlockerActive(false);
+        preferences.setRestrictedApps(List.of("app.one"));
+        preferences.setRestrictedUrls(List.of("blocked.example"));
+        assertFalse(preferences.isRestrictedApp("com.example.unlisted"));
+        assertEquals(null, preferences.findRestrictedUrlPattern(
+                "https://unlisted.example/page"));
+    }
+
+    @Test
+    public void corruptStrictRuleStorageMakesSurvivingRulesStrict() throws Exception {
+        preferences.setRestrictedUrls(List.of("blocked.example"));
+        preferences.setRestrictedApps(List.of("app.one"));
+        preferences.setIsBlockerActive(true);
+        portable().edit()
+                .putString("strict_restricted_url_list", "[bad")
+                .putString("strict_restricted_app_list", "[bad")
+                .commit();
+        resetSingleton();
+        preferences = AppPreferencesManagerSingleton.getInstance(application);
+
+        assertTrue(preferences.isStrictRestrictedApp("app.one"));
+        assertFalse(preferences.isRestrictedApp("com.example.unlisted"));
+        assertEquals(List.of("blocked.example"),
+                preferences.getStrictRestrictedUrlsSnapshot());
+        BrowserUrlEnforcementPolicy.RuleMatch match =
+                BrowserUrlEnforcementPolicy.findCommittedRestrictedMatch(
+                        "blocked.example", "blocked.example", false,
+                        preferences.getStrictRestrictedUrlsSnapshot(),
+                        preferences.getRestrictedUrlsSnapshot());
+        assertTrue(match != null && match.strict);
+    }
+
+    @Test
     public void pendingDeactivationIsLocalPersistentAndClearedByActivation() throws Exception {
         DeactivationPolicyEngine.Request request = new DeactivationPolicyEngine.Request(
                 "request-id", 1000, 2000, 3, 6000, 1000);
@@ -395,6 +479,10 @@ public class AppPreferencesManagerTest {
         return application.getSharedPreferences("global_preferences", Context.MODE_PRIVATE);
     }
 
+    private SharedPreferences portable() {
+        return application.getSharedPreferences("portable_preferences", Context.MODE_PRIVATE);
+    }
+
     private void clearAllPreferences() {
         application.getSharedPreferences("global_preferences", Context.MODE_PRIVATE)
                 .edit().clear().commit();
@@ -402,6 +490,14 @@ public class AppPreferencesManagerTest {
                 .edit().clear().commit();
         application.getSharedPreferences("display_recovery_state", Context.MODE_PRIVATE)
                 .edit().clear().commit();
+    }
+
+    private void installPackage(String packageName) {
+        PackageInfo packageInfo = new PackageInfo();
+        packageInfo.packageName = packageName;
+        packageInfo.applicationInfo = new ApplicationInfo();
+        packageInfo.applicationInfo.packageName = packageName;
+        Shadows.shadowOf(application.getPackageManager()).installPackage(packageInfo);
     }
 
     private static void resetSingleton() throws Exception {

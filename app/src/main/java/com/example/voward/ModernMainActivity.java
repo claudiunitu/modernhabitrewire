@@ -10,6 +10,8 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.text.Editable;
@@ -64,6 +66,15 @@ public class ModernMainActivity extends AppCompatActivity {
     private final DeactivationPolicyEngine deactivationEngine = new DeactivationPolicyEngine();
     private DeactivationPolicyEngine.State deactivationNoticeState;
     private boolean timeReceiverRegistered;
+    private boolean activityStarted;
+    private static final long DEACTIVATION_UI_BOUNDARY_SLOP_MS = 50;
+    private static final long DEACTIVATION_UI_MAX_DELAY_MS = 4L * 24 * 60 * 60 * 1000;
+    private final Handler deactivationUiHandler = new Handler(Looper.getMainLooper());
+    private final Runnable deactivationUiRefresh = () -> {
+        if (activityStarted && preferences != null && !isFinishing() && !isDestroyed()) {
+            refreshRecovery(preferences.getIsBlockerActive());
+        }
+    };
     private static final int[] COOLDOWN_MINUTES = {0, 1, 360, 720, 1440, 2880, 4320};
     private static final int[] WINDOW_HOURS = {1, 2, 3, 6, 12, 24};
     private final BroadcastReceiver timeChangedReceiver = new BroadcastReceiver() {
@@ -522,6 +533,7 @@ public class ModernMainActivity extends AppCompatActivity {
     }
 
     private void refreshRecovery(boolean active) {
+        deactivationUiHandler.removeCallbacks(deactivationUiRefresh);
         boolean hasKey = !preferences.getDeactivationKey().isEmpty();
         findViewById(R.id.deactivationKeySetterInputLayout).setVisibility(
                 !active && !hasKey ? View.VISIBLE : View.GONE);
@@ -553,6 +565,7 @@ public class ModernMainActivity extends AppCompatActivity {
                 keyInput.setVisibility(View.GONE);
                 action.setVisibility(View.GONE);
                 cancel.setVisibility(View.VISIBLE);
+                scheduleDeactivationUiRefresh(evaluation.remainingMs);
             } else if (evaluation.state == DeactivationPolicyEngine.State.WINDOW_OPEN) {
                 status.setText(getString(R.string.deactivation_window_open,
                         formatApproximateDuration(evaluation.remainingMs)));
@@ -560,6 +573,7 @@ public class ModernMainActivity extends AppCompatActivity {
                 action.setVisibility(View.VISIBLE);
                 action.setText(R.string.deactivate_now);
                 cancel.setVisibility(View.VISIBLE);
+                scheduleDeactivationUiRefresh(evaluation.remainingMs);
             } else {
                 DeactivationPolicyEngine.State notice = deactivationNoticeState != null
                         ? deactivationNoticeState : preferences.getDeactivationTerminalState();
@@ -574,6 +588,14 @@ public class ModernMainActivity extends AppCompatActivity {
             }
         }
         refreshKeyButton();
+    }
+
+    /** Refresh once at the next state boundary; no periodic polling or background wakeups. */
+    private void scheduleDeactivationUiRefresh(long remainingMs) {
+        if (!activityStarted || remainingMs <= 0) return;
+        long boundedDelay = Math.min(remainingMs, DEACTIVATION_UI_MAX_DELAY_MS);
+        deactivationUiHandler.postDelayed(deactivationUiRefresh,
+                boundedDelay + DEACTIVATION_UI_BOUNDARY_SLOP_MS);
     }
 
     private void refreshKeyButton() {
@@ -901,6 +923,7 @@ public class ModernMainActivity extends AppCompatActivity {
 
     @Override protected void onStart() {
         super.onStart();
+        activityStarted = true;
         if (!timeReceiverRegistered) {
             registerReceiver(timeChangedReceiver, new IntentFilter(Intent.ACTION_TIME_CHANGED));
             timeReceiverRegistered = true;
@@ -908,6 +931,8 @@ public class ModernMainActivity extends AppCompatActivity {
     }
 
     @Override protected void onStop() {
+        activityStarted = false;
+        deactivationUiHandler.removeCallbacks(deactivationUiRefresh);
         if (timeReceiverRegistered) {
             unregisterReceiver(timeChangedReceiver);
             timeReceiverRegistered = false;
@@ -916,6 +941,7 @@ public class ModernMainActivity extends AppCompatActivity {
     }
 
     @Override protected void onDestroy() {
+        deactivationUiHandler.removeCallbacks(deactivationUiRefresh);
         ioExecutor.shutdownNow();
         super.onDestroy();
     }

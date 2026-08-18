@@ -44,10 +44,14 @@ public class AttentionFirewallService extends AccessibilityService {
     private AppPreferencesManagerSingleton appPreferencesManager;
     private AttentionBudgetEngine attentionBudgetEngine;
     private GrayscaleController grayscaleController;
+    private static final long DEACTIVATION_VALIDATION_INTERVAL_MS = 60_000;
+    private final MonotonicThrottle deactivationValidationThrottle =
+            new MonotonicThrottle(DEACTIVATION_VALIDATION_INTERVAL_MS);
     private boolean timeChangeReceiverRegistered;
     private final BroadcastReceiver timeChangeReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
             if (appPreferencesManager != null) {
+                deactivationValidationThrottle.recordForcedRun(SystemClock.elapsedRealtime());
                 DeactivationRequestValidator.validate(context, appPreferencesManager);
             }
         }
@@ -348,6 +352,8 @@ public class AttentionFirewallService extends AccessibilityService {
         super.onServiceConnected();
         instance = this;
         appPreferencesManager = AppPreferencesManagerSingleton.getInstance(this);
+        deactivationValidationThrottle.recordForcedRun(SystemClock.elapsedRealtime());
+        DeactivationRequestValidator.validate(this, appPreferencesManager);
         registerReceiver(timeChangeReceiver, new IntentFilter(Intent.ACTION_TIME_CHANGED));
         timeChangeReceiverRegistered = true;
         // CRITICAL-01: Clear any stale temp-allow flag that survived a process death so a
@@ -480,11 +486,13 @@ public class AttentionFirewallService extends AccessibilityService {
         // Guard: managers are initialised in onServiceConnected; ignore any events
         // that arrive before that callback completes.
         if (appPreferencesManager == null || attentionBudgetEngine == null) return;
-        DeactivationRequestValidator.validate(this, appPreferencesManager);
+        long eventTime = SystemClock.elapsedRealtime();
+        if (deactivationValidationThrottle.acquire(eventTime)) {
+            DeactivationRequestValidator.validate(this, appPreferencesManager);
+        }
         if (event.getPackageName() == null) return;
         String packageName = event.getPackageName().toString();
         int eventType = event.getEventType();
-        long eventTime = SystemClock.elapsedRealtime();
 
         if (packageName.equals(getPackageName())) {
             boolean activeNow = appPreferencesManager.getIsBlockerActive();
@@ -613,7 +621,8 @@ public class AttentionFirewallService extends AccessibilityService {
             // Small delay so the window is fully rendered before touching the URL bar.
             urlCheckHandler.postDelayed(() -> {
                 String observed = lastObservedUrls.get(config.packageName);
-                if (observed != null) {
+                if (observed != null
+                        && !BrowserSupport.isConfiguredSafeAddress(config, observed)) {
                     boolean stillRestricted = false;
                     stillRestricted = appPreferencesManager.findRestrictedUrlPattern(observed) != null;
                     if (stillRestricted) beginBrowserRedirect(config);

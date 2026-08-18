@@ -22,12 +22,15 @@ public class UrlPatternMatcherTest {
         assertFalse(UrlPatternMatcher.isValidPattern("shorts"));
         assertFalse(UrlPatternMatcher.isValidPattern("https://"));
         assertFalse(UrlPatternMatcher.isValidPattern("exa mple.com"));
+        assertFalse(UrlPatternMatcher.isValidPattern("example.com:not-a-port"));
     }
 
     @Test
     public void domainMatchingIsCaseInsensitiveAndHonorsLabelBoundaries() {
         assertTrue(UrlPatternMatcher.matches(" HTTPS://WWW.Example.COM/ ", "example.com"));
         assertTrue(UrlPatternMatcher.matches("https://deep.sub.example.com", "www.example.com"));
+        assertTrue(UrlPatternMatcher.matches("https://example.com./news", "example.com"));
+        assertTrue(UrlPatternMatcher.matches("https://bücher.example/", "xn--bcher-kva.example"));
         assertFalse(UrlPatternMatcher.matches("https://notexample.com", "example.com"));
         assertFalse(UrlPatternMatcher.matches("https://example.com.evil.test", "example.com"));
         assertFalse(UrlPatternMatcher.matches("https://safe.test/?next=example.com", "example.com"));

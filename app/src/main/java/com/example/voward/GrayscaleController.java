@@ -14,7 +14,7 @@ import android.util.Log;
  * including other apps — without requiring a screen capture or overlay.
  *
  * Requires WRITE_SECURE_SETTINGS, which must be granted once via ADB:
- *   adb shell pm grant com.example.modernhabitrewire android.permission.WRITE_SECURE_SETTINGS
+ *   adb shell pm grant com.example.voward android.permission.WRITE_SECURE_SETTINGS
  */
 public class GrayscaleController {
 

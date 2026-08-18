@@ -6,7 +6,7 @@
     <!-- Hosts the offline browser block page on the device loopback interface only. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Grayscale mode: must be granted once via ADB:
-         adb shell pm grant com.example.modernhabitrewire android.permission.WRITE_SECURE_SETTINGS -->
+         adb shell pm grant com.example.voward android.permission.WRITE_SECURE_SETTINGS -->
     <!-- Optional developer/device-owner feature; normal installs run without grayscale. -->
     <uses-permission
         android:name="android.permission.WRITE_SECURE_SETTINGS"
