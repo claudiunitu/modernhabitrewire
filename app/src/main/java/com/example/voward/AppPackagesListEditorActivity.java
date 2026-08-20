@@ -1,7 +1,6 @@
 package com.example.voward;
 
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
@@ -27,6 +26,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.checkbox.MaterialCheckBox;
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.textfield.TextInputLayout;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -61,6 +61,7 @@ public class AppPackagesListEditorActivity extends AppCompatActivity {
         appPreferencesManagerSingleton = AppPreferencesManagerSingleton.getInstance(this);
 
         TextInputEditText packageNameEditText = findViewById(R.id.packageNameEditText);
+        TextInputLayout packageNameInput = findViewById(R.id.packageNameInput);
         Button addButton = findViewById(R.id.addButton);
         Button chooseButton = findViewById(R.id.chooseInstalledAppButton);
         newStrictRuleCheckbox = findViewById(R.id.newStrictRuleCheckbox);
@@ -82,6 +83,11 @@ public class AppPackagesListEditorActivity extends AppCompatActivity {
             String newAppPackage = packageNameEditText.getText() != null
                     ? packageNameEditText.getText().toString().trim() : "";
             if (!newAppPackage.isEmpty()) {
+                packageNameInput.setError(null);
+                if (!AppPreferencesManagerSingleton.isPlausiblePackageName(newAppPackage)) {
+                    packageNameInput.setError(getString(R.string.invalid_app_package_name));
+                    return;
+                }
                 if (addValidatedPackage(newAppPackage,
                         newStrictRuleCheckbox != null && newStrictRuleCheckbox.isChecked())) {
                     packageNameEditText.setText("");
@@ -112,12 +118,7 @@ public class AppPackagesListEditorActivity extends AppCompatActivity {
             Toast.makeText(this, R.string.critical_app_cannot_be_blocked, Toast.LENGTH_LONG).show();
             return false;
         }
-        try {
-            getPackageManager().getApplicationInfo(packageName, 0);
-        } catch (PackageManager.NameNotFoundException e) {
-            Toast.makeText(this, R.string.package_not_installed, Toast.LENGTH_LONG).show();
-            return false;
-        }
+        if (!AppPreferencesManagerSingleton.isPlausiblePackageName(packageName)) return false;
         appPreferencesManagerSingleton.addRestrictedAppPackage(packageName, strict);
         if (newStrictRuleCheckbox != null) newStrictRuleCheckbox.setChecked(false);
         refreshList();

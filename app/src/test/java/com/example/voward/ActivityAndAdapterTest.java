@@ -116,6 +116,21 @@ public class ActivityAndAdapterTest {
     }
 
     @Test
+    public void appEditorAllowsPackageThatIsNotInstalled() {
+        ActivityController<AppPackagesListEditorActivity> controller =
+                Robolectric.buildActivity(AppPackagesListEditorActivity.class).setup();
+        AppPackagesListEditorActivity activity = controller.get();
+        EditText input = activity.findViewById(R.id.packageNameEditText);
+
+        input.setText("com.example.futureapp");
+        activity.findViewById(R.id.addButton).performClick();
+
+        assertEquals(List.of("com.example.futureapp"), preferences.getRestrictedAppPackages());
+        assertEquals("", input.getText().toString());
+        controller.destroy();
+    }
+
+    @Test
     public void activeProtectionAllowsRegularRuleToBecomeStrictButNotRelaxAgain() {
         preferences.setRestrictedUrls(List.of("example.com"));
         preferences.setIsBlockerActive(true);

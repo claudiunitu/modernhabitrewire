@@ -359,8 +359,13 @@ public class AppPreferencesManagerTest {
 
         JSONObject missingApp = preferences.exportPortableState()
                 .put("restrictedApps", new JSONArray(List.of("missing.app")));
-        assertThrows(JSONException.class, () -> preferences.importPortableState(missingApp));
-        assertEquals(List.of(), preferences.getRestrictedAppPackages());
+        preferences.importPortableState(missingApp);
+        assertEquals(List.of("missing.app"), preferences.getRestrictedAppPackages());
+
+        JSONObject malformedApp = preferences.exportPortableState()
+                .put("restrictedApps", new JSONArray(List.of("not a package")));
+        assertThrows(JSONException.class, () -> preferences.importPortableState(malformedApp));
+        assertEquals(List.of("missing.app"), preferences.getRestrictedAppPackages());
     }
 
     @Test

@@ -105,7 +105,7 @@
         <string name="choose_installed_app">Choose an installed app</string>
         <string name="search_apps">Search apps</string>
         <string name="critical_app_cannot_be_blocked">This app is required for emergency access or device recovery and cannot be restricted.</string>
-        <string name="package_not_installed">That package is not an installed app visible to this device.</string>
+        <string name="invalid_app_package_name">Enter a valid Android package identifier, such as com.example.app.</string>
         <string name="progress_summary_template">Today: %1$s remaining · sessions: %2$d\nEnded early: %3$d · limits reached: %4$d\n%5$s</string>
         <string name="grayscale_available">Grayscale reminder available</string>
         <string name="grayscale_unavailable">Grayscale unavailable (optional ADB grant not present)</string>
@@ -281,7 +281,7 @@
         <string name="pause_countdown_description">Intentional pause countdown</string>
         <string name="apps_empty_state">No protected apps yet. Choose installed apps by name to add the intentional-use gate.</string>
         <string name="sites_empty_state">No protected websites yet. Add a domain, path, or explicit keyword rule.</string>
-        <string name="package_name_advanced_helper">Advanced: enter an installed Android package identifier.</string>
+        <string name="package_name_advanced_helper">Advanced: enter an Android package identifier, even if the app is not installed yet.</string>
         <string name="add_package_name">Add package name</string>
         <string name="url_rule_domain">Domain and subdomains</string>
         <string name="url_rule_path">Specific path and subtree</string>

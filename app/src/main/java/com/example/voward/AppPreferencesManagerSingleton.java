@@ -2,7 +2,6 @@ package com.example.voward;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -1137,15 +1136,12 @@ public class AppPreferencesManagerSingleton {
     }
 
     private void validateImportedApps(List<String> apps) throws JSONException {
-        PackageManager packageManager = appContext.getPackageManager();
         for (String appPackage : apps) {
+            if (!isPlausiblePackageName(appPackage)) {
+                throw new JSONException("Invalid restricted app package: " + appPackage);
+            }
             if (SafetyPolicy.isCriticalPackage(appPackage, appContext.getPackageName())) {
                 throw new JSONException("Critical package cannot be restricted: " + appPackage);
-            }
-            try {
-                packageManager.getApplicationInfo(appPackage, 0);
-            } catch (PackageManager.NameNotFoundException missing) {
-                throw new JSONException("Restricted app is not installed: " + appPackage);
             }
         }
     }
@@ -1174,7 +1170,7 @@ public class AppPreferencesManagerSingleton {
         return decoded;
     }
 
-    private static boolean isPlausiblePackageName(String value) {
+    static boolean isPlausiblePackageName(String value) {
         if (value == null || value.length() > 255 || value.startsWith(".")
                 || value.endsWith(".") || !value.contains(".")) return false;
         boolean previousDot = false;
