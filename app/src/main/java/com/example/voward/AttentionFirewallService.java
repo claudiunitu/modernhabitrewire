@@ -12,6 +12,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -28,6 +29,7 @@ import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -171,13 +173,60 @@ public class AttentionFirewallService extends AccessibilityService {
         }
     };
 
-    // Uninstall guard navigation is isolated from browser callbacks so one feature can
-    // never cancel the other's pending work.
-    private final Handler uninstallGuardHandler = new Handler(Looper.getMainLooper());
-    private Runnable pendingGuardHomeAction;
     private long lastUninstallGuardActionAt = 0;
     private static final long UNINSTALL_GUARD_COOLDOWN_MS = 900;
-    private static final long UNINSTALL_GUARD_HOME_DELAY_MS = 180;
+    private UninstallGuardPolicy.GuardTarget suppressedGuardTarget =
+            UninstallGuardPolicy.GuardTarget.NONE;
+    private long suppressedGuardTargetUntil;
+    private static final long GUARD_BACK_TRANSITION_GRACE_MS = 2500;
+    private final Handler guardWatchdogHandler = new Handler(Looper.getMainLooper());
+    private boolean guardWatchdogRunning;
+    private String guardWatchdogPackage;
+    private long guardWatchdogRootMismatchSince;
+    private static final long GUARD_WATCHDOG_INTERVAL_MS = 400;
+    private static final long GUARD_WATCHDOG_TRANSIENT_GRACE_MS = 2000;
+    private final Runnable guardWatchdog = new Runnable() {
+        @Override public void run() {
+            if (!guardWatchdogRunning
+                    || appPreferencesManager == null
+                    || !appPreferencesManager.getIsBlockerActive()
+                    || guardWatchdogPackage == null) {
+                stopGuardWatchdog();
+                return;
+            }
+
+            String activeRootPackage = getActiveRootPackageName();
+            if (!guardWatchdogPackage.equals(activeRootPackage)) {
+                long now = SystemClock.elapsedRealtime();
+                if (guardWatchdogRootMismatchSince == 0) {
+                    guardWatchdogRootMismatchSince = now;
+                }
+                if ((activeRootPackage != null
+                        && !isTransientSystemOverlay(activeRootPackage))
+                        || now - guardWatchdogRootMismatchSince
+                        >= GUARD_WATCHDOG_TRANSIENT_GRACE_MS) {
+                    stopGuardWatchdog();
+                    return;
+                }
+                guardWatchdogHandler.postDelayed(this, GUARD_WATCHDOG_INTERVAL_MS);
+                return;
+            }
+            guardWatchdogRootMismatchSince = 0;
+
+            UninstallGuardPolicy.GuardTarget guardTarget = classifyGuardScreen(
+                    guardWatchdogPackage, lastWindowId);
+            if (guardTarget == UninstallGuardPolicy.GuardTarget.NONE) {
+                clearGuardBackSuppression();
+            }
+            if (UninstallGuardPolicy.shouldBlock(
+                    guardTarget, appPreferencesManager.isUninstallGuardEnabled())) {
+                blockGuardedSystemScreen(guardTarget);
+            }
+            if (guardWatchdogRunning) {
+                guardWatchdogHandler.postDelayed(this, GUARD_WATCHDOG_INTERVAL_MS);
+            }
+        }
+    };
 
     // Pending browser URL clear: set when the gate is cancelled for a browser interception.
     // Fired the next time that browser package comes to the foreground, rather than on a
@@ -375,7 +424,8 @@ public class AttentionFirewallService extends AccessibilityService {
 
         AccessibilityServiceInfo info = new AccessibilityServiceInfo();
         info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED |
-                         AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED;
+                         AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED |
+                         AccessibilityEvent.TYPE_VIEW_CLICKED;
         info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC;
         info.flags = AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS | AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
         info.notificationTimeout = 100; // Coalesce bursts of scroll/content-change events.
@@ -495,6 +545,7 @@ public class AttentionFirewallService extends AccessibilityService {
         int eventType = event.getEventType();
 
         if (packageName.equals(getPackageName())) {
+            stopGuardWatchdog();
             boolean activeNow = appPreferencesManager.getIsBlockerActive();
             if (lastNotifiedActive == null || activeNow != lastNotifiedActive
                     || eventTime - lastNotificationUpdateTime >= NOTIFICATION_THROTTLE_MS) {
@@ -504,16 +555,22 @@ public class AttentionFirewallService extends AccessibilityService {
             return;
         }
 
-        if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && event.getClassName() != null) {
+        boolean guardHost = UninstallGuardPolicy.isGuardHostPackage(packageName);
+        if (guardHost
+                && eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                && event.getClassName() != null) {
             lastWindowClassName = event.getClassName().toString();
             lastWindowPackageName = packageName;
             lastWindowId = event.getWindowId();
         }
 
-        if (appPreferencesManager.getIsBlockerActive()
-                && UninstallGuardPolicy.isGuardHostPackage(packageName)) {
+        if (appPreferencesManager.getIsBlockerActive() && guardHost) {
+            startGuardWatchdog(packageName);
             UninstallGuardPolicy.GuardTarget guardTarget = classifyGuardScreen(
                     packageName, event.getWindowId());
+            if (guardTarget == UninstallGuardPolicy.GuardTarget.NONE) {
+                clearGuardBackSuppression();
+            }
             if (UninstallGuardPolicy.shouldBlock(
                     guardTarget, appPreferencesManager.isUninstallGuardEnabled())) {
                 blockGuardedSystemScreen(guardTarget);
@@ -522,6 +579,7 @@ public class AttentionFirewallService extends AccessibilityService {
         }
 
         if (!appPreferencesManager.getIsBlockerActive()) {
+            stopGuardWatchdog();
             return;
         }
 
@@ -1360,7 +1418,17 @@ public class AttentionFirewallService extends AccessibilityService {
         boolean deviceAdminControlVisible;
         boolean targetAccessibilityToggleVisible;
         boolean checkableControlVisible;
-        int actionButtonCount;
+        int targetBottom = -1;
+        final List<Integer> actionButtonTopPositions = new ArrayList<>();
+
+        int actionButtonsBelowTarget() {
+            if (targetBottom < 0) return 0;
+            int count = 0;
+            for (int top : actionButtonTopPositions) {
+                if (top >= targetBottom) count++;
+            }
+            return count;
+        }
     }
 
     private UninstallGuardPolicy.GuardTarget classifyGuardScreen(
@@ -1391,8 +1459,7 @@ public class AttentionFirewallService extends AccessibilityService {
             List<String> targetIdentifiers = Arrays.asList(
                     getPackageName().toLowerCase(Locale.ROOT),
                     getString(R.string.app_name).toLowerCase(Locale.ROOT),
-                    getString(R.string.accessibility_service_label).toLowerCase(Locale.ROOT),
-                    "attention firewall service"
+                    getString(R.string.accessibility_service_label).toLowerCase(Locale.ROOT)
             );
             String accessibilityServiceLabel = getString(R.string.accessibility_service_label)
                     .toLowerCase(Locale.ROOT);
@@ -1407,7 +1474,7 @@ public class AttentionFirewallService extends AccessibilityService {
                             scan.deviceAdminControlVisible,
                             scan.targetAccessibilityToggleVisible
                                     && scan.checkableControlVisible,
-                            scan.actionButtonCount >= 2));
+                            scan.actionButtonsBelowTarget() >= 2));
         } finally {
             root.recycle();
         }
@@ -1435,18 +1502,16 @@ public class AttentionFirewallService extends AccessibilityService {
         for (String identifier : targetIdentifiers) {
             if (!identifier.isEmpty() && combined.contains(identifier)) {
                 scan.targetVisible = true;
+                Rect bounds = new Rect();
+                node.getBoundsInScreen(bounds);
+                if (!bounds.isEmpty()) scan.targetBottom = Math.max(scan.targetBottom, bounds.bottom);
                 break;
             }
         }
 
         String normalizedViewId = viewId.toLowerCase(Locale.ROOT);
-        if (!accessibilityServiceLabel.isEmpty()
-                && combined.contains(accessibilityServiceLabel)
-                && (normalizedViewId.contains("switch_text")
-                || normalizedViewId.contains("switch_widget")
-                || normalizedViewId.contains("service_switch")
-                || normalizedViewId.contains("toggle_service")
-                || combined.contains("use " + accessibilityServiceLabel))) {
+        if (UninstallGuardPolicy.isTargetAccessibilityControl(
+                combined, normalizedViewId, accessibilityServiceLabel)) {
             // Android 14 hosts this page in a generic SubSettings activity. The
             // service-specific "Use Voward protection service" switch label is the
             // narrow evidence that distinguishes it from the general Accessibility
@@ -1454,10 +1519,10 @@ public class AttentionFirewallService extends AccessibilityService {
             scan.targetAccessibilityToggleVisible = true;
         }
 
-        if (UninstallGuardPolicy.isAppControlSignal(combined)) {
+        if (UninstallGuardPolicy.isAppControlSignal(combined, normalizedViewId)) {
             scan.appControlVisible = true;
         }
-        if (UninstallGuardPolicy.isDeviceAdminSignal(combined)) {
+        if (UninstallGuardPolicy.isDeviceAdminSignal(combined, normalizedViewId)) {
             scan.deviceAdminControlVisible = true;
         }
         CharSequence className = node.getClassName();
@@ -1480,7 +1545,9 @@ public class AttentionFirewallService extends AccessibilityService {
                 || normalizedViewId.endsWith(":id/button2")
                 || normalizedViewId.endsWith(":id/button3");
         if (!node.isCheckable() && (semanticButton || genericActionButtonId)) {
-            scan.actionButtonCount++;
+            Rect bounds = new Rect();
+            node.getBoundsInScreen(bounds);
+            if (!bounds.isEmpty()) scan.actionButtonTopPositions.add(bounds.top);
         }
 
         for (int i = 0; i < node.getChildCount(); i++) {
@@ -1497,32 +1564,58 @@ public class AttentionFirewallService extends AccessibilityService {
 
     private void blockGuardedSystemScreen(UninstallGuardPolicy.GuardTarget guardTarget) {
         long now = SystemClock.elapsedRealtime();
+        if (guardTarget == suppressedGuardTarget && now < suppressedGuardTargetUntil) return;
         if (now - lastUninstallGuardActionAt < UNINSTALL_GUARD_COOLDOWN_MS) return;
         lastUninstallGuardActionAt = now;
 
         Log.i(TAG, "Blocked guarded system screen: " + guardTarget);
         Toast.makeText(this, R.string.uninstall_guard_blocked_message, Toast.LENGTH_LONG).show();
 
-        if (pendingGuardHomeAction != null) {
-            uninstallGuardHandler.removeCallbacks(pendingGuardHomeAction);
-        }
-
         boolean backedOut = performGlobalAction(GLOBAL_ACTION_BACK);
-        pendingGuardHomeAction = () -> {
-            pendingGuardHomeAction = null;
-            if (appPreferencesManager != null
-                    && appPreferencesManager.getIsBlockerActive()
-                    && UninstallGuardPolicy.shouldBlock(
-                            guardTarget, appPreferencesManager.isUninstallGuardEnabled())) {
-                performGlobalAction(GLOBAL_ACTION_HOME);
-            }
-        };
+        // A successful BACK request is the least disruptive escape from a guarded
+        // detail screen. A delayed HOME fallback used to reclassify stale activity
+        // metadata and could eject the user even after BACK had reached a safe parent
+        // page (notably the main Accessibility dashboard). If Settings ignores BACK,
+        // subsequent accessibility events will retry after the short guard cooldown.
         if (backedOut) {
-            uninstallGuardHandler.postDelayed(
-                    pendingGuardHomeAction, UNINSTALL_GUARD_HOME_DELAY_MS);
+            suppressedGuardTarget = guardTarget;
+            suppressedGuardTargetUntil = now + GUARD_BACK_TRANSITION_GRACE_MS;
         } else {
-            pendingGuardHomeAction.run();
+            clearGuardBackSuppression();
+            performGlobalAction(GLOBAL_ACTION_HOME);
         }
+    }
+
+    private void startGuardWatchdog(String packageName) {
+        guardWatchdogPackage = packageName;
+        guardWatchdogRootMismatchSince = 0;
+        if (guardWatchdogRunning) return;
+        guardWatchdogRunning = true;
+        guardWatchdogHandler.postDelayed(guardWatchdog, GUARD_WATCHDOG_INTERVAL_MS);
+    }
+
+    private String getActiveRootPackageName() {
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        if (root == null) return null;
+        try {
+            CharSequence packageName = root.getPackageName();
+            return packageName == null ? null : packageName.toString();
+        } finally {
+            root.recycle();
+        }
+    }
+
+    private void stopGuardWatchdog() {
+        guardWatchdogRunning = false;
+        guardWatchdogPackage = null;
+        guardWatchdogRootMismatchSince = 0;
+        guardWatchdogHandler.removeCallbacks(guardWatchdog);
+        clearGuardBackSuppression();
+    }
+
+    private void clearGuardBackSuppression() {
+        suppressedGuardTarget = UninstallGuardPolicy.GuardTarget.NONE;
+        suppressedGuardTargetUntil = 0;
     }
 
     private AccessibilityNodeInfo findUrlBarByContentDescription(AccessibilityNodeInfo root) {
@@ -1560,10 +1653,13 @@ public class AttentionFirewallService extends AccessibilityService {
         }
         notificationHandler.removeCallbacksAndMessages(null);
         urlCheckHandler.removeCallbacksAndMessages(null);
-        uninstallGuardHandler.removeCallbacksAndMessages(null);
+        guardWatchdogHandler.removeCallbacksAndMessages(null);
         forcedEvictionHandler.removeCallbacksAndMessages(null);
         forcedEvictionPackage = null;
-        pendingGuardHomeAction = null;
+        guardWatchdogRunning = false;
+        guardWatchdogPackage = null;
+        guardWatchdogRootMismatchSince = 0;
+        clearGuardBackSuppression();
         pendingUrlChecks.clear();
         browserRedirectAttempts.clear();
         supportedBrowserByPackage.clear();

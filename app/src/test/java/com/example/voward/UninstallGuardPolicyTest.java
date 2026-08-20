@@ -66,6 +66,12 @@ public class UninstallGuardPolicyTest {
                 UninstallGuardPolicy.GuardTarget.NONE,
                 UninstallGuardPolicy.classify(
                         "com.android.settings",
+                        "com.android.settings.Settings$DeviceAdminSettingsActivity",
+                        TARGET_ONLY));
+        assertEquals(
+                UninstallGuardPolicy.GuardTarget.NONE,
+                UninstallGuardPolicy.classify(
+                        "com.android.settings",
                         "com.android.settings.accessibility.ToggleAccessibilityServicePreferenceFragment",
                         new UninstallGuardPolicy.ScreenEvidence(false, false, false, true, false)));
     }
@@ -117,6 +123,41 @@ public class UninstallGuardPolicyTest {
         assertTrue(UninstallGuardPolicy.isAppControlSignal("Stergeti datele"));
         assertTrue(UninstallGuardPolicy.isDeviceAdminSignal(
                 "Dezactivați administratorul dispozitivului"));
+    }
+
+    @Test
+    public void mainAccessibilityDashboardSwitchIsNotServiceDetailEvidence() {
+        String label = "voward protection service";
+
+        assertFalse(UninstallGuardPolicy.isTargetAccessibilityControl(
+                label,
+                "com.android.settings:id/switch_widget",
+                label));
+        assertFalse(UninstallGuardPolicy.isTargetAccessibilityControl(
+                "Use " + label,
+                "com.android.settings:id/switch_widget",
+                label));
+        assertTrue(UninstallGuardPolicy.isTargetAccessibilityControl(
+                label,
+                "com.android.settings:id/service_switch",
+                label));
+    }
+
+    @Test
+    public void stableResourceIdsDoNotDependOnTranslatedCaptions() {
+        assertTrue(UninstallGuardPolicy.isAppControlSignal(
+                "Vider le cache",
+                "com.android.settings:id/clear_cache"));
+        assertTrue(UninstallGuardPolicy.isAppControlSignal(
+                "Speicherinhalt loeschen",
+                "com.android.settings:id/clear_storage"));
+        assertTrue(UninstallGuardPolicy.isDeviceAdminSignal(
+                "Desactiver cette application",
+                "com.android.settings:id/restricted_action"));
+        assertTrue(UninstallGuardPolicy.isTargetAccessibilityControl(
+                "Utiliser voward protection service",
+                "com.android.settings:id/switch_text",
+                "voward protection service"));
     }
 
     @Test

@@ -42,10 +42,11 @@ final class UninstallGuardPolicy {
         }
     }
 
-    private static final String[] APP_CONTROL_SIGNALS = {
-            // AOSP text and stable resource-id fragments.
-            "uninstall", "delete app", "remove app", "force stop", "force_stop",
-            "clear data", "clear storage", "clear_data", "clear_storage",
+    private static final String[] APP_CONTROL_TEXT_SIGNALS = {
+            // Text is a compatibility fallback for Compose/OEM screens which expose
+            // neither a useful activity class nor stable resource IDs.
+            "uninstall", "delete app", "remove app", "force stop",
+            "clear data", "clear storage", "clear cache",
             // Romanian Settings translations. Matching is accent-insensitive so these
             // cover both OEM wording and devices configured without Romanian diacritics.
             "dezinstal", "sterge aplicatia", "elimina aplicatia",
@@ -54,10 +55,20 @@ final class UninstallGuardPolicy {
             "stergeti spatiul de stocare"
     };
 
-    private static final String[] DEVICE_ADMIN_SIGNALS = {
+    private static final String[] APP_CONTROL_VIEW_ID_SIGNALS = {
+            "uninstall_button", "button_uninstall", "force_stop",
+            "clear_data", "clear_storage", "clear_cache", "storage_settings"
+    };
+
+    private static final String[] DEVICE_ADMIN_TEXT_SIGNALS = {
             "deactivate", "remove device admin", "device administrator",
-            "device_admin", "device admin", "dezactiv", "administrator dispozitiv",
+            "dezactiv", "administrator dispozitiv",
             "administratorul dispozitivului", "administrare a dispozitivului"
+    };
+
+    private static final String[] DEVICE_ADMIN_VIEW_ID_SIGNALS = {
+            "admin_warning", "admin_policies", "deactivate_button",
+            "remove_admin", "restricted_action"
     };
 
     private static final Set<String> GUARD_HOST_PACKAGES = Collections.unmodifiableSet(
@@ -94,7 +105,6 @@ final class UninstallGuardPolicy {
 
     private static final String[] DEVICE_ADMIN_CLASS_FRAGMENTS = {
             "deviceadminadd",
-            "deviceadminsettings",
             "deviceadmindetails",
             "deviceadminwarning"
     };
@@ -187,11 +197,42 @@ final class UninstallGuardPolicy {
     }
 
     static boolean isAppControlSignal(String value) {
-        return containsNormalizedSignal(value, APP_CONTROL_SIGNALS);
+        return containsNormalizedSignal(value, APP_CONTROL_TEXT_SIGNALS);
+    }
+
+    static boolean isAppControlSignal(String value, String viewId) {
+        return containsNormalizedSignal(value, APP_CONTROL_TEXT_SIGNALS)
+                || containsViewIdSignal(viewId, APP_CONTROL_VIEW_ID_SIGNALS);
     }
 
     static boolean isDeviceAdminSignal(String value) {
-        return containsNormalizedSignal(value, DEVICE_ADMIN_SIGNALS);
+        return containsNormalizedSignal(value, DEVICE_ADMIN_TEXT_SIGNALS);
+    }
+
+    static boolean isDeviceAdminSignal(String value, String viewId) {
+        return containsNormalizedSignal(value, DEVICE_ADMIN_TEXT_SIGNALS)
+                || containsViewIdSignal(viewId, DEVICE_ADMIN_VIEW_ID_SIGNALS);
+    }
+
+    static boolean isTargetAccessibilityControl(
+            String value, String viewId, String accessibilityServiceLabel) {
+        if (value == null || viewId == null || accessibilityServiceLabel == null) return false;
+
+        String normalizedValue = value.toLowerCase(Locale.ROOT);
+        String normalizedViewId = viewId.toLowerCase(Locale.ROOT);
+        String normalizedLabel = accessibilityServiceLabel.toLowerCase(Locale.ROOT);
+        if (normalizedLabel.isEmpty() || !normalizedValue.contains(normalizedLabel)) return false;
+
+        // A generic switch_widget is also used for service rows on the main
+        // Accessibility dashboard, so it is deliberately not sufficient evidence.
+        return normalizedViewId.contains("switch_text")
+                || normalizedViewId.contains("service_switch")
+                || normalizedViewId.contains("toggle_service");
+    }
+
+    private static boolean containsViewIdSignal(String viewId, String[] signals) {
+        if (viewId == null || viewId.isEmpty()) return false;
+        return containsAny(viewId.toLowerCase(Locale.ROOT), signals);
     }
 
     private static boolean containsNormalizedSignal(String value, String[] signals) {
