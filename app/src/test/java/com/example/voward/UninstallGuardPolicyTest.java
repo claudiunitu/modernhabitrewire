@@ -59,6 +59,13 @@ public class UninstallGuardPolicyTest {
         assertEquals(
                 UninstallGuardPolicy.GuardTarget.NONE,
                 UninstallGuardPolicy.classify(
+                        "com.android.settings",
+                        "com.android.settings.Settings$AccessibilitySettingsActivity",
+                        new UninstallGuardPolicy.ScreenEvidence(
+                                true, false, false, true, false)));
+        assertEquals(
+                UninstallGuardPolicy.GuardTarget.NONE,
+                UninstallGuardPolicy.classify(
                         "com.samsung.android.settings",
                         "com.samsung.android.settings.accessibility.base.widget.AccessibilityDashboardActivity",
                         TARGET_ONLY));
@@ -123,6 +130,12 @@ public class UninstallGuardPolicyTest {
         assertTrue(UninstallGuardPolicy.isAppControlSignal("Stergeti datele"));
         assertTrue(UninstallGuardPolicy.isDeviceAdminSignal(
                 "Dezactivați administratorul dispozitivului"));
+    }
+
+    @Test
+    public void accessibilityDisabledStatusIsNotADeviceAdminAction() {
+        assertFalse(UninstallGuardPolicy.isDeviceAdminSignal("Funcție dezactivată"));
+        assertFalse(UninstallGuardPolicy.isDeviceAdminSignal("Feature deactivated"));
     }
 
     @Test

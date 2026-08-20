@@ -61,9 +61,16 @@ final class UninstallGuardPolicy {
     };
 
     private static final String[] DEVICE_ADMIN_TEXT_SIGNALS = {
-            "deactivate", "remove device admin", "device administrator",
-            "dezactiv", "administrator dispozitiv",
-            "administratorul dispozitivului", "administrare a dispozitivului"
+            // Use complete action phrases only. Generic state words such as
+            // "deactivate"/"dezactiv" also appear in ordinary Accessibility row
+            // summaries (for example Romanian "Funcție dezactivată") and would
+            // incorrectly classify the Accessibility overview as Device Admin.
+            "deactivate device admin", "deactivate this device administrator",
+            "remove device admin", "remove this device administrator",
+            "dezactiveaza administratorul dispozitivului",
+            "dezactivati administratorul dispozitivului",
+            "elimina administratorul dispozitivului",
+            "eliminati administratorul dispozitivului"
     };
 
     private static final String[] DEVICE_ADMIN_VIEW_ID_SIGNALS = {
@@ -116,6 +123,11 @@ final class UninstallGuardPolicy {
             "accessibilityservicedetails"
     };
 
+    private static final String[] ACCESSIBILITY_OVERVIEW_CLASS_FRAGMENTS = {
+            "accessibilitysettingsactivity",
+            "accessibilitydashboardactivity"
+    };
+
     private UninstallGuardPolicy() {}
 
     static boolean isGuardHostPackage(String packageName) {
@@ -153,6 +165,14 @@ final class UninstallGuardPolicy {
                 : className.toLowerCase(Locale.ROOT);
 
         if (!evidence.targetVisible) return GuardTarget.NONE;
+
+        // Newer Pixel/OEM Accessibility dashboards may expose the service row with
+        // the same resource ID used by a detail-page switch. The window activity is
+        // the stronger discriminator: the overview itself must remain accessible,
+        // even when Voward's row and a switch-like control are both visible.
+        if (containsAny(normalizedClass, ACCESSIBILITY_OVERVIEW_CLASS_FRAGMENTS)) {
+            return GuardTarget.NONE;
+        }
 
         // Only service-detail classes are intrinsically dangerous. A general
         // AccessibilitySettings/Dashboard class may legitimately show Voward's row
