@@ -62,6 +62,13 @@
         <item name="android:textStyle">bold</item>
     </style>
 
+    <style name="Widget.Voward.Button.HeroAction" parent="Widget.Voward.Button.Pill">
+        <item name="backgroundTint">@color/hero_action_background</item>
+        <item name="android:textColor">@color/hero_action_foreground</item>
+        <item name="strokeColor">@color/hero_action_outline</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+
     <!-- Resource aliases retained so older layouts inherit the Voward design tokens. -->
     <style name="ShapeAppearance.ModernHabit.Small" parent="@style/ShapeAppearance.Voward.Small" />
     <style name="ShapeAppearance.ModernHabit.Medium" parent="@style/ShapeAppearance.Voward.Medium" />
@@ -70,6 +77,7 @@
     <style name="Widget.ModernHabit.Card.Hero" parent="@style/Widget.Voward.Card.Hero" />
     <style name="Widget.ModernHabit.Card.Compact" parent="@style/Widget.Voward.Card.Compact" />
     <style name="Widget.ModernHabit.Button.Pill" parent="@style/Widget.Voward.Button.Pill" />
+    <style name="Widget.ModernHabit.Button.HeroAction" parent="@style/Widget.Voward.Button.HeroAction" />
 
     <!-- Kept for backward compatibility: base theme is already NoActionBar -->
     <style name="Theme.Voward.NoActionBar" />

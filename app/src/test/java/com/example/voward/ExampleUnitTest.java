@@ -31,7 +31,7 @@ public class ExampleUnitTest {
     @Test
     public void waitTimeIsBoundedAndFinite() {
         assertEquals(30, BudgetMath.calculateReentryWaitSeconds(30, .35, 0));
-        assertEquals(37, BudgetMath.calculateReentryWaitSeconds(30, .35, 1));
+        assertEquals(41, BudgetMath.calculateReentryWaitSeconds(30, .35, 1));
         assertEquals(3600, BudgetMath.calculateReentryWaitSeconds(3600, 1, Integer.MAX_VALUE));
         assertEquals(300, BudgetMath.quoteSessionSeconds(1000, 300));
         assertEquals(100, BudgetMath.quoteSessionSeconds(100, 300));

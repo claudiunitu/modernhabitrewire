@@ -4,4 +4,7 @@
     <color name="status_positive_container">@color/status_positive_container_dark</color>
     <color name="status_warning">@color/status_warning_dark</color>
     <color name="status_warning_container">@color/status_warning_container_dark</color>
+    <color name="hero_manage_background">@color/md_dark_surface_container_highest</color>
+    <color name="hero_manage_foreground">@color/md_dark_primary</color>
+    <color name="hero_manage_outline">@color/md_dark_outline</color>
 </resources>

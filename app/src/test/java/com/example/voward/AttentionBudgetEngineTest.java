@@ -112,7 +112,7 @@ public class AttentionBudgetEngineTest {
         preferences.setDailySessionCount(1);
 
         assertTrue(engine.hasPositiveBudget());
-        assertEquals(51, engine.calculateWaitSeconds());
+        assertEquals(60, engine.calculateWaitSeconds());
         assertEquals(5, engine.calculateUsageSeconds(5_999));
         assertEquals(60, engine.quoteSessionSeconds(60));
         assertEquals(100, engine.quoteSessionSeconds(200));

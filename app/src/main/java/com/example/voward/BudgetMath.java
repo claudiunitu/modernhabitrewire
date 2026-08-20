@@ -31,7 +31,10 @@ public final class BudgetMath {
         int safeBase = Math.max(1, Math.min(3600, baseWaitSeconds));
         double safeGrowth = Double.isFinite(growth) ? Math.max(0, Math.min(1, growth)) : 0;
         int safeSessions = Math.max(0, completedSessions);
-        double wait = safeBase * (1.0 + safeGrowth * Math.log1p(safeSessions));
+        // Every completed session adds the same percentage of the base pause. Keep the
+        // base fixed so 10 seconds with 50% growth is 10, 15, 20, ... rather than a
+        // logarithmic curve whose increment changes on every re-entry.
+        double wait = safeBase * (1.0 + safeGrowth * safeSessions);
         if (!Double.isFinite(wait)) return 3600;
         return (int) Math.max(1, Math.min(3600, Math.round(wait)));
     }

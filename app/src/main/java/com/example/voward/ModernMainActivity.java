@@ -381,8 +381,9 @@ public class ModernMainActivity extends AppCompatActivity {
         ((TextView) findViewById(R.id.nextPauseValue)).setText(getResources().getQuantityString(
                 R.plurals.seconds_compact, pause, pause));
         ((TextView) findViewById(R.id.protectedCountValue)).setText(String.valueOf(ruleCount));
-        ((Button) findViewById(R.id.heroActionButton)).setText(active
-                ? R.string.manage_protection : R.string.activate_protection);
+        Button heroActionButton = findViewById(R.id.heroActionButton);
+        heroActionButton.setSelected(active);
+        heroActionButton.setText(active ? R.string.manage_protection : R.string.activate_protection);
 
         String goal = preferences.getFunctionalGoal();
         refreshTodayGoal();

@@ -31,9 +31,19 @@ public class BudgetMathTest {
         assertEquals(30, BudgetMath.calculateReentryWaitSeconds(30, Double.NaN, 100));
         assertEquals(30, BudgetMath.calculateReentryWaitSeconds(30, -.5, 100));
         assertEquals(30, BudgetMath.calculateReentryWaitSeconds(30, 1, -5));
-        assertEquals(51, BudgetMath.calculateReentryWaitSeconds(30, 1, 1));
+        assertEquals(60, BudgetMath.calculateReentryWaitSeconds(30, 1, 1));
         assertEquals(3_600, BudgetMath.calculateReentryWaitSeconds(
                 3_600, 1, Integer.MAX_VALUE));
+    }
+
+    @Test
+    public void waitGrowthAddsAFixedPercentageOfTheBaseOnEveryReentry() {
+        assertEquals(10, BudgetMath.calculateReentryWaitSeconds(10, .5, 0));
+        assertEquals(15, BudgetMath.calculateReentryWaitSeconds(10, .5, 1));
+        assertEquals(20, BudgetMath.calculateReentryWaitSeconds(10, .5, 2));
+        assertEquals(10, BudgetMath.calculateReentryWaitSeconds(10, 1, 0));
+        assertEquals(20, BudgetMath.calculateReentryWaitSeconds(10, 1, 1));
+        assertEquals(30, BudgetMath.calculateReentryWaitSeconds(10, 1, 2));
     }
 
     @Test
