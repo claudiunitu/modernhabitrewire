@@ -1,6 +1,9 @@
 package com.example.voward;
+import android.content.Intent;
 import android.os.Bundle;
 import android.widget.Button;
+import android.widget.TextView;
+import android.widget.Toast;
 import android.view.View;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.view.WindowCompat;
@@ -38,12 +41,21 @@ public class UrlListEditorActivity extends AppCompatActivity {
             appPreferencesManagerSingleton.removeUrl(url);
             refreshList();
         }, (url, strict) ->
-                appPreferencesManagerSingleton.setRestrictedUrlStrict(url, strict));
+                appPreferencesManagerSingleton.setRestrictedUrlStrict(url, strict),
+                this::requestSession);
 
         recyclerView.setAdapter(adapter);
         boolean locked = appPreferencesManagerSingleton.getIsBlockerActive();
-        findViewById(R.id.lockedBanner).setVisibility(locked ? View.VISIBLE : View.GONE);
+        TextView lockedBanner = findViewById(R.id.lockedBanner);
+        lockedBanner.setVisibility(locked ? View.VISIBLE : View.GONE);
+        // Tapping a row is the only route to a session for a website, so it has to be said.
+        if (locked && BrowserPolicy.sessionBrowser(this,
+                new PolicyReconciler(this).mirroredState().managedBrowsers) != null) {
+            lockedBanner.setText(getString(R.string.rules_locked_read_only)
+                    + " " + getString(R.string.website_session_hint));
+        }
         findViewById(R.id.editorComposer).setVisibility(View.VISIBLE);
+        RuleComposer.bind(this, appPreferencesManagerSingleton.getRestrictedUrls().isEmpty());
         refreshList();
 
         addButton.setOnClickListener(v -> {
@@ -62,6 +74,33 @@ public class UrlListEditorActivity extends AppCompatActivity {
                 }
             }
         });
+    }
+
+    /**
+     * The way back to the gate for a website rule.
+     *
+     * <p>Once the browser is enforcing the rule itself it shows its own block page, and that
+     * page cannot link anywhere. Without this there would be no way to ask for a session for a
+     * website at all — the rule would quietly become a hard block.</p>
+     */
+    private void requestSession(String rule) {
+        if (!appPreferencesManagerSingleton.getIsBlockerActive()) return;
+        if (appPreferencesManagerSingleton.isStrictRestrictedUrlPattern(rule)) {
+            Toast.makeText(this, R.string.strict_rule_no_session, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String browser = BrowserPolicy.sessionBrowser(this,
+                new PolicyReconciler(this).mirroredState().managedBrowsers);
+        if (browser == null) {
+            // Nothing is enforcing this in a browser, so the gate still appears at the moment
+            // the page is opened. Offering a session here would be a second, pointless door.
+            Toast.makeText(this, R.string.website_session_unavailable, Toast.LENGTH_LONG).show();
+            return;
+        }
+        appPreferencesManagerSingleton.setLastInterceptedApp(browser);
+        appPreferencesManagerSingleton.setLastInterceptedUrl(rule);
+        appPreferencesManagerSingleton.setLastInterceptionKind("URL");
+        startActivity(new Intent(this, DecisionGateActivity.class));
     }
 
     @Override

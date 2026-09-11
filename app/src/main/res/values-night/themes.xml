@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Dark theme overrides — Material 3 DayNight picks this automatically at night. -->
     <style name="Theme.Voward" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/md_dark_primary</item>
@@ -37,7 +37,8 @@
         <item name="colorOnSurfaceInverse">@color/md_dark_inverse_on_surface</item>
         <item name="colorPrimaryInverse">@color/md_dark_inverse_primary</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
+        <!-- API 27+. Absent and ignored on 26, where false is already the platform default. -->
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.Voward.Small</item>

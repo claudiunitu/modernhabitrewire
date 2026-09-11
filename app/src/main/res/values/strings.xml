@@ -1,6 +1,5 @@
 <resources>
     <string name="app_name">Voward</string>
-    <string name="accessibility_service_label">Voward protection service</string>
     <string name="uninstall_guard_blocked_message">Protected while Voward is active. Deactivate protection in Voward first.</string>
     <string name="restricted_urls_title">Restricted URLs</string>
     <string name="add_restricted_url">Add restricted URL</string>
@@ -34,11 +33,8 @@
     <string name="reset_daily_stats_debug">Reset today’s statistics</string>
 
     <!-- Notification strings -->
-    <string name="notification_channel_name">Firewall Live Stats</string>
     <string name="notification_channel_description">Shows real-time allowance and session statistics</string>
     <string name="blocker_active">Voward protection is active</string>
-    <string name="blocker_inactive">Voward protection is inactive</string>
-    <string name="notification_stats_template">Remaining %1$s · this session %2$s</string>
 
     <!-- Decision Gate strings -->
     <string name="system_state_template">Sessions today: %1$d\nRemaining allowance: %2$s\n%3$s\nOne allowance second equals one use second</string>
@@ -82,7 +78,7 @@
     <string name="help_model_content">One allowance second always buys one second of restricted use. The balance carries at most one daily allowance and can never fall below zero or borrow from a future day. When today’s allowance is depleted, no new restricted session can start. Each repeat entry adds the configured percentage of the base pause; it never changes a quoted session cap. Domain rules match the domain and subdomains. A path matches only that path and its subtree; a configured query must match exactly. Use keyword:text only when broad text matching is intentional.</string>
 
     <string name="help_security_title">Security &amp; Friction</string>
-    <string name="help_security_content">The recovery key is the only in-app way to deactivate active protection. With a positive cooldown, enter it once to request deactivation and again during the deactivation confirmation period. Protection remains active while waiting. The optional uninstall guard adds friction but cannot turn a normal Android installation into an unbreakable kiosk. Accessibility can observe foreground app/window content and supported browser address text. Data stays on-device unless you explicitly export it.</string>
+    <string name="help_security_content">The recovery key is the only in-app way to deactivate active protection. With a positive cooldown, enter it once to request deactivation and again during the confirmation period. Protection remains active while waiting. Rules are enforced by Android as the device owner, so they hold even when Voward is not running, but a recovery-mode factory reset can always wipe the phone. Data stays on-device unless you explicitly export it.</string>
 
         <!-- UI section titles -->
         <string name="blocked_content_section_title">Blocked Content</string>
@@ -110,7 +106,7 @@
         <string name="grayscale_available">Grayscale reminder available</string>
         <string name="grayscale_unavailable">Grayscale unavailable (optional ADB grant not present)</string>
         <string name="setup_disclosure_title">Before enabling control permissions</string>
-        <string name="setup_disclosure_message">Accessibility observes foreground apps, window content, and supported browser address text so it can show a gate, navigate Home, or replace a blocked tab. Device Admin makes uninstall harder. Notification access shows allowance status. Restricted-use records remain on this device unless you export configuration. Emergency and recovery apps are never blocked. This is a self-management tool, not medical treatment.</string>
+        <string name="setup_disclosure_message">Voward blocks apps and websites as the device owner: Android pauses a protected app and your browser refuses a blocked address. Notification access shows allowance status, and usage access measures how long a session really lasted. Records stay on this device unless you export configuration. Emergency and recovery apps are never blocked. This is a self-management tool, not medical treatment.</string>
         <string name="setup_continue">I understand — continue setup</string>
         <string name="setup_not_now">Not now</string>
         <string name="url_rule_helper">Examples: example.com · example.com/news · keyword:shorts</string>
@@ -192,14 +188,11 @@
         <string name="seconds_short">sec</string>
         <string name="uninstall_guard_optional_label">Use optional uninstall protection</string>
         <string name="permissions_title">Permissions</string>
-        <string name="permissions_body">One Attention Firewall accessibility service handles blocking and optional uninstall protection. Device Admin and notifications are separate optional choices.</string>
-        <string name="firewall_permission_ready">Attention Firewall · Ready</string>
-        <string name="firewall_permission_missing">Attention Firewall · Required</string>
+        <string name="permissions_body">Voward enforces your rules as the device owner, through Android itself. Notifications and usage access are separate optional choices.</string>
         <string name="uninstall_permission_ready">Uninstall protection · Ready</string>
         <string name="uninstall_permission_optional">Uninstall protection · Optional</string>
         <string name="notifications_ready">Allowance notifications · Ready</string>
         <string name="notifications_optional">Allowance notifications · Optional</string>
-        <string name="open_accessibility_settings">Open accessibility settings</string>
         <string name="configure_optional_protection">Configure optional protection</string>
         <string name="allow_notifications">Allow notifications</string>
         <string name="protection_and_recovery">Protection &amp; recovery</string>
@@ -216,7 +209,6 @@
         <string name="reset_stats_confirm">Reset statistics</string>
         <string name="advanced_and_data">Advanced &amp; data</string>
         <string name="review_setup_and_permissions">Review setup and permissions</string>
-        <string name="permission_required_to_activate">Enable the Attention Firewall accessibility service before activating protection.</string>
         <string name="rules_required_to_activate">Choose at least one app or website rule before activating protection.</string>
         <string name="allowance_required_to_activate">Set a daily allowance above zero before activating protection.</string>
         <string name="setup_ready_summary">Required setup complete. Optional protection can be reviewed anytime.</string>
@@ -227,18 +219,18 @@
         <string name="setup_progress">Step %1$d of %2$d</string>
         <string name="setup_welcome_title">A pause with a purpose</string>
         <string name="setup_welcome_body">Voward adds a private planning pause before selected apps and sites. It is a self-management tool—not treatment or a diagnostic device.</string>
-        <string name="setup_privacy_title">What the firewall can observe</string>
-        <string name="setup_privacy_body">The required accessibility service observes foreground apps, window content, and supported browser address text so it can show the gate or replace a blocked tab. Records stay on this device unless you export configuration.</string>
+        <string name="setup_privacy_title">What Voward can see</string>
+        <string name="setup_privacy_body">Voward reads the list of apps installed on this phone and, with usage access, how long you spent in one during an approved session. It never sees what is on your screen or what you type. Records stay on this device unless you export configuration.</string>
         <string name="setup_goal_title">Choose what matters</string>
         <string name="setup_goal_body">A concrete real-life goal gives the pause useful context. You can change these values before protection is active.</string>
         <string name="setup_rules_title">Choose where to pause</string>
         <string name="setup_rules_body">Select apps by their familiar names and add website domain or path rules. Emergency and recovery apps can never be restricted.</string>
         <string name="setup_permissions_title">Enable only what you choose</string>
-        <string name="setup_permissions_body">Attention Firewall is required. Uninstall protection and notifications are optional and are requested separately.</string>
+        <string name="setup_permissions_body">Device owner provisioning is required and is done once from a computer. Uninstall protection and notifications are optional.</string>
         <string name="setup_key_title">Create a recovery path</string>
         <string name="setup_key_body">Choose a key you can retrieve when needed, then choose how long deactivation must wait and how much time you will have to confirm it afterward. The key is stored only as a salted, slow password hash.</string>
         <string name="setup_review_title">Review and activate</string>
-        <string name="setup_review_body">Protection activates only when the firewall permission, a rule, a positive allowance, and a recovery key are ready.</string>
+        <string name="setup_review_body">Protection activates only when Voward is the device owner and you have a rule, a positive allowance, and a recovery key.</string>
         <string name="setup_back">Back</string>
         <string name="setup_next">Continue</string>
         <string name="setup_skip">Finish later</string>
@@ -288,7 +280,7 @@
         <string name="url_rule_keyword">Broad keyword match</string>
         <string name="no_apps_found">No matching installed apps</string>
         <string name="help_quick_start_title">Quick start</string>
-        <string name="help_quick_start_content">1. Set a daily allowance, a default session length, and a real-life goal.\n2. Choose at least one protected app or website.\n3. Enable the required Attention Firewall accessibility service. Device Admin uninstall protection and notifications are optional.\n4. Create a recovery key, then choose the deactivation cooldown and how long you will have to confirm deactivation afterward.\n5. Review the setup summary and activate protection.</string>
+        <string name="help_quick_start_content">1. Set a daily allowance, a default session length, and a real-life goal.\n2. Choose at least one protected app or website.\n3. Make Voward the device owner from a computer, once. Uninstall protection and notifications are optional.\n4. Create a recovery key, then choose the deactivation cooldown and how long you will have to confirm deactivation afterward.\n5. Review the setup summary and activate protection.</string>
         <string name="help_pause_title">How the intentional pause works</string>
         <string name="help_pause_content">At the gate, name a specific purpose and choose 1–60 minutes. Start the circular pause, then review the plan and explicitly choose Open intentionally or Not now. Finishing the timer never opens protected content automatically. You can configure three alternatives in Settings; choosing one leaves the protected content, returns you Home, and is counted in Progress.</string>
         <string name="help_budget_title">Allowance and session limits</string>
@@ -300,14 +292,14 @@
         <string name="help_grayscale_title">Optional grayscale for restricted sessions</string>
         <string name="help_grayscale_content">Grayscale is automatic for approved sessions in regular restricted apps and websites after a one-time ADB permission grant; there is no separate in-app switch. Strict rules never open, so grayscale does not apply to them. To enable it:\n1. Install Android Platform Tools on a computer.\n2. On the phone, enable Developer options and USB debugging, connect it to the computer, and approve the debugging prompt.\n3. Run: adb shell pm grant com.example.voward android.permission.WRITE_SECURE_SETTINGS\n4. Open Voward → Settings → Advanced and data and confirm that it says “Grayscale reminder available.”\nVoward restores the previous Android color-correction setting when the approved session ends. To revoke access, run: adb shell pm revoke com.example.voward android.permission.WRITE_SECURE_SETTINGS</string>
         <string name="help_privacy_title">Privacy and permissions</string>
-        <string name="help_privacy_content">The Attention Firewall accessibility service observes foreground apps, window content, and supported browser address text so it can enforce your rules. Device Admin uninstall friction and notifications are optional. Rules, settings, and usage counters stay on-device. Configuration export includes the configured cooldown and deactivation-confirmation-period durations, but excludes the recovery key, active-protection state, pending deactivation request and timestamps, current allowance balance, usage counters, and temporary approvals. Import is unavailable while protection is active and cannot restore a pending request. Purpose text entered at the gate is not stored.</string>
+        <string name="help_privacy_content">Voward reads which apps are installed and, with usage access, how long one was in the foreground during an approved session. It never reads your screen. Website rules are sent to your browser as enterprise policy and enforced there. Rules, settings, and usage counters stay on-device. Configuration export includes the configured cooldown and confirmation-period durations, but excludes the recovery key, active-protection state, pending deactivation request and timestamps, current allowance balance, usage counters, and temporary approvals. Import is unavailable while protection is active and cannot restore a pending request. Purpose text entered at the gate is not stored.</string>
         <string name="help_recovery_title">Safety and recovery</string>
-        <string name="help_recovery_content">The default deactivation policy is a 24-hour cooldown followed by a 1-hour confirmation period. Cooldown choices are 0, 1 minute, 6 hours, 12 hours, 24 hours, 48 hours, or 72 hours; confirmation-period choices are 1, 2, 3, 6, 12, or 24 hours. These settings can be changed only while protection is inactive. With a positive cooldown, enter the recovery key once to request deactivation. Protection and uninstall friction remain active while waiting. You can cancel the request immediately without the key. The confirmation period begins and expires silently: there is no notification, sound, vibration, badge, background polling, or automatic deactivation. During this period, enter the key again, press Deactivate protection, and accept the final confirmation. Incorrect keys do not change the deadline. If the confirmation period expires, the complete process must be restarted. Eligibility uses monotonic device time; a detected clock shift over two minutes or a reboot invalidates the request. With cooldown 0, one correct key, an explicit button press, and final confirmation deactivate without creating a request. Critical emergency and device-recovery apps cannot be selected for protection. Optional Device Admin and accessibility-based uninstall protection add friction, not kiosk-mode guarantees.</string>
+        <string name="help_recovery_content">The default deactivation policy is a 24-hour cooldown followed by a 1-hour confirmation period. Cooldown choices are 0, 1 minute, 6 hours, 12 hours, 24 hours, 48 hours, or 72 hours; confirmation-period choices are 1, 2, 3, 6, 12, or 24 hours. These settings can be changed only while protection is inactive. With a positive cooldown, enter the recovery key once to request deactivation. Protection and uninstall friction remain active while waiting. You can cancel the request immediately without the key. The confirmation period begins and expires silently: there is no notification, sound, vibration, badge, background polling, or automatic deactivation. During this period, enter the key again, press Deactivate protection, and accept the final confirmation. Incorrect keys do not change the deadline. If the confirmation period expires, the complete process must be restarted. Eligibility uses monotonic device time; a detected clock shift over two minutes or a reboot invalidates the request. With cooldown 0, one correct key, an explicit button press, and final confirmation deactivate without creating a request. Critical emergency and device-recovery apps cannot be selected for protection. If Voward stops running altogether, the dead man switch releases every restriction on its own after the number of days you set.</string>
         <string name="strict_rule_checkbox">Strictly forbid this entry</string>
         <string name="strict_rule_helper">Strict rules ignore the remaining allowance. Access stays blocked until you deactivate protection.</string>
-        <string name="strict_rule_row_label">Strict rule · allowance cannot unlock</string>
-        <string name="strict_rule_locked_label">Strict rule · cannot relax during protection</string>
-        <string name="strict_badge">STRICT</string>
+        <string name="strict_chip_label">Strict</string>
+        <string name="composer_add_app_rule">Add an app rule</string>
+        <string name="composer_add_url_rule">Add a website rule</string>
         <string name="strict_gate_stage">STRICT RULE</string>
         <string name="strict_gate_title">Access blocked</string>
         <string name="strict_gate_summary">Your remaining allowance cannot unlock this entry.</string>
@@ -342,4 +334,151 @@
     <string name="activation_delayed_summary">Deactivation requires your recovery key, a %1$s cooldown, then your recovery key again within a %2$d-hour confirmation period.</string>
     <string name="activation_immediate_summary">Cooldown is 0. Your recovery key can deactivate protection immediately.</string>
     <string name="deactivation_window_closed">The time allowed to confirm deactivation has ended. Protection remains active.</string>
-    </resources>
+    
+    <!-- Standalone release screen (escape ladder rung 2). -->
+    <string name="release_title">Release protection</string>
+    <string name="release_explanation">This screen releases every restriction Voward applied. It needs your recovery key and follows the same cooldown you configured. Use it when the main app will not open.</string>
+    <string name="release_checking">Checking key…</string>
+    <string name="release_active">Protection is active.</string>
+    <string name="release_not_active">Protection is not active. There is nothing to release.</string>
+    <string name="release_cooldown_pending">Deactivation is already requested. Come back after the cooldown to confirm it.</string>
+    <string name="release_window_open">The confirmation period is open. Enter your key to release now.</string>
+    <string name="release_done">Released. Every restriction has been cleared.</string>
+
+    <!-- Suspension support message shown on the system's paused-app dialog. -->
+    <string name="suspended_support_message">Paused by Voward. Tap for details to request a session.</string>
+
+    <string name="usage_access_ready">Usage access · Ready</string>
+    <string name="usage_access_optional">Usage access · Optional</string>
+    <string name="allow_usage_access">Allow usage access</string>
+    <string name="usage_access_unavailable">Usage access settings are not available on this device.</string>
+
+    <!-- Device Owner removal (hardening plan 6.2, the second level of release). -->
+    <string name="device_owner_active">Voward is the device owner app on this phone. Android will not let it be uninstalled until that is given up.</string>
+    <string name="remove_voward">Remove Voward</string>
+    <string name="remove_voward_title">Remove Voward?</string>
+    <string name="remove_voward_message">This clears every restriction and gives up device-owner control, so Voward can be uninstalled normally. Setting it up again needs a computer. Protection must be off first.</string>
+    <string name="remove_voward_confirm">Give up control</string>
+    <string name="remove_voward_done">Device-owner control released. Voward can now be uninstalled.</string>
+    <string name="remove_voward_failed">Could not release device-owner control. See the installation guide for the recovery-mode reset.</string>
+
+    <string name="device_protection_title">Device protection</string>
+    <string name="device_protection_helper">Android enforces these once Voward is the device owner. Without provisioning they do nothing.</string>
+    <string name="guard_safe_mode_label">Block safe mode</string>
+    <string name="guard_safe_mode_helper">Safe mode starts Android with third-party apps disabled, which would switch protection off with a single reboot. Normal reboots are unaffected.</string>
+    <string name="guard_extra_users_label">Block extra users and profiles</string>
+    <string name="guard_extra_users_helper">A second user, guest session, work profile or private space is a fresh copy of your apps, outside these rules. Existing profiles must be removed before you provision.</string>
+    <string name="guard_clock_label">Lock date and time</string>
+    <string name="guard_clock_helper">Forces network time. Rolling the clock forward would otherwise refill your daily allowance. Time-zone changes are unaffected, so travelling is fine.</string>
+    <string name="guard_settings_reset_label">Block factory reset in Settings</string>
+    <string name="guard_settings_reset_helper">Removes the reset option from Settings. The recovery-mode reset still works, so you are never locked out, but OEM unlocking is disabled until you deactivate.</string>
+    <string name="guard_debugging_label">Disable USB debugging</string>
+    <string name="guard_debugging_helper">Removes one of your escape routes. ADB over a cable is how you would recover this phone from a computer if something went wrong.</string>
+    <string name="guard_debugging_confirm_title">Close the ADB escape route?</string>
+    <string name="guard_debugging_confirm_message">A cable and a computer are how you recover this phone if Voward stops working. With this on, that route is closed until you deactivate with your recovery key.</string>
+    <string name="guard_debugging_confirm">Close it</string>
+
+    <string name="browser_check_title">Browsers</string>
+    <string name="browser_check_explanation">Website rules are enforced inside the browser itself, through the same channel a workplace uses. A browser that cannot take those rules is paused instead of filtered. Some browsers honour the rules without advertising it, so you can test any of them here.</string>
+    <string name="browser_check_none">No browser is installed on this phone.</string>
+    <string name="browser_check_needs_provisioning">Voward is not the device owner yet, so nothing below is enforced and testing is unavailable.</string>
+    <string name="browser_check_test">Test this browser</string>
+    <string name="browser_status_verified">Filtered — you confirmed this one blocks correctly</string>
+    <string name="browser_status_declared">Filtered — this browser advertises support</string>
+    <string name="browser_status_rejected">Paused — you confirmed this one does not block</string>
+    <string name="browser_status_untested">Paused — untested. Test it if you want to keep using it.</string>
+    <string name="browser_check_push_failed">Could not send the test rule. Voward has to be the device owner first.</string>
+    <string name="browser_check_cannot_open">That browser would not open the test page.</string>
+    <string name="browser_check_verdict_title">Did %1$s block the page?</string>
+    <string name="browser_check_verdict_message">A filtering browser refuses the page and says your administrator blocked it. Anything else — the page loading, or an ordinary cannot-be-reached error — means it is not filtering.</string>
+    <string name="browser_check_verdict_yes">It was blocked</string>
+    <string name="browser_check_verdict_no">It was not</string>
+    <string name="open_browser_check">Check browsers</string>
+    <string name="keyword_rules_retired">These keyword rules are no longer enforced: %1$s. Website rules now run inside the browser, which matches addresses and not page text. Replace them with an address or a path rule.</string>
+
+    <string name="about_setting">About %1$s</string>
+    <string name="dead_mans_switch_label">Dead man switch (days)</string>
+    <string name="dead_mans_switch_error">Choose between 1 and 90 days</string>
+    <string name="provisioning_active">Device owner: active. Android is enforcing your rules.</string>
+    <string name="provisioning_inactive">Device owner: not set up. Nothing on this screen is enforced until it is.</string>
+    <string name="info_goal_title">Goal</string>
+    <string name="info_goal_body">The real-life reason you are doing this. Shown on the Today screen and at the gate, so you see it at the moment you are deciding. It is never sent anywhere.</string>
+    <string name="info_alternatives_title">Alternative next steps</string>
+    <string name="info_alternatives_body">Three things you can do instead. They appear as buttons at the gate; choosing one returns you to the home screen. Leave them blank to hide the buttons.</string>
+    <string name="info_daily_allowance_title">Daily allowance</string>
+    <string name="info_daily_allowance_body">Locked while protection is active. Total minutes of approved use per day, across all regular rules. One allowance second buys one second of use. Unused time carries over up to one full day worth. Strict rules ignore it entirely.</string>
+    <string name="info_default_session_title">Default session</string>
+    <string name="info_default_session_body">Locked while protection is active. The session length pre-selected at the gate. You can still choose 1 to 60 minutes each time. A session ends at whichever is smaller: your chosen length, or the allowance you have left.</string>
+    <string name="info_base_pause_title">Base pause</string>
+    <string name="info_base_pause_body">Locked while protection is active. How long you wait at the gate before the Open button appears, on your first entry of the day. The app never opens anything automatically when the timer reaches zero — you still have to choose.</string>
+    <string name="info_reentry_growth_title">Repeat-entry growth</string>
+    <string name="info_reentry_growth_body">Locked while protection is active. How much the pause grows each time you come back the same day, as a percentage. At zero the pause never grows. The pause is capped at one hour regardless.</string>
+    <string name="info_recovery_key_title">Recovery key</string>
+    <string name="info_recovery_key_body">The only in-app way to turn protection off. Stored as a salted PBKDF2-HMAC-SHA256 hash — it cannot be displayed or recovered, by you or by anyone else. Write it down somewhere outside this phone before you activate. Losing it means waiting out the dead man switch or wiping the device.</string>
+    <string name="info_cooldown_title">Deactivation cooldown</string>
+    <string name="info_cooldown_body">Locked while protection is active. How long you must wait after requesting deactivation before you can confirm it. Protection stays fully active throughout, and you can cancel at any point without the key. Set it to 0 to deactivate immediately after confirming.</string>
+    <string name="info_confirmation_window_title">Confirmation window</string>
+    <string name="info_confirmation_window_body">Locked while protection is active. How long you have to finish deactivating once the cooldown ends. The window opens and closes silently — no notification, no reminder. Miss it and the request is deleted and you start over. A shorter window is stronger protection.</string>
+    <string name="info_dead_mans_switch_title">Dead man switch</string>
+    <string name="info_dead_mans_switch_body">Your safety net. If the app fails a health check for this many days in a row, every restriction releases itself automatically, without the recovery key. This is what saves you from a crash loop or a bad update. Shortening it weakens protection; lengthening it increases the risk of being stuck. Default 14 days.</string>
+    <string name="info_provisioning_title">Provisioning status</string>
+    <string name="info_provisioning_body">Shows whether Voward is the device owner. Without it, nothing on this screen can be enforced — apps can be uninstalled and website rules do nothing. Setting it up needs a computer, once; see the installation guide.</string>
+    <string name="info_block_uninstall_title">Block uninstall</string>
+    <string name="info_block_uninstall_body">Stops Voward being uninstalled, force-stopped, or having its data cleared from Settings. Enforced by Android, not by Voward, so it holds even when the app is not running. Released by the normal key-and-cooldown flow.</string>
+    <string name="info_safe_mode_title">Block safe mode</string>
+    <string name="info_safe_mode_body">Safe mode starts Android with third-party apps disabled, which would otherwise switch protection off with a single reboot. This closes that. Normal reboots are unaffected.</string>
+    <string name="info_extra_users_title">Block extra users and profiles</string>
+    <string name="info_extra_users_body">A second user, a guest session, a work profile, or a private space each get their own copy of your apps, outside these rules. This blocks creating them. Existing profiles must be removed before you can provision the device at all.</string>
+    <string name="info_clock_title">Lock date and time</string>
+    <string name="info_clock_body">Rolling the clock forward would refill your daily allowance. This forces automatic network time and blocks manual changes. Time-zone changes are unaffected, so travelling is fine.</string>
+    <string name="info_settings_reset_title">Block factory reset in Settings</string>
+    <string name="info_settings_reset_body">Removes the reset option from Settings. It does not block the recovery-mode reset — the hardware key combination always works, so you are never locked out of your own phone. It also disables the OEM-unlocking toggle, so you cannot unlock the bootloader until you deactivate.</string>
+    <string name="info_debugging_title">Disable USB debugging</string>
+    <string name="info_debugging_body">Removes one of your escape routes. ADB is how you would recover this phone from a computer if something went wrong. Turning it off closes the last manual bypass; leaving it on means anyone with a cable and your unlocked phone has more options. Off by default.</string>
+    <string name="info_browsers_title">Browsers</string>
+    <string name="info_browsers_body">Website rules are enforced inside the browser itself, through Android managed configuration, so they work in fullscreen, across redirects, and in links opened from other apps. A browser Voward cannot configure is paused rather than filtered: the icon stays, but opening it shows a message. Some browsers honour the rules without advertising it, so you can test any of them and decide for yourself. You do not have to uninstall anything.</string>
+    <string name="info_app_rules_title">App rules and strict rules</string>
+    <string name="info_app_rules_body">A regular rule asks for a purpose and a pause before opening. A strict rule cannot be opened at all while protection is active — no gate, no allowance, no exception. While protection is active you can add rules and make them strict, but you cannot remove them or make them regular again.</string>
+    <string name="info_website_rules_title">Website rules</string>
+    <string name="info_website_rules_body">Addresses and paths, matched by the browser rather than by reading the screen. A rule for a domain covers its subdomains. Keyword rules match page text and have no equivalent inside a browser, so they stop being enforced once your browser takes over — the rules screen names any you still have.</string>
+    <string name="info_notifications_title">Notifications</string>
+    <string name="info_notifications_body">Optional allowance reminders. Deactivation is deliberately silent — you will never be notified that your confirmation window has opened.</string>
+    <string name="info_usage_access_title">Usage access</string>
+    <string name="info_usage_access_body">Lets Voward measure how long you actually spent in an app, so a session ends on time. Granted from Android Settings, not from a computer. Without it, sessions end on the clock rather than on real use, and you are charged the full length you asked for.</string>
+    <string name="info_grayscale_title">Grayscale</string>
+    <string name="info_grayscale_body">Turns the screen grayscale during an approved session and restores your previous setting afterwards. Needs a one-time permission granted from a computer; everything else works without it.</string>
+    <string name="info_activate_title">Activate protection</string>
+    <string name="info_activate_body">Applies every rule and restriction above. Requires at least one rule, a positive allowance, and a recovery key. From this point, timing settings are locked and rules can only be tightened.</string>
+    <string name="info_reset_stats_title">Reset today statistics</string>
+    <string name="info_reset_stats_body">Clears today counters. It does not restore spent allowance. Unavailable while protection is active.</string>
+    <string name="info_remove_voward_title">Remove Voward</string>
+    <string name="info_remove_voward_body">Gives up device ownership so Voward can be uninstalled normally. Android will not let you uninstall a device owner app at all, so without this the only way off would be a factory reset. Available only once protection is off.</string>
+
+    <string name="strict_rule_no_session">Strict rules cannot be opened while protection is active.</string>
+    <string name="website_session_unavailable">This rule is not enforced inside a browser yet, so the pause appears when you open the page.</string>
+    <string name="website_session_hint">Tap a rule to ask for a session.</string>
+    <string name="app_session_hint">Tap an app to ask for a session.</string>
+    <string name="app_session_not_installed">This app is not installed on this phone yet.</string>
+
+    <string name="quarantine_title">New app on this phone</string>
+    <string name="quarantine_message">%1$s was installed after protection was switched on, so Voward paused it once. Keep it, or make it a rule so it goes through the gate like the rest.</string>
+    <string name="quarantine_keep">Keep it</string>
+    <string name="quarantine_restrict">Make it a rule</string>
+    <string name="quarantine_pending">Paused pending your decision: %1$s. Open one from your app list to choose.</string>
+    <string name="guard_quarantine_label">Quarantine new apps</string>
+    <string name="guard_quarantine_helper">Any newly installed app is paused once and you decide whether to keep it. This catches clones and web wrappers that would otherwise slip past your rules. You can still install anything you want.</string>
+    <string name="info_quarantine_title">Quarantine new apps</string>
+    <string name="info_quarantine_body">Any newly installed app is paused once, and you decide whether to keep it or make it a rule. This catches web wrappers and clones that would otherwise slip past your rules — without it, installing the same thing under a different name is the cheapest way around every rule you have. You can still install anything you want, from Play or elsewhere. Only applies while protection is active.</string>
+
+    <string name="uninstall_guard_needs_provisioning">Uninstall protection needs Voward to be the device owner. See the installation guide.</string>
+    <string name="provisioning_required_to_activate">Voward has to be the device owner before it can enforce anything. See the installation guide.</string>
+
+    <string name="provisioning_ready">Device owner · Active</string>
+    <string name="provisioning_missing">Device owner · Required</string>
+
+    <string name="read_installation_guide">Read the installation guide</string>
+
+    <string name="notification_channel_name">Allowance status</string>
+    <string name="notification_remaining">Remaining today: %1$s</string>
+    <string name="notification_remaining_in_session">Remaining today: %1$s · session ends in %2$s</string>
+</resources>

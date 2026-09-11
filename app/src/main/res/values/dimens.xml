@@ -11,6 +11,10 @@
     <dimen name="card_corner_radius_compact">14dp</dimen>
     <dimen name="card_corner_radius_large">28dp</dimen>
     <dimen name="touch_target_min">48dp</dimen>
+    <!-- One rule per line: the icon, the name and the strict chip all sit on the same row. -->
+    <dimen name="rule_row_min_height">56dp</dimen>
+    <dimen name="rule_row_icon">36dp</dimen>
+    <dimen name="rule_row_chip_height">32dp</dimen>
     <dimen name="content_max_width">720dp</dimen>
     <dimen name="content_horizontal_padding">20dp</dimen>
     <dimen name="section_gap">18dp</dimen>

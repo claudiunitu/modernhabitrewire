@@ -1,13 +1,9 @@
 package com.example.voward;
 
-import android.app.admin.DevicePolicyManager;
-import android.content.ComponentName;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -29,7 +25,6 @@ import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.android.material.textfield.TextInputLayout;
 
-import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -84,7 +79,8 @@ public class SetupActivity extends AppCompatActivity {
                 startActivity(new Intent(this, AppPackagesListEditorActivity.class)));
         findViewById(R.id.setupChooseSitesButton).setOnClickListener(v ->
                 startActivity(new Intent(this, UrlListEditorActivity.class)));
-        findViewById(R.id.setupFirewallButton).setOnClickListener(v -> openAccessibilitySettings());
+        findViewById(R.id.setupFirewallButton).setOnClickListener(
+                v -> startActivity(new Intent(this, HelpActivity.class)));
         findViewById(R.id.setupGuardButton).setOnClickListener(v -> configureGuard());
         findViewById(R.id.setupNotificationButton).setOnClickListener(v -> requestNotifications());
 
@@ -188,11 +184,11 @@ public class SetupActivity extends AppCompatActivity {
         ((TextView) findViewById(R.id.setupRulesSummary)).setText(getString(
                 R.string.setup_rules_summary, apps, sites));
 
-        boolean firewall = isAccessEnabled(AttentionFirewallService.class);
+        boolean provisioned = new PolicyReconciler(this).isProvisioned();
         boolean guard = isGuardReady();
         boolean notifications = areNotificationsReady();
-        refreshPermissionRow(R.id.setupFirewallStatus, R.id.setupFirewallButton, firewall,
-                R.string.firewall_permission_ready, R.string.firewall_permission_missing);
+        refreshPermissionRow(R.id.setupFirewallStatus, R.id.setupFirewallButton, provisioned,
+                R.string.provisioning_ready, R.string.provisioning_missing);
         refreshPermissionRow(R.id.setupGuardStatus, R.id.setupGuardButton, guard,
                 R.string.uninstall_permission_ready, R.string.uninstall_permission_optional);
         refreshPermissionRow(R.id.setupNotificationStatus, R.id.setupNotificationButton, notifications,
@@ -202,7 +198,7 @@ public class SetupActivity extends AppCompatActivity {
         findViewById(R.id.setupKeyReady).setVisibility(keyReady ? View.VISIBLE : View.GONE);
         findViewById(R.id.setupKeyInputLayout).setVisibility(keyReady ? View.GONE : View.VISIBLE);
 
-        if (step == STEP_COUNT - 1) refreshReview(apps, sites, firewall, keyReady);
+        if (step == STEP_COUNT - 1) refreshReview(apps, sites, provisioned, keyReady);
     }
 
     private void refreshPermissionRow(int statusId, int buttonId, boolean ready,
@@ -211,7 +207,7 @@ public class SetupActivity extends AppCompatActivity {
         findViewById(buttonId).setVisibility(ready ? View.GONE : View.VISIBLE);
     }
 
-    private void refreshReview(int apps, int sites, boolean firewall, boolean keyReady) {
+    private void refreshReview(int apps, int sites, boolean provisioned, boolean keyReady) {
         String goal = preferences.getFunctionalGoal();
         if (goal.isEmpty()) goal = getString(R.string.no_goal_compact);
         ((TextView) findViewById(R.id.setupReviewSummary)).setText(getString(
@@ -224,7 +220,7 @@ public class SetupActivity extends AppCompatActivity {
                 formatCooldownDuration(preferences.getDeactivationCooldownMinutes()),
                 preferences.getDeactivationWindowHours())));
         int missing = 0;
-        if (!firewall) missing++;
+        if (!provisioned) missing++;
         if (apps + sites == 0) missing++;
         if (preferences.getDailyAllowanceSeconds() <= 0) missing++;
         if (!keyReady) missing++;
@@ -269,6 +265,10 @@ public class SetupActivity extends AppCompatActivity {
             boolean ready = isReadyToActivate();
             if (ready) {
                 preferences.setIsBlockerActive(true);
+                executor.execute(() -> {
+                    EnforcementCoordinator.schedulePeriodicReconcile(this);
+                    EnforcementCoordinator.reconcileNow(this);
+                });
             }
             finishSetup(ready);
             return;
@@ -300,7 +300,7 @@ public class SetupActivity extends AppCompatActivity {
     }
 
     private boolean isReadyToActivate() {
-        return isAccessEnabled(AttentionFirewallService.class)
+        return new PolicyReconciler(this).isProvisioned()
                 && (!preferences.getRestrictedAppPackages().isEmpty()
                 || !preferences.getRestrictedUrls().isEmpty())
                 && preferences.getDailyAllowanceSeconds() > 0
@@ -315,22 +315,11 @@ public class SetupActivity extends AppCompatActivity {
 
     private void configureGuard() {
         preferences.setUninstallGuardEnabled(true);
-        DevicePolicyManager manager = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
-        ComponentName admin = new ComponentName(this, MyDeviceAdminReceiver.class);
-        if (manager != null && !manager.isAdminActive(admin)) {
-            settingsLauncher.launch(new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
-                    .putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin)
-                    .putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                            getString(R.string.uninstall_permission_optional)));
-        } else if (!isAccessEnabled(AttentionFirewallService.class)) {
-            openAccessibilitySettings();
-        } else {
-            refreshStepData();
+        if (!new PolicyReconciler(this).isProvisioned()) {
+            Toast.makeText(this, R.string.uninstall_guard_needs_provisioning,
+                    Toast.LENGTH_LONG).show();
         }
-    }
-
-    private void openAccessibilitySettings() {
-        settingsLauncher.launch(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+        refreshStepData();
     }
 
     private void requestNotifications() {
@@ -341,12 +330,10 @@ public class SetupActivity extends AppCompatActivity {
         }
     }
 
+    /** {@code setUninstallBlocked} in PackageManager, which needs nothing but the device owner. */
     private boolean isGuardReady() {
-        DevicePolicyManager manager = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
-        boolean admin = manager != null && manager.isAdminActive(
-                new ComponentName(this, MyDeviceAdminReceiver.class));
-        return preferences.isUninstallGuardEnabled() && admin
-                && isAccessEnabled(AttentionFirewallService.class);
+        return preferences.isUninstallGuardEnabled()
+                && new PolicyReconciler(this).isProvisioned();
     }
 
     private boolean areNotificationsReady() {
@@ -355,13 +342,6 @@ public class SetupActivity extends AppCompatActivity {
                 == PackageManager.PERMISSION_GRANTED;
     }
 
-    private boolean isAccessEnabled(Class<?> serviceClass) {
-        String enabled = Settings.Secure.getString(
-                getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
-        String component = getPackageName() + "/" + serviceClass.getName();
-        return enabled != null && enabled.toLowerCase(Locale.ROOT)
-                .contains(component.toLowerCase(Locale.ROOT));
-    }
 
     private static int parseInt(EditText input) {
         try {

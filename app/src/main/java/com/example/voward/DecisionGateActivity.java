@@ -329,35 +329,40 @@ public class DecisionGateActivity extends AppCompatActivity {
         handler.postDelayed(this::runCountdown, Math.min(1000, remainingMs));
     }
 
+    /**
+     * Grants the session the user just planned.
+     *
+     * <p>Both kinds of rule are the same shape now: an approved session lifts exactly one
+     * thing, for a bounded time, in system_server. An app rule has its suspension lifted and is
+     * launched; a website rule comes out of the browser policy and the page needs a reload.</p>
+     */
     private void launchTargetApp() {
         String targetPackage = appPreferencesManager.getLastInterceptedApp();
-        if (targetPackage != null && !targetPackage.isEmpty()) {
-            String interceptedUrl = appPreferencesManager.getLastInterceptedUrl();
-            if (interceptedUrl != null && !interceptedUrl.isEmpty()) {
-                // MEDIUM-04: URL-based interception — the browser is already open with the
-                // page loaded. Only set the approval flag; relaunching would open a new blank
-                // tab and trigger the gate again when the user navigates back.
-                appPreferencesManager.setTempAllowAppLaunch(true);
-                AttentionFirewallService.notifyTempAllowGranted();
-            } else {
-                // App-based interception: explicitly launch the target app.
-                Intent intent = getPackageManager().getLaunchIntentForPackage(targetPackage);
-                if (intent != null) {
-                    // Set the flag only after confirming the intent is valid, so it can never
-                    // be stuck true when the target app is unavailable (e.g. uninstalled).
-                    appPreferencesManager.setTempAllowAppLaunch(true);
-                    AttentionFirewallService.notifyTempAllowGranted();
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    startActivity(intent);
-                }
+        if (targetPackage == null || targetPackage.isEmpty()) {
+            finish();
+            return;
+        }
+        String interceptedUrl = appPreferencesManager.getLastInterceptedUrl();
+        if (interceptedUrl != null && !interceptedUrl.isEmpty()) {
+            String rule = appPreferencesManager.matchingRestrictedUrlRule(interceptedUrl);
+            if (!rule.isEmpty()) {
+                EnforcementCoordinator.startSession(this, targetPackage, rule,
+                        quotedSessionSeconds);
+            }
+        } else {
+            // The launch intent only resolves once the suspension has actually been lifted, so
+            // the session has to start first.
+            EnforcementCoordinator.startSession(this, targetPackage, quotedSessionSeconds);
+            Intent intent = getPackageManager().getLaunchIntentForPackage(targetPackage);
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
             }
         }
         finish();
     }
 
     private void goHome() {
-        AttentionFirewallService.notifyGateClosed();
-        AttentionFirewallService.notifyGateCancelled();
         finish();
     }
 

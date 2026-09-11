@@ -11,7 +11,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.material.checkbox.MaterialCheckBox;
+import com.google.android.material.chip.Chip;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -21,8 +21,7 @@ class AppPackagesViewHolder extends RecyclerView.ViewHolder {
     TextView appNameView;
     ImageView appIcon;
     ImageView deleteButton;
-    MaterialCheckBox strictRuleCheckbox;
-    TextView strictBadge;
+    Chip strictRuleCheckbox;
 
     AppPackagesViewHolder(@NonNull View itemView, Boolean isLocked) {
         super(itemView);
@@ -32,7 +31,6 @@ class AppPackagesViewHolder extends RecyclerView.ViewHolder {
         appIcon = itemView.findViewById(R.id.app_icon);
         deleteButton = itemView.findViewById(R.id.delete_button);
         strictRuleCheckbox = itemView.findViewById(R.id.strict_rule_checkbox);
-        strictBadge = itemView.findViewById(R.id.strict_badge);
         deleteButton.setVisibility(isLocked ? View.GONE : View.VISIBLE);
     }
 }
@@ -49,17 +47,24 @@ public class AppPackagesListRecyclerAdapter extends RecyclerView.Adapter<AppPack
         void onStrictChanged(String packageName, boolean strict);
     }
 
+    public interface OnRuleClickListener {
+        void onRuleClick(String packageName);
+    }
+
     private List<String> appPackagesList;
     private final OnDeleteClickListener deleteListener;
     private final OnStrictChangedListener strictChangedListener;
+    private final OnRuleClickListener ruleClickListener;
 
     public AppPackagesListRecyclerAdapter(
             List<String> appPackagesList,
             OnDeleteClickListener listener,
-            OnStrictChangedListener strictChangedListener) {
+            OnStrictChangedListener strictChangedListener,
+            OnRuleClickListener ruleClickListener) {
         this.appPackagesList = appPackagesList;
         this.deleteListener = listener;
         this.strictChangedListener = strictChangedListener;
+        this.ruleClickListener = ruleClickListener;
     }
 
     @NonNull
@@ -93,10 +98,6 @@ public class AppPackagesListRecyclerAdapter extends RecyclerView.Adapter<AppPack
         holder.strictRuleCheckbox.setEnabled(!protectionActive || !strict);
         holder.strictRuleCheckbox.setClickable(!protectionActive || !strict);
         holder.strictRuleCheckbox.setFocusable(!protectionActive || !strict);
-        holder.strictRuleCheckbox.setText(protectionActive && strict
-                ? R.string.strict_rule_locked_label : R.string.strict_rule_row_label);
-        holder.strictBadge.setVisibility(holder.strictRuleCheckbox.isChecked()
-                ? View.VISIBLE : View.GONE);
         holder.strictRuleCheckbox.setOnCheckedChangeListener((button, checked) -> {
             if (appPreferencesManagerSingleton.getIsBlockerActive() && !checked) {
                 Toast.makeText(context, R.string.blocker_active_cannot_relax,
@@ -106,12 +107,12 @@ public class AppPackagesListRecyclerAdapter extends RecyclerView.Adapter<AppPack
                 return;
             }
             strictChangedListener.onStrictChanged(appPackage, checked);
-            holder.strictBadge.setVisibility(checked ? View.VISIBLE : View.GONE);
             if (appPreferencesManagerSingleton.getIsBlockerActive() && checked) {
                 int adapterPosition = holder.getBindingAdapterPosition();
                 if (adapterPosition != RecyclerView.NO_POSITION) notifyItemChanged(adapterPosition);
             }
         });
+        holder.itemView.setOnClickListener(v -> ruleClickListener.onRuleClick(appPackage));
         holder.deleteButton.setOnClickListener(v -> {
             if(!appPreferencesManagerSingleton.getIsBlockerActive()){
                 deleteListener.onDeleteClick(appPackage);

@@ -286,6 +286,9 @@ public class AppPreferencesManagerTest {
         preferences.setCarryoverCapDays(.5f);
         preferences.setLaunchFrictionEnabled(false);
         preferences.setUninstallGuardEnabled(true);
+        preferences.setSafeModeGuardEnabled(false);
+        preferences.setDebuggingGuardEnabled(true);
+        preferences.setNewAppQuarantineEnabled(false);
         preferences.setDeactivationCooldownMinutes(48 * 60);
         preferences.setDeactivationWindowHours(3);
         preferences.setIsBlockerActive(true);
@@ -301,6 +304,9 @@ public class AppPreferencesManagerTest {
         assertFalse(exported.has("pendingDeactivation"));
         assertEquals(48 * 60, exported.getInt("deactivationCooldownMinutes"));
         assertEquals(3, exported.getInt("deactivationWindowHours"));
+        assertFalse(exported.getBoolean("safeModeGuardEnabled"));
+        assertTrue(exported.getBoolean("debuggingGuardEnabled"));
+        assertFalse(exported.getBoolean("newAppQuarantineEnabled"));
 
         preferences.setRestrictedUrls(List.of("changed.test"));
         preferences.importPortableState(exported);
@@ -315,6 +321,10 @@ public class AppPreferencesManagerTest {
         assertTrue(preferences.getIsBlockerActive());
         assertEquals(48 * 60, preferences.getDeactivationCooldownMinutes());
         assertEquals(3, preferences.getDeactivationWindowHours());
+        assertFalse(preferences.isSafeModeGuardEnabled());
+        assertTrue(preferences.isDebuggingGuardEnabled());
+        assertTrue(preferences.isExtraUserGuardEnabled());
+        assertFalse(preferences.isNewAppQuarantineEnabled());
     }
 
     @Test
@@ -332,6 +342,12 @@ public class AppPreferencesManagerTest {
         assertEquals(500, preferences.getDailyAllowanceSeconds());
         assertEquals(1, preferences.getBaseWaitTimeSeconds());
         assertTrue(preferences.isUninstallGuardEnabled());
+        assertTrue(preferences.isSafeModeGuardEnabled());
+        assertTrue(preferences.isExtraUserGuardEnabled());
+        assertTrue(preferences.isClockGuardEnabled());
+        assertFalse(preferences.isDebuggingGuardEnabled());
+        assertFalse(preferences.isSettingsResetGuardEnabled());
+        assertTrue(preferences.isNewAppQuarantineEnabled());
 
         assertThrows(JSONException.class, () -> preferences.importPortableState(
                 new JSONObject().put("schemaVersion", 0)));
@@ -400,30 +416,6 @@ public class AppPreferencesManagerTest {
         assertFalse(preferences.isRestrictedApp("com.example.unlisted"));
         assertEquals(null, preferences.findRestrictedUrlPattern(
                 "https://unlisted.example/page"));
-    }
-
-    @Test
-    public void corruptStrictRuleStorageMakesSurvivingRulesStrict() throws Exception {
-        preferences.setRestrictedUrls(List.of("blocked.example"));
-        preferences.setRestrictedApps(List.of("app.one"));
-        preferences.setIsBlockerActive(true);
-        portable().edit()
-                .putString("strict_restricted_url_list", "[bad")
-                .putString("strict_restricted_app_list", "[bad")
-                .commit();
-        resetSingleton();
-        preferences = AppPreferencesManagerSingleton.getInstance(application);
-
-        assertTrue(preferences.isStrictRestrictedApp("app.one"));
-        assertFalse(preferences.isRestrictedApp("com.example.unlisted"));
-        assertEquals(List.of("blocked.example"),
-                preferences.getStrictRestrictedUrlsSnapshot());
-        BrowserUrlEnforcementPolicy.RuleMatch match =
-                BrowserUrlEnforcementPolicy.findCommittedRestrictedMatch(
-                        "blocked.example", "blocked.example", false,
-                        preferences.getStrictRestrictedUrlsSnapshot(),
-                        preferences.getRestrictedUrlsSnapshot());
-        assertTrue(match != null && match.strict);
     }
 
     @Test
