@@ -1,6 +1,5 @@
 package com.example.voward;
 
-import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -11,7 +10,6 @@ import android.os.SystemClock;
 import androidx.core.app.NotificationCompat;
 
 import java.util.Locale;
-import java.util.concurrent.TimeUnit;
 
 /**
  * The ongoing allowance notification, rebuilt without a resident service behind it.
@@ -23,7 +21,8 @@ import java.util.concurrent.TimeUnit;
  *
  * <p>Between those moments the remaining allowance does not move — time is only ever spent
  * inside an approved session — so a notification that updates on those edges is showing the
- * same truth the old one was, with none of the cost.</p>
+ * same truth the old one was, with none of the cost. The session countdown is the exception,
+ * and it is drawn by the platform chronometer rather than re-posted.</p>
  */
 final class StatusNotifier {
 
@@ -51,20 +50,19 @@ final class StatusNotifier {
         long remaining = new AttentionBudgetEngine(context).getRemainingBudget();
         String detail = context.getString(R.string.notification_remaining,
                 formatMinutesSeconds(remaining));
-        String sessionPackage = preferences.getManagedSessionPackage();
-        if (!sessionPackage.isEmpty()) {
-            long leftMs = preferences.getManagedSessionDeadlineElapsedMs()
+        long sessionLeftMs = 0;
+        if (!preferences.getManagedSessionPackage().isEmpty()) {
+            sessionLeftMs = preferences.getManagedSessionDeadlineElapsedMs()
                     - SystemClock.elapsedRealtime();
-            if (leftMs > 0) {
+            if (sessionLeftMs > 0) {
                 detail = context.getString(R.string.notification_remaining_in_session,
-                        formatMinutesSeconds(remaining),
-                        formatMinutesSeconds(TimeUnit.MILLISECONDS.toSeconds(leftMs)));
+                        formatMinutesSeconds(remaining));
             }
         }
 
         PendingIntent open = PendingIntent.getActivity(context, 0,
                 new Intent(context, ModernMainActivity.class), PendingIntent.FLAG_IMMUTABLE);
-        Notification notification = new NotificationCompat.Builder(context, CHANNEL_ID)
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setContentTitle(context.getString(R.string.blocker_active))
                 .setContentText(detail)
                 // Native-density masks preserve the Voward mark's antialiased alpha edge.
@@ -72,9 +70,19 @@ final class StatusNotifier {
                 .setColor(context.getColor(R.color.md_primary_container))
                 .setOngoing(true)
                 .setContentIntent(open)
-                .setOnlyAlertOnce(true)
-                .build();
-        manager.notify(NOTIFICATION_ID, notification);
+                .setOnlyAlertOnce(true);
+        if (sessionLeftMs > 0) {
+            // The one number here that moves on its own, with nothing resident to redraw it.
+            // Handing the deadline to the platform chronometer has the system tick it down
+            // every second instead of freezing it at whatever it read when this was posted.
+            builder.setWhen(System.currentTimeMillis() + sessionLeftMs)
+                    .setShowWhen(true)
+                    .setUsesChronometer(true)
+                    .setChronometerCountDown(true);
+        } else {
+            builder.setShowWhen(false);
+        }
+        manager.notify(NOTIFICATION_ID, builder.build());
     }
 
     private static void createChannel(Context context, NotificationManager manager) {

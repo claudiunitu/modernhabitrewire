@@ -480,5 +480,5 @@
 
     <string name="notification_channel_name">Allowance status</string>
     <string name="notification_remaining">Remaining today: %1$s</string>
-    <string name="notification_remaining_in_session">Remaining today: %1$s · session ends in %2$s</string>
+    <string name="notification_remaining_in_session">In a session · remaining today: %1$s</string>
 </resources>

@@ -12,6 +12,8 @@ import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -45,6 +47,8 @@ final class EnforcementCoordinator {
             releaseNow(context);
             return;
         }
+
+        restoreInterruptedEviction(preferences, reconciler);
 
         // A session whose deadline passed while nothing was running ends here, so a missed
         // alarm costs at most one tick rather than an open-ended free pass.
@@ -130,6 +134,7 @@ final class EnforcementCoordinator {
 
         long quotedSeconds = preferences.getManagedSessionQuotedSeconds();
         long startWallMs = preferences.getManagedSessionStartWallMs();
+        boolean wasWebsiteSession = !preferences.getManagedSessionUrlPattern().isEmpty();
         long measuredMs = UsageMeter.foregroundMillis(context, packageName, startWallMs,
                 System.currentTimeMillis());
         long chargedMs = measuredMs < 0 ? TimeUnit.SECONDS.toMillis(quotedSeconds)
@@ -142,10 +147,52 @@ final class EnforcementCoordinator {
 
         preferences.clearManagedSession();
         cancelDeadline(context);
-        new PolicyReconciler(context).reconcile(desiredState(context, preferences));
+        EnforcementState desired = desiredState(context, preferences);
+        PolicyReconciler reconciler = new PolicyReconciler(context);
+        reconciler.reconcile(desired);
+        if (wasWebsiteSession) evictBrowsers(preferences, reconciler, desired);
         StatusNotifier.refresh(context, preferences);
         Log.i(TAG, "Session ended for " + packageName + ", charged " + chargedSeconds + "s"
                 + (measuredMs < 0 ? " (no usage access; quoted duration charged)" : ""));
+    }
+
+    /**
+     * Ends a website session on screen and not only in policy.
+     *
+     * <p>The rule is back in {@code URLBlocklist} by the time this runs, but Chromium checks
+     * that on navigation, and a feed the user is already scrolling never navigates again. The
+     * page would go on working until the user happened to type a new address, which for an
+     * infinite feed is never. Restarting the browsers the rule was lifted from forces the tab
+     * to be restored, and that restore is the navigation the policy catches.</p>
+     *
+     * <p>Every managed browser, not just the one the session was metered against: the rule was
+     * lifted from all of them, so the page could be open in any of them. A browser under a
+     * strict rule is left alone — putting the hide back would undo the rule.</p>
+     */
+    private static void evictBrowsers(AppPreferencesManagerSingleton preferences,
+                                      PolicyReconciler reconciler, EnforcementState desired) {
+        Set<String> targets = new HashSet<>(desired.managedBrowsers);
+        targets.removeAll(desired.hiddenPackages);
+        if (targets.isEmpty()) return;
+        preferences.setPendingBrowserEviction(targets);
+        try {
+            reconciler.evictBrowsers(targets);
+        } finally {
+            preferences.clearPendingBrowserEviction();
+        }
+    }
+
+    /**
+     * Puts back a browser that an eviction hid and never got to unhide. Nothing else would:
+     * the hide is deliberately outside the mirror, so a reconcile cannot see it.
+     */
+    private static void restoreInterruptedEviction(AppPreferencesManagerSingleton preferences,
+                                                   PolicyReconciler reconciler) {
+        Set<String> pending = preferences.getPendingBrowserEviction();
+        if (pending.isEmpty()) return;
+        Log.w(TAG, "Restoring " + pending.size() + " browser(s) from an interrupted eviction");
+        reconciler.restoreEvictedBrowsers(pending);
+        preferences.clearPendingBrowserEviction();
     }
 
     private static boolean hasExpiredSession(AppPreferencesManagerSingleton preferences) {
@@ -193,7 +240,9 @@ final class EnforcementCoordinator {
     static void releaseNow(Context context) {
         AppPreferencesManagerSingleton preferences =
                 AppPreferencesManagerSingleton.getInstance(context);
-        new PolicyReconciler(context).release();
+        PolicyReconciler reconciler = new PolicyReconciler(context);
+        restoreInterruptedEviction(preferences, reconciler);
+        reconciler.release();
         preferences.setIsBlockerActive(false);
         preferences.clearManagedSession();
         cancelDeadline(context);

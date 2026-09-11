@@ -43,6 +43,7 @@ public class AppPreferencesManagerSingleton {
     private static final String KEY_SESSION_START_WALL_MS = "managed_session_start_wall_ms";
     private static final String KEY_SESSION_DEADLINE_ELAPSED_MS = "managed_session_deadline_elapsed_ms";
     private static final String KEY_SESSION_URL_PATTERN = "managed_session_url_pattern";
+    private static final String KEY_PENDING_BROWSER_EVICTION = "pending_browser_eviction_v1";
     private static final String KEY_APPROVED_BROWSERS = "approved_browsers_v1";
     private static final String KEY_REJECTED_BROWSERS = "rejected_browsers_v1";
     private static final String KEY_RETIRED_KEYWORD_RULES = "retired_keyword_rules_v1";
@@ -477,6 +478,28 @@ public class AppPreferencesManagerSingleton {
                 .remove(KEY_SESSION_QUOTED_SECONDS)
                 .remove(KEY_SESSION_START_WALL_MS).remove(KEY_SESSION_DEADLINE_ELAPSED_MS)
                 .commit();
+    }
+
+    /**
+     * Browsers hidden for the instant it takes to force-stop them at the end of a website
+     * session, if that eviction is still in flight.
+     *
+     * <p>Written before the hide and removed after the unhide, both with {@code commit()}: the
+     * whole value of the record is that it is already on disk if the process dies in between,
+     * because a browser left hidden has no icon and nothing else tracking it.</p>
+     */
+    public Set<String> getPendingBrowserEviction() {
+        return new TreeSet<>(
+                decodeStringList(prefs.getString(KEY_PENDING_BROWSER_EVICTION, "")).values);
+    }
+
+    public void setPendingBrowserEviction(Set<String> packages) {
+        prefs.edit().putString(KEY_PENDING_BROWSER_EVICTION,
+                new JSONArray(sanitizeList(new ArrayList<>(packages))).toString()).commit();
+    }
+
+    public void clearPendingBrowserEviction() {
+        prefs.edit().remove(KEY_PENDING_BROWSER_EVICTION).commit();
     }
 
     /**

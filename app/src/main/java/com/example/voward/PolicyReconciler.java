@@ -206,6 +206,40 @@ final class PolicyReconciler {
     }
 
     /**
+     * Force-stops browsers so that whatever they have on screen has to be fetched again.
+     *
+     * <p>{@code URLBlocklist} is a navigation check. When a website session ends the rule goes
+     * straight back into the policy, but a page that is already loaded never navigates again —
+     * an infinite feed will scroll for hours on XHR alone — so the session would end in policy
+     * and not on screen.</p>
+     *
+     * <p>Suspension is not enough: verified on Samsung API 30, suspending the foreground
+     * browser drops it to the launcher but leaves the process and the loaded page alive.
+     * Hiding is the device owner's only force-stop, and a killed browser has to restore its
+     * tab from disk, which is the navigation the policy catches.</p>
+     *
+     * <p>The hidden state is put back immediately and never reaches the mirror, so this is
+     * outside {@link EnforcementState} on purpose. A caller must record the packages first —
+     * see {@link #restoreEvictedBrowsers} for what repairs an interrupted eviction.</p>
+     */
+    void evictBrowsers(Collection<String> browsers) {
+        if (!isProvisioned() || browsers == null || browsers.isEmpty()) return;
+        Set<String> targets = new HashSet<>(browsers);
+        Log.i(TAG, "Evicting " + targets.size() + " browser(s) to end a website session");
+        try {
+            setHidden(targets, true);
+        } finally {
+            setHidden(targets, false);
+        }
+    }
+
+    /** Undoes a hide that an interrupted {@link #evictBrowsers} left behind. */
+    void restoreEvictedBrowsers(Collection<String> browsers) {
+        if (!isProvisioned() || browsers == null || browsers.isEmpty()) return;
+        setHidden(new HashSet<>(browsers), false);
+    }
+
+    /**
      * Writes one sentinel rule to a single browser so the user can see for themselves whether
      * it honours the policy. Section 4.4: a browser that declares nothing is unknown, not
      * unsupported, and a Chromium fork can enforce a key it never advertises.
