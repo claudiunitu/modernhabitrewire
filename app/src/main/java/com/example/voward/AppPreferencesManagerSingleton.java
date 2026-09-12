@@ -20,7 +20,7 @@ public class AppPreferencesManagerSingleton {
     private static final String PREF_NAME = "global_preferences";
     private static final String PORTABLE_PREF_NAME = "portable_preferences";
     private static final String KEY_PORTABLE_MIGRATION_COMPLETE = "portable_migration_complete_v1";
-    public static final int PORTABLE_SCHEMA_VERSION = 7;
+    public static final int PORTABLE_SCHEMA_VERSION = 8;
     private static final String KEY_RESTRICTED_URL_LIST = "restricted_url_list";
     private static final String KEY_RESTRICTED_APP_LIST = "restricted_app_list";
     private static final String KEY_STRICT_URL_LIST = "strict_restricted_url_list";
@@ -1354,7 +1354,8 @@ public class AppPreferencesManagerSingleton {
                 .put("settingsResetGuardEnabled", isSettingsResetGuardEnabled())
                 .put("newAppQuarantineEnabled", isNewAppQuarantineEnabled())
                 .put("deactivationCooldownMinutes", getDeactivationCooldownMinutes())
-                .put("deactivationWindowHours", getDeactivationWindowHours());
+                .put("deactivationWindowHours", getDeactivationWindowHours())
+                .put("deadMansDays", getDeadMansSwitchDays());
     }
 
     public synchronized void importPortableState(JSONObject data) throws JSONException {
@@ -1424,6 +1425,8 @@ public class AppPreferencesManagerSingleton {
                 .putInt(KEY_DEACTIVATION_COOLDOWN_MINUTES, cooldownMinutes)
                 .remove(KEY_DEACTIVATION_COOLDOWN_HOURS)
                 .putInt(KEY_DEACTIVATION_WINDOW_HOURS, windowHours)
+                .putInt(KEY_DEAD_MANS_DAYS, DeadMansSwitchPolicy.clampDays(
+                        data.optInt("deadMansDays", DeadMansSwitchPolicy.DEFAULT_DAYS)))
                 .putBoolean(KEY_PORTABLE_MIGRATION_COMPLETE, true)
                 .apply();
         restrictedUrlsCache = immutableList(urls);

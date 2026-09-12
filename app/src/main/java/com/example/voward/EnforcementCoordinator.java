@@ -111,6 +111,10 @@ final class EnforcementCoordinator {
                 AppPreferencesManagerSingleton.getInstance(context);
         if (packageName == null || packageName.isEmpty() || quotedSeconds <= 0) return;
 
+        // Counted here rather than at the gate, because this is where a session is actually
+        // granted and both call sites pass through it. The re-entry pause grows from this
+        // count, and the sessions-today figures read it too.
+        new AttentionBudgetEngine(context).incrementSessionCount();
         long deadlineElapsed = SystemClock.elapsedRealtime()
                 + TimeUnit.SECONDS.toMillis(quotedSeconds);
         preferences.startManagedSession(packageName, urlPattern, quotedSeconds,

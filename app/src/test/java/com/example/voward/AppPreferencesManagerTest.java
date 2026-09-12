@@ -291,6 +291,7 @@ public class AppPreferencesManagerTest {
         preferences.setNewAppQuarantineEnabled(false);
         preferences.setDeactivationCooldownMinutes(48 * 60);
         preferences.setDeactivationWindowHours(3);
+        preferences.setDeadMansSwitchDays(30);
         preferences.setIsBlockerActive(true);
         preferences.setRemainingBudgetSeconds(123);
         preferences.setDeactivationKey("secret");
@@ -304,6 +305,7 @@ public class AppPreferencesManagerTest {
         assertFalse(exported.has("pendingDeactivation"));
         assertEquals(48 * 60, exported.getInt("deactivationCooldownMinutes"));
         assertEquals(3, exported.getInt("deactivationWindowHours"));
+        assertEquals(30, exported.getInt("deadMansDays"));
         assertFalse(exported.getBoolean("safeModeGuardEnabled"));
         assertTrue(exported.getBoolean("debuggingGuardEnabled"));
         assertFalse(exported.getBoolean("newAppQuarantineEnabled"));
@@ -321,6 +323,7 @@ public class AppPreferencesManagerTest {
         assertTrue(preferences.getIsBlockerActive());
         assertEquals(48 * 60, preferences.getDeactivationCooldownMinutes());
         assertEquals(3, preferences.getDeactivationWindowHours());
+        assertEquals(30, preferences.getDeadMansSwitchDays());
         assertFalse(preferences.isSafeModeGuardEnabled());
         assertTrue(preferences.isDebuggingGuardEnabled());
         assertTrue(preferences.isExtraUserGuardEnabled());
@@ -348,6 +351,7 @@ public class AppPreferencesManagerTest {
         assertFalse(preferences.isDebuggingGuardEnabled());
         assertFalse(preferences.isSettingsResetGuardEnabled());
         assertTrue(preferences.isNewAppQuarantineEnabled());
+        assertEquals(DeadMansSwitchPolicy.DEFAULT_DAYS, preferences.getDeadMansSwitchDays());
 
         assertThrows(JSONException.class, () -> preferences.importPortableState(
                 new JSONObject().put("schemaVersion", 0)));
