@@ -1,7 +1,5 @@
 package com.example.voward;
 
-import android.app.admin.DevicePolicyManager;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.BroadcastReceiver;
@@ -40,7 +38,6 @@ import androidx.core.widget.NestedScrollView;
 
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
-import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.android.material.textfield.TextInputLayout;
 
@@ -52,16 +49,20 @@ import java.nio.charset.StandardCharsets;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 /** Modern, state-first shell for the existing on-device enforcement engine. */
 public class ModernMainActivity extends AppCompatActivity {
     private AppPreferencesManagerSingleton preferences;
     private AttentionBudgetEngine budgetEngine;
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
+    private InfoSheet infoSheet;
     private boolean updatingFields;
     private final DeactivationPolicyEngine deactivationEngine = new DeactivationPolicyEngine();
     private DeactivationPolicyEngine.State deactivationNoticeState;
@@ -162,9 +163,15 @@ public class ModernMainActivity extends AppCompatActivity {
                 attemptActivation();
             }
         });
-        findViewById(R.id.firewallPermissionButton).setOnClickListener(v -> openAccessibilitySettings());
-        findViewById(R.id.guardPermissionButton).setOnClickListener(v -> configureOptionalGuard());
         findViewById(R.id.notificationPermissionButton).setOnClickListener(v -> requestNotifications());
+        findViewById(R.id.exactAlarmButton).setOnClickListener(v -> openExactAlarmSettings());
+        infoSheet = new InfoSheet(this);
+        bindInfoButtons();
+        findViewById(R.id.usageAccessButton).setOnClickListener(v -> openUsageAccessSettings());
+        findViewById(R.id.browserCheckButton).setOnClickListener(
+                v -> startActivity(new Intent(this, BrowserCheckActivity.class)));
+        findViewById(R.id.removeDeviceOwnerButton).setOnClickListener(
+                v -> confirmRemoveDeviceOwner());
         findViewById(R.id.cancelDeactivationRequestButton).setOnClickListener(v -> {
             preferences.clearPendingDeactivation();
             deactivationNoticeState = null;
@@ -183,12 +190,13 @@ public class ModernMainActivity extends AppCompatActivity {
         }
         String[] windowLabels = new String[WINDOW_HOURS.length];
         for (int i = 0; i < WINDOW_HOURS.length; i++) {
-            windowLabels[i] = getString(R.string.window_hours_choice, WINDOW_HOURS[i]);
+            windowLabels[i] = getResources().getQuantityString(
+                    R.plurals.window_hours_choice, WINDOW_HOURS[i], WINDOW_HOURS[i]);
         }
         cooldown.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_dropdown_item_1line, cooldownLabels));
+                R.layout.dropdown_menu_item, cooldownLabels));
         window.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_dropdown_item_1line, windowLabels));
+                R.layout.dropdown_menu_item, windowLabels));
         cooldown.setText(cooldownLabels[indexOf(COOLDOWN_MINUTES,
                 preferences.getDeactivationCooldownMinutes())], false);
         window.setText(windowLabels[indexOf(WINDOW_HOURS,
@@ -204,6 +212,84 @@ public class ModernMainActivity extends AppCompatActivity {
                 preferences.setDeactivationWindowHours(WINDOW_HOURS[position]);
             }
         });
+    }
+
+    /**
+     * A tamper restriction, writable only while protection is off. They take effect through
+     * the reconciler at activation; nothing here touches {@code DevicePolicyManager}.
+     */
+    private void watchGuardSwitch(int viewId, Consumer<Boolean> write) {
+        ((SwitchCompat) findViewById(viewId)).setOnCheckedChangeListener((view, checked) -> {
+            if (updatingFields || preferences.getIsBlockerActive()) return;
+            write.accept(checked);
+        });
+    }
+
+    /**
+     * The one restriction that closes an escape route rather than a bypass, so it is the one
+     * that asks first. Everything else here can be undone from a computer; this cannot.
+     */
+    private void watchDebuggingGuardSwitch() {
+        ((SwitchCompat) findViewById(R.id.debuggingGuardSwitch)).setOnCheckedChangeListener(
+                (view, checked) -> {
+                    if (updatingFields || preferences.getIsBlockerActive()) return;
+                    if (!checked) {
+                        preferences.setDebuggingGuardEnabled(false);
+                        return;
+                    }
+                    new AlertDialog.Builder(this)
+                            .setTitle(R.string.guard_debugging_confirm_title)
+                            .setMessage(R.string.guard_debugging_confirm_message)
+                            .setNegativeButton(R.string.cancel,
+                                    (dialog, which) -> view.setChecked(false))
+                            .setOnCancelListener(dialog -> view.setChecked(false))
+                            .setPositiveButton(R.string.guard_debugging_confirm,
+                                    (dialog, which) -> preferences.setDebuggingGuardEnabled(true))
+                            .show();
+                });
+    }
+
+    /**
+     * Section 7.1: every setting has its own info affordance, read-only status rows included.
+     * One sheet, bound at show time, and the content description names the setting so the row
+     * is distinguishable without sight.
+     */
+    private void bindInfoButtons() {
+        bindInfo(R.id.info_goal, R.string.info_goal_title, R.string.info_goal_body);
+        bindInfo(R.id.info_alternatives, R.string.info_alternatives_title, R.string.info_alternatives_body);
+        bindInfo(R.id.info_daily_allowance, R.string.info_daily_allowance_title, R.string.info_daily_allowance_body);
+        bindInfo(R.id.info_default_session, R.string.info_default_session_title, R.string.info_default_session_body);
+        bindInfo(R.id.info_base_pause, R.string.info_base_pause_title, R.string.info_base_pause_body);
+        bindInfo(R.id.info_reentry_growth, R.string.info_reentry_growth_title, R.string.info_reentry_growth_body);
+        bindInfo(R.id.info_recovery_key, R.string.info_recovery_key_title, R.string.info_recovery_key_body);
+        bindInfo(R.id.info_cooldown, R.string.info_cooldown_title, R.string.info_cooldown_body);
+        bindInfo(R.id.info_confirmation_window, R.string.info_confirmation_window_title, R.string.info_confirmation_window_body);
+        bindInfo(R.id.info_dead_mans_switch, R.string.info_dead_mans_switch_title, R.string.info_dead_mans_switch_body);
+        bindInfo(R.id.info_provisioning, R.string.info_provisioning_title, R.string.info_provisioning_body);
+        bindInfo(R.id.info_block_uninstall, R.string.info_block_uninstall_title, R.string.info_block_uninstall_body);
+        bindInfo(R.id.info_safe_mode, R.string.info_safe_mode_title, R.string.info_safe_mode_body);
+        bindInfo(R.id.info_extra_users, R.string.info_extra_users_title, R.string.info_extra_users_body);
+        bindInfo(R.id.info_clock, R.string.info_clock_title, R.string.info_clock_body);
+        bindInfo(R.id.info_settings_reset, R.string.info_settings_reset_title, R.string.info_settings_reset_body);
+        bindInfo(R.id.info_debugging, R.string.info_debugging_title, R.string.info_debugging_body);
+        bindInfo(R.id.info_browsers, R.string.info_browsers_title, R.string.info_browsers_body);
+        bindInfo(R.id.info_quarantine, R.string.info_quarantine_title,
+                R.string.info_quarantine_body);
+        bindInfo(R.id.info_app_rules, R.string.info_app_rules_title, R.string.info_app_rules_body);
+        bindInfo(R.id.info_website_rules, R.string.info_website_rules_title, R.string.info_website_rules_body);
+        bindInfo(R.id.info_notifications, R.string.info_notifications_title, R.string.info_notifications_body);
+        bindInfo(R.id.info_exact_alarms, R.string.info_exact_alarms_title, R.string.info_exact_alarms_body);
+        bindInfo(R.id.info_usage_access, R.string.info_usage_access_title, R.string.info_usage_access_body);
+        bindInfo(R.id.info_grayscale, R.string.info_grayscale_title, R.string.info_grayscale_body);
+        bindInfo(R.id.info_activate, R.string.info_activate_title, R.string.info_activate_body);
+        bindInfo(R.id.info_reset_stats, R.string.info_reset_stats_title, R.string.info_reset_stats_body);
+        bindInfo(R.id.info_remove_voward, R.string.info_remove_voward_title, R.string.info_remove_voward_body);
+    }
+
+    private void bindInfo(int buttonId, int titleRes, int bodyRes) {
+        View button = findViewById(buttonId);
+        button.setContentDescription(getString(R.string.about_setting, getString(titleRes)));
+        button.setOnClickListener(view -> infoSheet.show(titleRes, bodyRes));
     }
 
     private void openSetup() {
@@ -230,10 +316,25 @@ public class ModernMainActivity extends AppCompatActivity {
         ((EditText) findViewById(R.id.replacementThreeInput)).setText(preferences.getReplacementTask());
         ((SwitchCompat) findViewById(R.id.uninstallGuardSwitch)).setChecked(
                 preferences.isUninstallGuardEnabled());
+        ((EditText) findViewById(R.id.deadMansSwitchInput)).setText(String.valueOf(
+                preferences.getDeadMansSwitchDays()));
+        ((SwitchCompat) findViewById(R.id.safeModeGuardSwitch)).setChecked(
+                preferences.isSafeModeGuardEnabled());
+        ((SwitchCompat) findViewById(R.id.extraUserGuardSwitch)).setChecked(
+                preferences.isExtraUserGuardEnabled());
+        ((SwitchCompat) findViewById(R.id.clockGuardSwitch)).setChecked(
+                preferences.isClockGuardEnabled());
+        ((SwitchCompat) findViewById(R.id.settingsResetGuardSwitch)).setChecked(
+                preferences.isSettingsResetGuardEnabled());
+        ((SwitchCompat) findViewById(R.id.debuggingGuardSwitch)).setChecked(
+                preferences.isDebuggingGuardEnabled());
+        ((SwitchCompat) findViewById(R.id.quarantineSwitch)).setChecked(
+                preferences.isNewAppQuarantineEnabled());
         MaterialAutoCompleteTextView cooldown = findViewById(R.id.deactivationCooldownSpinner);
         MaterialAutoCompleteTextView window = findViewById(R.id.deactivationWindowSpinner);
         cooldown.setText(formatCooldownChoice(preferences.getDeactivationCooldownMinutes()), false);
-        window.setText(getString(R.string.window_hours_choice,
+        window.setText(getResources().getQuantityString(R.plurals.window_hours_choice,
+                preferences.getDeactivationWindowHours(),
                 preferences.getDeactivationWindowHours()), false);
         updatingFields = false;
         refreshCooldownControls();
@@ -252,6 +353,22 @@ public class ModernMainActivity extends AppCompatActivity {
                         preferences.setUninstallGuardEnabled(checked);
                     }
                 });
+        watch(R.id.deadMansSwitchInput, value -> {
+            if (preferences.getIsBlockerActive()) return;
+            int days = parseInt(value);
+            TextInputLayout layout = findViewById(R.id.deadMansSwitchInputLayout);
+            boolean valid = days >= DeadMansSwitchPolicy.MIN_DAYS
+                    && days <= DeadMansSwitchPolicy.MAX_DAYS;
+            layout.setError(valid ? null : getString(R.string.dead_mans_switch_error));
+            if (valid) preferences.setDeadMansSwitchDays(days);
+        });
+        watchGuardSwitch(R.id.safeModeGuardSwitch, preferences::setSafeModeGuardEnabled);
+        watchGuardSwitch(R.id.extraUserGuardSwitch, preferences::setExtraUserGuardEnabled);
+        watchGuardSwitch(R.id.clockGuardSwitch, preferences::setClockGuardEnabled);
+        watchGuardSwitch(R.id.settingsResetGuardSwitch,
+                preferences::setSettingsResetGuardEnabled);
+        watchGuardSwitch(R.id.quarantineSwitch, preferences::setNewAppQuarantineEnabled);
+        watchDebuggingGuardSwitch();
 
         watch(R.id.dailyBudgetInput, value -> {
             if (preferences.getIsBlockerActive()) return;
@@ -349,30 +466,40 @@ public class ModernMainActivity extends AppCompatActivity {
         if (preferences == null) return;
         budgetEngine.resetBudgetIfNeeded();
         boolean active = preferences.getIsBlockerActive();
-        boolean firewallReady = isAccessEnabled(AttentionFirewallService.class);
-        boolean guardReady = isGuardReady();
+        boolean provisioned = new PolicyReconciler(this).isProvisioned();
         boolean notificationsReady = areNotificationsReady();
         int appCount = preferences.getRestrictedAppPackages().size();
         int urlCount = preferences.getRestrictedUrls().size();
         int ruleCount = appCount + urlCount;
         long remaining = budgetEngine.getRemainingBudget();
 
-        boolean essentialsReady = firewallReady && ruleCount > 0
+        boolean essentialsReady = provisioned && ruleCount > 0
                 && preferences.getDailyAllowanceSeconds() > 0
                 && !preferences.getDeactivationKey().isEmpty();
         boolean operational = active && essentialsReady;
+        // Three states, not two: a fully configured app that is simply switched off is paused,
+        // and saying "setup needed" there contradicts the readiness card on the same screen.
+        boolean paused = !active && essentialsReady;
 
         TextView badge = findViewById(R.id.protectionStatusBadge);
-        badge.setText(operational ? R.string.protection_on_badge : R.string.protection_off_badge);
-        badge.setBackgroundResource(operational ? R.drawable.bg_status_active : R.drawable.bg_status_attention);
-        badge.setTextColor(ContextCompat.getColor(this,
-                operational ? R.color.status_positive : R.color.status_warning));
+        badge.setText(operational ? R.string.protection_on_badge
+                : paused ? R.string.protection_paused_badge : R.string.protection_off_badge);
+        badge.setBackgroundResource(operational ? R.drawable.bg_status_active
+                : paused ? R.drawable.bg_status_paused : R.drawable.bg_status_attention);
+        badge.setTextColor(ContextCompat.getColor(this, operational ? R.color.status_positive
+                : paused ? R.color.status_neutral : R.color.status_warning));
+        // Three states here too: "Ready when you are" over a SETUP NEEDED badge said the
+        // opposite of the badge and of the detail line right under it.
         ((TextView) findViewById(R.id.protectionStatusTitle)).setText(operational
                 ? R.string.protection_active_title
-                : active ? R.string.protection_incomplete_title : R.string.protection_needs_attention);
+                : active ? R.string.protection_incomplete_title
+                : paused ? R.string.protection_needs_attention
+                : R.string.protection_setup_title);
         ((TextView) findViewById(R.id.protectionStatusDetail)).setText(operational
                 ? R.string.protection_status_active_detail
-                : active ? R.string.protection_incomplete_detail : R.string.protection_status_inactive_detail);
+                : active ? R.string.protection_incomplete_detail
+                : paused ? R.string.protection_paused_detail
+                : R.string.protection_status_inactive_detail);
         ((TextView) findViewById(R.id.remainingBudgetValue)).setText(formatMinutesSeconds(remaining));
         int dailyAllowance = preferences.getDailyAllowanceSeconds();
         ((AllowanceRingView) findViewById(R.id.allowanceRing)).setFraction(
@@ -402,8 +529,10 @@ public class ModernMainActivity extends AppCompatActivity {
                 ? getString(R.string.no_sites_protected)
                 : getResources().getQuantityString(R.plurals.protected_sites_summary, urlCount, urlCount));
         findViewById(R.id.rulesLockBanner).setVisibility(active ? View.VISIBLE : View.GONE);
+        refreshKeywordRulesBanner();
+        refreshQuarantineBanner();
         int missing = 0;
-        if (!firewallReady) missing++;
+        if (!provisioned) missing++;
         if (ruleCount == 0) missing++;
         if (preferences.getDailyAllowanceSeconds() <= 0) missing++;
         if (preferences.getDeactivationKey().isEmpty()) missing++;
@@ -431,16 +560,21 @@ public class ModernMainActivity extends AppCompatActivity {
                 preferences.getBaseWaitTimeSeconds(),
                 Math.round(preferences.getReentryGrowth() * 100)));
 
-        refreshPermissionRow(R.id.firewallPermissionStatus, R.id.firewallPermissionButton,
-                firewallReady, R.string.firewall_permission_ready, R.string.firewall_permission_missing);
-        refreshPermissionRow(R.id.guardPermissionStatus, R.id.guardPermissionButton,
-                guardReady, R.string.uninstall_permission_ready, R.string.uninstall_permission_optional);
         refreshPermissionRow(R.id.notificationPermissionStatus, R.id.notificationPermissionButton,
                 notificationsReady, R.string.notifications_ready, R.string.notifications_optional);
+        refreshPermissionRow(R.id.exactAlarmStatus, R.id.exactAlarmButton,
+                AlarmPermission.isGranted(this),
+                R.string.exact_alarms_ready, R.string.exact_alarms_missing);
+        refreshPermissionRow(R.id.usageAccessStatus, R.id.usageAccessButton,
+                UsageMeter.hasUsageAccess(this),
+                R.string.usage_access_ready, R.string.usage_access_optional);
 
         ((TextView) findViewById(R.id.grayscaleStatus)).setText(
                 GrayscaleController.isGrayscaleAvailable(this)
                         ? R.string.grayscale_available : R.string.grayscale_unavailable);
+        ((TextView) findViewById(R.id.provisioningStatus)).setText(provisioned
+                ? R.string.provisioning_active : R.string.provisioning_inactive);
+        refreshDeviceOwnerRemoval(active);
         refreshRecovery(active);
     }
 
@@ -525,6 +659,95 @@ public class ModernMainActivity extends AppCompatActivity {
                 : getResources().getQuantityString(R.plurals.most_chosen_alternative,
                         weekAlternatives[mostChosen], labels[mostChosen],
                         weekAlternatives[mostChosen]));
+    }
+
+    /**
+     * Android will not uninstall the device owner app, so the only way off this phone that
+     * is not a factory reset is Voward giving the role up itself. Offered once protection is
+     * off, never while it is on.
+     */
+    /**
+     * Names the keyword rules that stopped being enforced when website rules moved into the
+     * browser. Losing a rule silently is the failure this app can least afford.
+     */
+    private void refreshKeywordRulesBanner() {
+        TextView banner = findViewById(R.id.keywordRulesRetiredBanner);
+        List<String> retired = preferences.getRetiredKeywordRules();
+        if (retired.isEmpty()) {
+            banner.setVisibility(View.GONE);
+            return;
+        }
+        banner.setText(getString(R.string.keyword_rules_retired, String.join(", ", retired)));
+        banner.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * Names the apps waiting on a decision. The paused-app dialog is the usual route, but not
+     * every OEM offers its details button, and a pause with no visible way to answer it is
+     * indistinguishable from a broken app.
+     */
+    private void refreshQuarantineBanner() {
+        TextView banner = findViewById(R.id.quarantinePendingBanner);
+        Set<String> waiting = preferences.getQuarantinedPackages();
+        if (waiting.isEmpty()) {
+            banner.setVisibility(View.GONE);
+            banner.setOnClickListener(null);
+            banner.setClickable(false);
+            return;
+        }
+        List<String> labels = new ArrayList<>();
+        for (String packageName : waiting) labels.add(labelOf(packageName));
+        banner.setText(getString(R.string.quarantine_pending, String.join(", ", labels)));
+        banner.setVisibility(View.VISIBLE);
+        // Asking the question here as well as from the paused-app dialog. That dialog's details
+        // button is the intended route and this phone's OEM does not offer one, which leaves an
+        // app paused with no way to answer for it — a hard block nobody chose. One app per tap;
+        // the banner comes back for the next until none are left.
+        String next = waiting.iterator().next();
+        banner.setOnClickListener(view -> startActivity(
+                new Intent(this, SuspendedAppDetailsActivity.class)
+                        .putExtra(Intent.EXTRA_PACKAGE_NAME, next)));
+    }
+
+    private String labelOf(String packageName) {
+        try {
+            return getPackageManager().getApplicationLabel(
+                    getPackageManager().getApplicationInfo(packageName, 0)).toString();
+        } catch (PackageManager.NameNotFoundException uninstalled) {
+            return packageName;
+        }
+    }
+
+    private void refreshDeviceOwnerRemoval(boolean active) {
+        boolean provisioned = new PolicyReconciler(this).isProvisioned();
+        findViewById(R.id.deviceOwnerStatus).setVisibility(
+                provisioned ? View.VISIBLE : View.GONE);
+        int visibility = provisioned && !active ? View.VISIBLE : View.GONE;
+        findViewById(R.id.removeDeviceOwnerButton).setVisibility(visibility);
+        // The info button goes with it: an explanation for a control nobody can see is a
+        // control pointing at nothing.
+        findViewById(R.id.info_remove_voward).setVisibility(visibility);
+    }
+
+    private void confirmRemoveDeviceOwner() {
+        if (preferences.getIsBlockerActive()) {
+            Toast.makeText(this, R.string.reset_stats_blocked, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.remove_voward_title)
+                .setMessage(R.string.remove_voward_message)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.remove_voward_confirm, (dialog, which) ->
+                        ioExecutor.execute(() -> {
+                            boolean removed = new PolicyReconciler(this).removeDeviceOwner();
+                            runOnUiThread(() -> {
+                                if (isDestroyed()) return;
+                                Toast.makeText(this, removed ? R.string.remove_voward_done
+                                        : R.string.remove_voward_failed, Toast.LENGTH_LONG).show();
+                                refreshAll();
+                            });
+                        })).show();
     }
 
     private void refreshPermissionRow(int statusId, int buttonId, boolean ready,
@@ -643,9 +866,10 @@ public class ModernMainActivity extends AppCompatActivity {
     }
 
     private void attemptActivation() {
-        if (!isAccessEnabled(AttentionFirewallService.class)) {
-            Toast.makeText(this, R.string.permission_required_to_activate, Toast.LENGTH_LONG).show();
-            openSetup();
+        // Nothing else on this screen can be enforced without it.
+        if (!new PolicyReconciler(this).isProvisioned()) {
+            Toast.makeText(this, R.string.provisioning_required_to_activate,
+                    Toast.LENGTH_LONG).show();
             return;
         }
         if (preferences.getRestrictedAppPackages().isEmpty() && preferences.getRestrictedUrls().isEmpty()) {
@@ -675,6 +899,7 @@ public class ModernMainActivity extends AppCompatActivity {
                 .setPositiveButton(R.string.activate_protection, (dialog, which) -> {
                     preferences.clearPendingDeactivation();
                     preferences.setIsBlockerActive(true);
+                    applyEnforcement();
                     deactivationNoticeState = null;
                     refreshAll();
                 }).show();
@@ -727,6 +952,7 @@ public class ModernMainActivity extends AppCompatActivity {
                     deactivationNoticeState = null;
                     populateEditableFields();
                     refreshAll();
+                    ioExecutor.execute(() -> EnforcementCoordinator.releaseNow(this));
                 }).show();
     }
 
@@ -740,6 +966,18 @@ public class ModernMainActivity extends AppCompatActivity {
             preferences.finishPendingDeactivation(result.state);
         }
         return result;
+    }
+
+    /**
+     * Hands the desired state to the one component allowed to talk to
+     * {@link android.app.admin.DevicePolicyManager}. Off the main thread because applying a
+     * policy is an IPC plus a disk write inside system_server.
+     */
+    private void applyEnforcement() {
+        ioExecutor.execute(() -> {
+            EnforcementCoordinator.schedulePeriodicReconcile(this);
+            EnforcementCoordinator.reconcileNow(this);
+        });
     }
 
     private int currentBootCount() {
@@ -801,24 +1039,18 @@ public class ModernMainActivity extends AppCompatActivity {
                 }).show();
     }
 
-    private void configureOptionalGuard() {
-        preferences.setUninstallGuardEnabled(true);
-        DevicePolicyManager manager = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
-        ComponentName admin = new ComponentName(this, MyDeviceAdminReceiver.class);
-        if (manager != null && !manager.isAdminActive(admin)) {
-            externalSettingsLauncher.launch(new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
-                    .putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin)
-                    .putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                            getString(R.string.uninstall_permission_optional)));
-        } else if (!isAccessEnabled(AttentionFirewallService.class)) {
-            openAccessibilitySettings();
-        } else {
-            refreshAll();
-        }
-    }
 
-    private void openAccessibilitySettings() {
-        externalSettingsLauncher.launch(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+    /**
+     * Without usage access a session is charged for its full quoted length; with it, only for
+     * the time the app was really in the foreground. Granted in Settings, not over adb.
+     */
+    private void openUsageAccessSettings() {
+        Intent intent = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS);
+        if (intent.resolveActivity(getPackageManager()) == null) {
+            Toast.makeText(this, R.string.usage_access_unavailable, Toast.LENGTH_LONG).show();
+            return;
+        }
+        externalSettingsLauncher.launch(intent);
     }
 
     private void requestNotifications() {
@@ -827,13 +1059,19 @@ public class ModernMainActivity extends AppCompatActivity {
         }
     }
 
-    private boolean isGuardReady() {
-        DevicePolicyManager manager = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
-        boolean admin = manager != null && manager.isAdminActive(
-                new ComponentName(this, MyDeviceAdminReceiver.class));
-        return preferences.isUninstallGuardEnabled() && admin
-                && isAccessEnabled(AttentionFirewallService.class);
+    /**
+     * Android 12 and later do not grant SCHEDULE_EXACT_ALARM at install, and nothing was asking
+     * for it, so every session deadline fell back to an inexact alarm and ran over.
+     */
+    private void openExactAlarmSettings() {
+        Intent intent = AlarmPermission.requestIntent(this);
+        if (intent == null || intent.resolveActivity(getPackageManager()) == null) {
+            Toast.makeText(this, R.string.exact_alarms_unavailable, Toast.LENGTH_LONG).show();
+            return;
+        }
+        externalSettingsLauncher.launch(intent);
     }
+
 
     private boolean areNotificationsReady() {
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
@@ -841,13 +1079,6 @@ public class ModernMainActivity extends AppCompatActivity {
                 == PackageManager.PERMISSION_GRANTED;
     }
 
-    private boolean isAccessEnabled(Class<?> serviceClass) {
-        String enabled = Settings.Secure.getString(
-                getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
-        String component = getPackageName() + "/" + serviceClass.getName();
-        return enabled != null && enabled.toLowerCase(Locale.ROOT)
-                .contains(component.toLowerCase(Locale.ROOT));
-    }
 
     @Override public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu_main, menu);
@@ -944,6 +1175,7 @@ public class ModernMainActivity extends AppCompatActivity {
     @Override protected void onDestroy() {
         deactivationUiHandler.removeCallbacks(deactivationUiRefresh);
         ioExecutor.shutdownNow();
+        if (infoSheet != null) infoSheet.dismiss();
         super.onDestroy();
     }
 
@@ -968,8 +1200,7 @@ public class ModernMainActivity extends AppCompatActivity {
 
     private String formatCooldownChoice(int minutes) {
         if (minutes == 0) return getString(R.string.cooldown_zero_choice);
-        if (minutes == 1) return getString(R.string.cooldown_one_minute_choice);
-        return getString(R.string.cooldown_hours_choice, minutes / 60);
+        return formatCooldownDuration(minutes);
     }
 
     private String formatCooldownDuration(int minutes) {
@@ -978,7 +1209,10 @@ public class ModernMainActivity extends AppCompatActivity {
     }
 
     private static String formatCompactDuration(long seconds) {
-        long minutes = Math.max(0, seconds) / 60;
+        long safe = Math.max(0, seconds);
+        long minutes = safe / 60;
+        // Rounding a real but short session down to "0m" next to "3 sessions" reads as a bug.
+        if (minutes == 0) return safe == 0 ? "0m" : "<1m";
         if (minutes < 60) return minutes + "m";
         return String.format(Locale.getDefault(), "%dh %02dm", minutes / 60, minutes % 60);
     }

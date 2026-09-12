@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /** Searchable full-screen app chooser that returns a package identifier. */
 public class InstalledAppPickerActivity extends AppCompatActivity {
@@ -65,11 +66,16 @@ public class InstalledAppPickerActivity extends AppCompatActivity {
     private List<AppChoice> loadChoices() {
         Intent launcher = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
         List<ResolveInfo> resolved = getPackageManager().queryIntentActivities(launcher, 0);
+        // The user is choosing from the live app list, so resolve it fresh: a dialer
+        // installed since this process started must not be selectable.
+        SafetyPolicy.invalidate();
+        Set<String> criticalPackages = SafetyPolicy.criticalPackages(this);
         List<AppChoice> choices = new ArrayList<>();
         for (ResolveInfo info : resolved) {
             if (info.activityInfo == null) continue;
             String packageName = info.activityInfo.packageName;
-            if (SafetyPolicy.isCriticalPackage(packageName, getPackageName())) continue;
+            if (SafetyPolicy.isCriticalPackage(
+                    packageName, getPackageName(), criticalPackages)) continue;
             choices.add(new AppChoice(String.valueOf(info.loadLabel(getPackageManager())),
                     packageName, info.loadIcon(getPackageManager())));
         }

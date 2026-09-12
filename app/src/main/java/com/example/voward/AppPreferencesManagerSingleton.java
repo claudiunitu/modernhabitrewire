@@ -7,18 +7,12 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
+import java.util.Set;
+import java.util.TreeSet;
 
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.PBEKeySpec;
 
 public class AppPreferencesManagerSingleton {
 
@@ -26,7 +20,7 @@ public class AppPreferencesManagerSingleton {
     private static final String PREF_NAME = "global_preferences";
     private static final String PORTABLE_PREF_NAME = "portable_preferences";
     private static final String KEY_PORTABLE_MIGRATION_COMPLETE = "portable_migration_complete_v1";
-    public static final int PORTABLE_SCHEMA_VERSION = 6;
+    public static final int PORTABLE_SCHEMA_VERSION = 8;
     private static final String KEY_RESTRICTED_URL_LIST = "restricted_url_list";
     private static final String KEY_RESTRICTED_APP_LIST = "restricted_app_list";
     private static final String KEY_STRICT_URL_LIST = "strict_restricted_url_list";
@@ -37,6 +31,28 @@ public class AppPreferencesManagerSingleton {
     private static final String KEY_REMAINING_BUDGET_SECONDS = "remaining_budget_seconds";
     private static final String KEY_LAST_BUDGET_RESET_DATE = "last_budget_reset_date";
     private static final String KEY_LAST_BUDGET_RESET_EPOCH_DAY = "last_budget_reset_epoch_day";
+    private static final String KEY_BUDGET_CLOCK_WALL_MS = "budget_clock_wall_ms";
+    private static final String KEY_BUDGET_CLOCK_ELAPSED_MS = "budget_clock_elapsed_ms";
+    private static final String KEY_BUDGET_CLOCK_BOOT_COUNT = "budget_clock_boot_count";
+    private static final String KEY_DEAD_MANS_WALL_MS = "dead_mans_wall_ms";
+    private static final String KEY_DEAD_MANS_ELAPSED_MS = "dead_mans_elapsed_ms";
+    private static final String KEY_DEAD_MANS_BOOT_COUNT = "dead_mans_boot_count";
+    private static final String KEY_DEAD_MANS_DAYS = "dead_mans_days";
+    private static final String KEY_SESSION_PACKAGE = "managed_session_package";
+    private static final String KEY_SESSION_QUOTED_SECONDS = "managed_session_quoted_seconds";
+    private static final String KEY_SESSION_START_WALL_MS = "managed_session_start_wall_ms";
+    private static final String KEY_SESSION_DEADLINE_ELAPSED_MS = "managed_session_deadline_elapsed_ms";
+    private static final String KEY_SESSION_URL_PATTERN = "managed_session_url_pattern";
+    private static final String KEY_SESSION_BOOT_COUNT = "managed_session_boot_count";
+    private static final String KEY_PENDING_BROWSER_EVICTION = "pending_browser_eviction_v1";
+    private static final String KEY_APPROVED_BROWSERS = "approved_browsers_v1";
+    private static final String KEY_REJECTED_BROWSERS = "rejected_browsers_v1";
+    private static final String KEY_RETIRED_KEYWORD_RULES = "retired_keyword_rules_v1";
+    private static final String KEY_KNOWN_PACKAGES = "known_packages_v1";
+    private static final String KEY_QUARANTINED_PACKAGES = "quarantined_packages_v1";
+    private static final String KEY_QUARANTINE_ENABLED = "new_app_quarantine_enabled";
+    private static final String KEY_BROWSER_VERDICT_TIMES = "browser_verdict_times_v1";
+    private static final String KEY_APP_LABELS = "app_labels_v1";
     private static final String KEY_TEMP_ALLOW_APP_LAUNCH = "temp_allow_app_launch";
     private static final String KEY_LAST_INTERCEPTED_APP = "last_intercepted_app";
     private static final String KEY_LAST_INTERCEPTED_URL = "last_intercepted_url";
@@ -59,6 +75,11 @@ public class AppPreferencesManagerSingleton {
 
     private static final String KEY_DEACTIVATION_HASH = "deactivation_hash";
     private static final String KEY_UNINSTALL_GUARD_ENABLED = "uninstall_guard_enabled";
+    private static final String KEY_SAFE_MODE_GUARD_ENABLED = "safe_mode_guard_enabled";
+    private static final String KEY_EXTRA_USER_GUARD_ENABLED = "extra_user_guard_enabled";
+    private static final String KEY_CLOCK_GUARD_ENABLED = "clock_guard_enabled";
+    private static final String KEY_DEBUGGING_GUARD_ENABLED = "debugging_guard_enabled";
+    private static final String KEY_SETTINGS_RESET_GUARD_ENABLED = "settings_reset_guard_enabled";
     private static final String KEY_DEACTIVATION_COOLDOWN_HOURS = "deactivation_cooldown_hours";
     private static final String KEY_DEACTIVATION_COOLDOWN_MINUTES = "deactivation_cooldown_minutes";
     private static final String KEY_DEACTIVATION_WINDOW_HOURS = "deactivation_window_hours";
@@ -75,15 +96,11 @@ public class AppPreferencesManagerSingleton {
     private static final String KEY_METRIC_FRICTION_SHOWN = "metric_friction_shown";
     private static final String KEY_METRIC_FRICTION_ENDURED = "metric_friction_endured";
     private static final String KEY_METRIC_FRICTION_ABORTED = "metric_friction_aborted";
-    private static final String KEY_METRIC_RETRY_LATENCY_SUM = "metric_retry_latency_sum";
-    private static final String KEY_METRIC_RETRY_COUNT = "metric_retry_count";
     private static final String KEY_METRIC_SESSIONS_ENDED_EARLY = "metric_sessions_ended_early";
     private static final String KEY_METRIC_SESSION_LIMIT_REACHED = "metric_session_limit_reached";
     private static final String KEY_DAILY_USAGE_HISTORY = "daily_usage_history_v1";
     private static final String KEY_DAILY_SESSION_HOURS = "daily_session_hours_v1";
     private static final String KEY_DAILY_ALTERNATIVE_CHOICES = "daily_alternative_choices_v1";
-    private static final int PBKDF2_ITERATIONS = 100_000;
-    private static final int PBKDF2_BITS = 256;
 
     private final SharedPreferences prefs;
     private final SharedPreferences portablePrefs;
@@ -223,6 +240,51 @@ public class AppPreferencesManagerSingleton {
         return portablePrefs.getBoolean(KEY_UNINSTALL_GUARD_ENABLED, false);
     }
 
+    public void setSafeModeGuardEnabled(boolean enabled) {
+        portablePrefs.edit().putBoolean(KEY_SAFE_MODE_GUARD_ENABLED, enabled).apply();
+    }
+
+    /** On by default: safe mode would otherwise switch protection off with a single reboot. */
+    public boolean isSafeModeGuardEnabled() {
+        return portablePrefs.getBoolean(KEY_SAFE_MODE_GUARD_ENABLED, true);
+    }
+
+    public void setExtraUserGuardEnabled(boolean enabled) {
+        portablePrefs.edit().putBoolean(KEY_EXTRA_USER_GUARD_ENABLED, enabled).apply();
+    }
+
+    /** On by default: a second user or profile is a clean copy of the phone, outside the rules. */
+    public boolean isExtraUserGuardEnabled() {
+        return portablePrefs.getBoolean(KEY_EXTRA_USER_GUARD_ENABLED, true);
+    }
+
+    public void setClockGuardEnabled(boolean enabled) {
+        portablePrefs.edit().putBoolean(KEY_CLOCK_GUARD_ENABLED, enabled).apply();
+    }
+
+    /** On by default: rolling the clock forward is the cheapest way to refill the allowance. */
+    public boolean isClockGuardEnabled() {
+        return portablePrefs.getBoolean(KEY_CLOCK_GUARD_ENABLED, true);
+    }
+
+    public void setDebuggingGuardEnabled(boolean enabled) {
+        portablePrefs.edit().putBoolean(KEY_DEBUGGING_GUARD_ENABLED, enabled).apply();
+    }
+
+    /** Off by default: ADB is the escape ladder's second rung, and closing it is a real cost. */
+    public boolean isDebuggingGuardEnabled() {
+        return portablePrefs.getBoolean(KEY_DEBUGGING_GUARD_ENABLED, false);
+    }
+
+    public void setSettingsResetGuardEnabled(boolean enabled) {
+        portablePrefs.edit().putBoolean(KEY_SETTINGS_RESET_GUARD_ENABLED, enabled).apply();
+    }
+
+    /** Off by default: it also disables the OEM-unlock toggle, which the user may still want. */
+    public boolean isSettingsResetGuardEnabled() {
+        return portablePrefs.getBoolean(KEY_SETTINGS_RESET_GUARD_ENABLED, false);
+    }
+
     public void setIsBlockerActive(Boolean flag) {
         SharedPreferences.Editor editor = prefs.edit().putBoolean(KEY_IS_BLOCKER_ACTIVE, flag);
         // Activation and successful deactivation both atomically discard stale local requests.
@@ -314,40 +376,9 @@ public class AppPreferencesManagerSingleton {
         return prefs.getBoolean(KEY_IS_BLOCKER_ACTIVE, false);
     }
 
-    private static String sha256Hex(String input) {
-        if (input == null || input.isEmpty()) return "";
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hex = new StringBuilder();
-            for (byte b : hash) hex.append(String.format(Locale.ROOT, "%02x", b));
-            return hex.toString();
-        } catch (NoSuchAlgorithmException e) {
-            // SHA-256 is guaranteed to be present on all Android versions
-            throw new RuntimeException("SHA-256 not available", e);
-        }
-    }
-
-    private static String createPasswordHash(String input) {
-        if (input == null || input.isEmpty()) return "";
-        try {
-            byte[] salt = new byte[16];
-            new SecureRandom().nextBytes(salt);
-            PBEKeySpec spec = new PBEKeySpec(input.toCharArray(), salt, PBKDF2_ITERATIONS, PBKDF2_BITS);
-            byte[] hash = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-                    .generateSecret(spec).getEncoded();
-            spec.clearPassword();
-            return "pbkdf2$" + PBKDF2_ITERATIONS + "$"
-                    + Base64.getEncoder().encodeToString(salt) + "$"
-                    + Base64.getEncoder().encodeToString(hash);
-        } catch (Exception e) {
-            throw new IllegalStateException("Unable to protect deactivation key", e);
-        }
-    }
-
     /** Store a salted, deliberately slow hash so plaintext is never persisted. */
     public void setDeactivationKey(String key) {
-        prefs.edit().putString(KEY_DEACTIVATION_HASH, createPasswordHash(key)).apply();
+        prefs.edit().putString(KEY_DEACTIVATION_HASH, RecoveryKeyHash.create(key)).apply();
     }
 
     /** Returns true if the stored hash is empty (no key has been set). */
@@ -358,28 +389,304 @@ public class AppPreferencesManagerSingleton {
     /** Compare a raw input against the stored hash without exposing the key. */
     public boolean verifyDeactivationKey(String input) {
         String stored = getDeactivationKey();
-        if (stored.isEmpty() || input == null) return false;
-        try {
-            if (stored.startsWith("pbkdf2$")) {
-                String[] parts = stored.split("\\$");
-                if (parts.length != 4) return false;
-                byte[] salt = Base64.getDecoder().decode(parts[2]);
-                byte[] expected = Base64.getDecoder().decode(parts[3]);
-                PBEKeySpec spec = new PBEKeySpec(input.toCharArray(), salt,
-                        Integer.parseInt(parts[1]), expected.length * 8);
-                byte[] actual = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-                        .generateSecret(spec).getEncoded();
-                spec.clearPassword();
-                return MessageDigest.isEqual(expected, actual);
-            }
-            boolean valid = MessageDigest.isEqual(
-                    stored.getBytes(StandardCharsets.US_ASCII),
-                    sha256Hex(input).getBytes(StandardCharsets.US_ASCII));
-            if (valid) setDeactivationKey(input);
-            return valid;
-        } catch (Exception ignored) {
-            return false;
+        if (!RecoveryKeyHash.matches(stored, input)) return false;
+        // A key that still validates against the pre-PBKDF2 format is upgraded on first use.
+        if (RecoveryKeyHash.isLegacyFormat(stored)) setDeactivationKey(input);
+        return true;
+    }
+
+    /**
+     * How many days without a successful health check release every restriction. Rung 3 of
+     * the escape ladder; see {@link DeadMansSwitchPolicy}.
+     */
+    public void setDeadMansSwitchDays(int days) {
+        portablePrefs.edit().putInt(KEY_DEAD_MANS_DAYS,
+                DeadMansSwitchPolicy.clampDays(days)).apply();
+    }
+
+    public int getDeadMansSwitchDays() {
+        return DeadMansSwitchPolicy.clampDays(portablePrefs.getInt(KEY_DEAD_MANS_DAYS,
+                DeadMansSwitchPolicy.DEFAULT_DAYS));
+    }
+
+    public long getDeadMansSwitchWallTimeMs() {
+        return prefs.getLong(KEY_DEAD_MANS_WALL_MS, DeadMansSwitchPolicy.NO_CHECK);
+    }
+
+    public long getDeadMansSwitchElapsedRealtimeMs() {
+        return prefs.getLong(KEY_DEAD_MANS_ELAPSED_MS, DeadMansSwitchPolicy.NO_CHECK);
+    }
+
+    public int getDeadMansSwitchBootCount() {
+        return prefs.getInt(KEY_DEAD_MANS_BOOT_COUNT, -1);
+    }
+
+    public void setDeadMansSwitchCheck(long wallTimeMs, long elapsedRealtimeMs, int bootCount) {
+        prefs.edit()
+                .putLong(KEY_DEAD_MANS_WALL_MS, wallTimeMs)
+                .putLong(KEY_DEAD_MANS_ELAPSED_MS, elapsedRealtimeMs)
+                .putInt(KEY_DEAD_MANS_BOOT_COUNT, bootCount)
+                .apply();
+    }
+
+    /**
+     * The one package unsuspended for an approved session, or empty. Held here rather than in
+     * the service because enforcement must survive the process dying mid-session.
+     */
+    public String getManagedSessionPackage() {
+        return prefs.getString(KEY_SESSION_PACKAGE, "");
+    }
+
+    public long getManagedSessionQuotedSeconds() {
+        return Math.max(0, prefs.getLong(KEY_SESSION_QUOTED_SECONDS, 0));
+    }
+
+    public long getManagedSessionStartWallMs() {
+        return prefs.getLong(KEY_SESSION_START_WALL_MS, 0);
+    }
+
+    /** Monotonic deadline, so a wall-clock change cannot extend a running session. */
+    public long getManagedSessionDeadlineElapsedMs() {
+        return prefs.getLong(KEY_SESSION_DEADLINE_ELAPSED_MS, 0);
+    }
+
+    /**
+     * The boot count when the session started, or {@link SessionDeadlinePolicy#UNKNOWN_BOOT_COUNT}
+     * for a session that started before this was recorded. The monotonic deadline above is only
+     * meaningful within one boot, and this is what says whether it still is.
+     */
+    public int getManagedSessionBootCount() {
+        return prefs.getInt(KEY_SESSION_BOOT_COUNT, SessionDeadlinePolicy.UNKNOWN_BOOT_COUNT);
+    }
+
+    /**
+     * The one website rule lifted for an approved session, or empty. A browser session lifts a
+     * rule rather than a package: the browser itself is never suspended, because it is where
+     * the filtering happens.
+     */
+    public String getManagedSessionUrlPattern() {
+        return prefs.getString(KEY_SESSION_URL_PATTERN, "");
+    }
+
+    public void startManagedSession(String packageName, long quotedSeconds, long startWallMs,
+                                    long deadlineElapsedMs, int bootCount) {
+        startManagedSession(packageName, null, quotedSeconds, startWallMs, deadlineElapsedMs,
+                bootCount);
+    }
+
+    public void startManagedSession(String packageName, String urlPattern, long quotedSeconds,
+                                    long startWallMs, long deadlineElapsedMs, int bootCount) {
+        prefs.edit()
+                .putString(KEY_SESSION_PACKAGE, packageName == null ? "" : packageName)
+                .putString(KEY_SESSION_URL_PATTERN, urlPattern == null ? "" : urlPattern)
+                .putLong(KEY_SESSION_QUOTED_SECONDS, Math.max(0, quotedSeconds))
+                .putLong(KEY_SESSION_START_WALL_MS, startWallMs)
+                .putLong(KEY_SESSION_DEADLINE_ELAPSED_MS, deadlineElapsedMs)
+                .putInt(KEY_SESSION_BOOT_COUNT, bootCount)
+                .commit();
+    }
+
+    public void clearManagedSession() {
+        prefs.edit().remove(KEY_SESSION_PACKAGE).remove(KEY_SESSION_URL_PATTERN)
+                .remove(KEY_SESSION_QUOTED_SECONDS)
+                .remove(KEY_SESSION_START_WALL_MS).remove(KEY_SESSION_DEADLINE_ELAPSED_MS)
+                .remove(KEY_SESSION_BOOT_COUNT)
+                .commit();
+    }
+
+    /**
+     * Browsers hidden for the instant it takes to force-stop them at the end of a website
+     * session, if that eviction is still in flight.
+     *
+     * <p>Written before the hide and removed after the unhide, both with {@code commit()}: the
+     * whole value of the record is that it is already on disk if the process dies in between,
+     * because a browser left hidden has no icon and nothing else tracking it.</p>
+     */
+    public Set<String> getPendingBrowserEviction() {
+        return new TreeSet<>(
+                decodeStringList(prefs.getString(KEY_PENDING_BROWSER_EVICTION, "")).values);
+    }
+
+    public void setPendingBrowserEviction(Set<String> packages) {
+        prefs.edit().putString(KEY_PENDING_BROWSER_EVICTION,
+                new JSONArray(sanitizeList(new ArrayList<>(packages))).toString()).commit();
+    }
+
+    public void clearPendingBrowserEviction() {
+        prefs.edit().remove(KEY_PENDING_BROWSER_EVICTION).commit();
+    }
+
+    /**
+     * Browsers the user has confirmed really do enforce {@code URLBlocklist}, and browsers the
+     * user has confirmed do not. A browser in neither set is judged by its manifest probe.
+     * Device-specific, so these are deliberately outside the portable configuration.
+     */
+    public Set<String> getApprovedBrowserPackages() {
+        return new TreeSet<>(decodeStringList(prefs.getString(KEY_APPROVED_BROWSERS, "")).values);
+    }
+
+    public Set<String> getRejectedBrowserPackages() {
+        return new TreeSet<>(decodeStringList(prefs.getString(KEY_REJECTED_BROWSERS, "")).values);
+    }
+
+    /** Records one "test this browser" verdict, clearing the opposite one for that package. */
+    public void setBrowserVerdict(String packageName, boolean filtersCorrectly) {
+        if (packageName == null || packageName.trim().isEmpty()) return;
+        String value = packageName.trim();
+        Set<String> approved = getApprovedBrowserPackages();
+        Set<String> rejected = getRejectedBrowserPackages();
+        if (filtersCorrectly) {
+            approved.add(value);
+            rejected.remove(value);
+        } else {
+            rejected.add(value);
+            approved.remove(value);
         }
+        prefs.edit()
+                .putString(KEY_APPROVED_BROWSERS, new JSONArray(approved).toString())
+                .putString(KEY_REJECTED_BROWSERS, new JSONArray(rejected).toString())
+                .putString(KEY_BROWSER_VERDICT_TIMES,
+                        withVerdictTime(value, System.currentTimeMillis()))
+                .apply();
+    }
+
+    /**
+     * When each verdict was given, so a browser that has been updated since can be re-judged.
+     * A verdict is evidence about the build that was tested, not about the package name.
+     */
+    public long getBrowserVerdictTime(String packageName) {
+        try {
+            return new JSONObject(prefs.getString(KEY_BROWSER_VERDICT_TIMES, "{}"))
+                    .optLong(packageName, 0);
+        } catch (JSONException unreadable) {
+            return 0;
+        }
+    }
+
+    private String withVerdictTime(String packageName, long whenMs) {
+        try {
+            JSONObject times = new JSONObject(prefs.getString(KEY_BROWSER_VERDICT_TIMES, "{}"));
+            times.put(packageName, whenMs);
+            return times.toString();
+        } catch (JSONException unreadable) {
+            return "{}";
+        }
+    }
+
+    /**
+     * The name a rule was written under, remembered so a strict rule keeps it.
+     *
+     * <p>Hiding a package removes it from {@code PackageManager}, so once protection is on the
+     * label cannot be resolved any more and the rule would show a raw package name — exactly
+     * when the user is least able to do anything about it.</p>
+     */
+    public void rememberAppLabel(String packageName, String label) {
+        if (packageName == null || packageName.isEmpty() || label == null) return;
+        String clean = label.trim();
+        if (clean.isEmpty() || clean.equals(packageName)) return;
+        try {
+            JSONObject labels = new JSONObject(prefs.getString(KEY_APP_LABELS, "{}"));
+            labels.put(packageName, clean);
+            prefs.edit().putString(KEY_APP_LABELS, labels.toString()).apply();
+        } catch (JSONException unreadable) {
+            prefs.edit().putString(KEY_APP_LABELS, "{}").apply();
+        }
+    }
+
+    /** The remembered name, or empty when none was ever recorded. */
+    public String getRememberedAppLabel(String packageName) {
+        if (packageName == null || packageName.isEmpty()) return "";
+        try {
+            return new JSONObject(prefs.getString(KEY_APP_LABELS, "{}"))
+                    .optString(packageName, "");
+        } catch (JSONException unreadable) {
+            return "";
+        }
+    }
+
+    public void setNewAppQuarantineEnabled(boolean enabled) {
+        portablePrefs.edit().putBoolean(KEY_QUARANTINE_ENABLED, enabled).apply();
+    }
+
+    /** On by default: an unnamed replacement app is the cheapest bypass the design has. */
+    public boolean isNewAppQuarantineEnabled() {
+        return portablePrefs.getBoolean(KEY_QUARANTINE_ENABLED, true);
+    }
+
+    /**
+     * What was installed at the last sweep. The quarantine works by diffing against this,
+     * because {@code ACTION_PACKAGE_ADDED} cannot be received from the manifest.
+     */
+    public Set<String> getKnownPackages() {
+        return new TreeSet<>(decodeStringList(prefs.getString(KEY_KNOWN_PACKAGES, "")).values);
+    }
+
+    public void setKnownPackages(Set<String> packages) {
+        prefs.edit().putString(KEY_KNOWN_PACKAGES,
+                new JSONArray(sanitizeList(new ArrayList<>(packages))).toString()).apply();
+    }
+
+    /** Apps paused pending one decision from the user. */
+    public Set<String> getQuarantinedPackages() {
+        return new TreeSet<>(
+                decodeStringList(prefs.getString(KEY_QUARANTINED_PACKAGES, "")).values);
+    }
+
+    public void addQuarantinedPackages(Set<String> packages) {
+        Set<String> merged = getQuarantinedPackages();
+        merged.addAll(packages);
+        writeQuarantine(merged);
+    }
+
+    /** The user has decided. Either a rule was written, or the app is theirs to use. */
+    public void releaseFromQuarantine(String packageName) {
+        Set<String> remaining = getQuarantinedPackages();
+        if (!remaining.remove(packageName)) return;
+        writeQuarantine(remaining);
+    }
+
+    public void clearQuarantine() {
+        prefs.edit().remove(KEY_QUARANTINED_PACKAGES).apply();
+    }
+
+    private void writeQuarantine(Set<String> packages) {
+        prefs.edit().putString(KEY_QUARANTINED_PACKAGES,
+                new JSONArray(sanitizeList(new ArrayList<>(packages))).toString()).apply();
+    }
+
+    /** Forgets a verdict, putting the browser back to being judged by its manifest probe. */
+    public void clearBrowserVerdict(String packageName) {
+        if (packageName == null || packageName.trim().isEmpty()) return;
+        String value = packageName.trim();
+        Set<String> approved = getApprovedBrowserPackages();
+        Set<String> rejected = getRejectedBrowserPackages();
+        if (!approved.remove(value) && !rejected.remove(value)) return;
+        prefs.edit()
+                .putString(KEY_APPROVED_BROWSERS, new JSONArray(approved).toString())
+                .putString(KEY_REJECTED_BROWSERS, new JSONArray(rejected).toString())
+                .apply();
+    }
+
+    /**
+     * The {@code keyword:} rules dropped when website rules moved into the browser. Kept so the
+     * user is told what stopped being enforced instead of discovering it themselves.
+     */
+    public List<String> getRetiredKeywordRules() {
+        return decodeStringList(prefs.getString(KEY_RETIRED_KEYWORD_RULES, "")).values;
+    }
+
+    public void setRetiredKeywordRules(List<String> rules) {
+        prefs.edit().putString(KEY_RETIRED_KEYWORD_RULES,
+                new JSONArray(sanitizeList(rules)).toString()).apply();
+    }
+
+    public void clearRetiredKeywordRules() {
+        prefs.edit().remove(KEY_RETIRED_KEYWORD_RULES).apply();
+    }
+
+    public void clearDeadMansSwitchCheck() {
+        prefs.edit().remove(KEY_DEAD_MANS_WALL_MS).remove(KEY_DEAD_MANS_ELAPSED_MS)
+                .remove(KEY_DEAD_MANS_BOOT_COUNT).apply();
     }
 
     public List<String> getRestrictedUrls() {
@@ -497,6 +804,20 @@ public class AppPreferencesManagerSingleton {
         return strictUrlsCache;
     }
 
+    /**
+     * The first website rule the URL matches, or empty.
+     *
+     * <p>An approved session lifts one rule, not one address, so the gate has to know which
+     * rule it is granting against.</p>
+     */
+    public String matchingRestrictedUrlRule(String url) {
+        if (url == null || url.trim().isEmpty()) return "";
+        for (String rule : getRestrictedUrls()) {
+            if (UrlPatternMatcher.matches(url, rule)) return rule;
+        }
+        return "";
+    }
+
     public boolean isStrictRestrictedUrlPattern(String pattern) {
         return containsIgnoreCase(getStrictRestrictedUrlsSnapshot(), pattern);
     }
@@ -556,7 +877,7 @@ public class AppPreferencesManagerSingleton {
     public boolean isRestrictedApp(String packageName) {
         getRestrictedAppPackages(); // Populate the volatile cache once.
         if (getIsBlockerActive() && restrictedAppsStorageCorrupt) {
-            return !SafetyPolicy.isCriticalPackage(packageName, appContext.getPackageName());
+            return !SafetyPolicy.isCriticalPackage(appContext, packageName);
         }
         return restrictedAppsCache.contains(packageName);
     }
@@ -666,6 +987,31 @@ public class AppPreferencesManagerSingleton {
 
     public void setLastBudgetResetEpochDay(long epochDay) {
         prefs.edit().putLong(KEY_LAST_BUDGET_RESET_EPOCH_DAY, epochDay).apply();
+    }
+
+    /**
+     * Clock readings taken when the daily allowance was last granted. They let the budget
+     * engine tell a real day boundary from a wall clock that was simply moved forward.
+     * Absent readings report {@link Long#MIN_VALUE} and a boot count of -1.
+     */
+    public long getBudgetClockWallTimeMs() {
+        return prefs.getLong(KEY_BUDGET_CLOCK_WALL_MS, Long.MIN_VALUE);
+    }
+
+    public long getBudgetClockElapsedRealtimeMs() {
+        return prefs.getLong(KEY_BUDGET_CLOCK_ELAPSED_MS, Long.MIN_VALUE);
+    }
+
+    public int getBudgetClockBootCount() {
+        return prefs.getInt(KEY_BUDGET_CLOCK_BOOT_COUNT, -1);
+    }
+
+    public void setBudgetClockMarker(long wallTimeMs, long elapsedRealtimeMs, int bootCount) {
+        prefs.edit()
+                .putLong(KEY_BUDGET_CLOCK_WALL_MS, wallTimeMs)
+                .putLong(KEY_BUDGET_CLOCK_ELAPSED_MS, elapsedRealtimeMs)
+                .putInt(KEY_BUDGET_CLOCK_BOOT_COUNT, bootCount)
+                .apply();
     }
 
     public boolean getTempAllowAppLaunch() {
@@ -912,14 +1258,6 @@ public class AppPreferencesManagerSingleton {
         int val = prefs.getInt(KEY_METRIC_FRICTION_ABORTED, 0);
         prefs.edit().putInt(KEY_METRIC_FRICTION_ABORTED, val + 1).apply();
     }
-    public void recordRetryLatency(long ms) {
-        long sum = prefs.getLong(KEY_METRIC_RETRY_LATENCY_SUM, 0);
-        int count = prefs.getInt(KEY_METRIC_RETRY_COUNT, 0);
-        prefs.edit().putLong(KEY_METRIC_RETRY_LATENCY_SUM, sum + ms)
-                   .putInt(KEY_METRIC_RETRY_COUNT, count + 1)
-                   .apply();
-    }
-
     public int getFrictionAbortedCount() {
         return prefs.getInt(KEY_METRIC_FRICTION_ABORTED, 0);
     }
@@ -1033,8 +1371,6 @@ public class AppPreferencesManagerSingleton {
                 .putInt(KEY_METRIC_FRICTION_SHOWN, 0)
                 .putInt(KEY_METRIC_FRICTION_ENDURED, 0)
                 .putInt(KEY_METRIC_FRICTION_ABORTED, 0)
-                .putLong(KEY_METRIC_RETRY_LATENCY_SUM, 0)
-                .putInt(KEY_METRIC_RETRY_COUNT, 0)
                 .putInt(KEY_METRIC_SESSIONS_ENDED_EARLY, 0)
                 .putInt(KEY_METRIC_SESSION_LIMIT_REACHED, 0)
                 .putString(KEY_DAILY_SESSION_HOURS, "[]")
@@ -1051,13 +1387,23 @@ public class AppPreferencesManagerSingleton {
                 .put("strictRestrictedApps", new JSONArray(getStrictRestrictedAppPackages()))
                 .put("dailyAllowanceSeconds", getDailyAllowanceSeconds())
                 .put("baseWaitTimeSeconds", getBaseWaitTimeSeconds())
-                .put("reentryGrowth", getReentryGrowth())
+                // Widening the stored float to a double writes 0.3499999940395355 for 35 %.
+                // The value is only ever set as whole percent, so two places is its real
+                // precision and the file the user keeps stops looking broken.
+                .put("reentryGrowth", Math.round(getReentryGrowth() * 100f) / 100d)
                 .put("defaultSessionSeconds", getDefaultSessionSeconds())
                 .put("carryoverCapDays", getCarryoverCapDays())
                 .put("launchFrictionEnabled", getLaunchFrictionEnabled())
                 .put("uninstallGuardEnabled", isUninstallGuardEnabled())
+                .put("safeModeGuardEnabled", isSafeModeGuardEnabled())
+                .put("extraUserGuardEnabled", isExtraUserGuardEnabled())
+                .put("clockGuardEnabled", isClockGuardEnabled())
+                .put("debuggingGuardEnabled", isDebuggingGuardEnabled())
+                .put("settingsResetGuardEnabled", isSettingsResetGuardEnabled())
+                .put("newAppQuarantineEnabled", isNewAppQuarantineEnabled())
                 .put("deactivationCooldownMinutes", getDeactivationCooldownMinutes())
-                .put("deactivationWindowHours", getDeactivationWindowHours());
+                .put("deactivationWindowHours", getDeactivationWindowHours())
+                .put("deadMansDays", getDeadMansSwitchDays());
     }
 
     public synchronized void importPortableState(JSONObject data) throws JSONException {
@@ -1112,9 +1458,23 @@ public class AppPreferencesManagerSingleton {
                 .putBoolean(KEY_UNINSTALL_GUARD_ENABLED, version >= 3
                         ? data.optBoolean("uninstallGuardEnabled", false)
                         : data.optBoolean("settingsLockEnabled", false))
+                .putBoolean(KEY_SAFE_MODE_GUARD_ENABLED,
+                        data.optBoolean("safeModeGuardEnabled", true))
+                .putBoolean(KEY_EXTRA_USER_GUARD_ENABLED,
+                        data.optBoolean("extraUserGuardEnabled", true))
+                .putBoolean(KEY_CLOCK_GUARD_ENABLED,
+                        data.optBoolean("clockGuardEnabled", true))
+                .putBoolean(KEY_DEBUGGING_GUARD_ENABLED,
+                        data.optBoolean("debuggingGuardEnabled", false))
+                .putBoolean(KEY_SETTINGS_RESET_GUARD_ENABLED,
+                        data.optBoolean("settingsResetGuardEnabled", false))
+                .putBoolean(KEY_QUARANTINE_ENABLED,
+                        data.optBoolean("newAppQuarantineEnabled", true))
                 .putInt(KEY_DEACTIVATION_COOLDOWN_MINUTES, cooldownMinutes)
                 .remove(KEY_DEACTIVATION_COOLDOWN_HOURS)
                 .putInt(KEY_DEACTIVATION_WINDOW_HOURS, windowHours)
+                .putInt(KEY_DEAD_MANS_DAYS, DeadMansSwitchPolicy.clampDays(
+                        data.optInt("deadMansDays", DeadMansSwitchPolicy.DEFAULT_DAYS)))
                 .putBoolean(KEY_PORTABLE_MIGRATION_COMPLETE, true)
                 .apply();
         restrictedUrlsCache = immutableList(urls);
@@ -1140,7 +1500,7 @@ public class AppPreferencesManagerSingleton {
             if (!isPlausiblePackageName(appPackage)) {
                 throw new JSONException("Invalid restricted app package: " + appPackage);
             }
-            if (SafetyPolicy.isCriticalPackage(appPackage, appContext.getPackageName())) {
+            if (SafetyPolicy.isCriticalPackage(appContext, appPackage)) {
                 throw new JSONException("Critical package cannot be restricted: " + appPackage);
             }
         }

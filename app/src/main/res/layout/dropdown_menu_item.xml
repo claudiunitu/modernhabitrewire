@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The platform's simple_dropdown_item_1line is one ellipsized line, which cut
+  "Confirm deactivation within: 24 hours" down to "…within: 24 ho..". These labels are
+  whole sentences, so the item wraps instead.
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:gravity="center_vertical"
+    android:minHeight="@dimen/touch_target_min"
+    android:paddingStart="@dimen/spacing_md"
+    android:paddingEnd="@dimen/spacing_md"
+    android:paddingTop="@dimen/spacing_sm"
+    android:paddingBottom="@dimen/spacing_sm"
+    android:textAppearance="?attr/textAppearanceBodyLarge" />

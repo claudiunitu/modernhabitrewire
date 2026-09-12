@@ -3,8 +3,16 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <!-- Hosts the offline browser block page on the device loopback interface only. -->
-    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Re-runs the policy reconcile at boot so a half-applied state heals immediately. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Measures how long an approved session was really spent in the app instead of charging
+         wall time. Granted by the user in Settings, not from a computer; sessions fall back to
+         the quoted duration without it. -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+    <!-- Ends an approved session on time whether or not Voward is still running. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- Grayscale mode: must be granted once via ADB:
          adb shell pm grant com.example.voward android.permission.WRITE_SECURE_SETTINGS -->
     <!-- Optional developer/device-owner feature; normal installs run without grayscale. -->
@@ -12,7 +20,7 @@
         android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
 
-    <!-- Package visibility is limited to launchable apps and explicitly supported browsers. -->
+    <!-- Package visibility: launchable apps, browsers, and the safety-critical components. -->
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
@@ -22,39 +30,40 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.APP_BROWSER" />
         </intent>
-        <package android:name="com.android.chrome" />
-        <package android:name="com.chrome.beta" />
-        <package android:name="com.chrome.dev" />
-        <package android:name="com.chrome.canary" />
-        <package android:name="com.brave.browser" />
-        <package android:name="com.brave.browser_beta" />
-        <package android:name="com.brave.browser_nightly" />
-        <package android:name="com.microsoft.emmx" />
-        <package android:name="com.microsoft.emmx.beta" />
-        <package android:name="com.microsoft.emmx.dev" />
-        <package android:name="com.microsoft.emmx.canary" />
-        <package android:name="com.vivaldi.browser" />
-        <package android:name="com.vivaldi.browser.snapshot" />
-        <package android:name="com.kiwibrowser.browser" />
-        <package android:name="org.cromite.cromite" />
-        <package android:name="com.ecosia.android" />
-        <package android:name="org.mozilla.firefox" />
-        <package android:name="org.mozilla.firefox_beta" />
-        <package android:name="org.mozilla.fenix" />
-        <package android:name="org.mozilla.focus" />
-        <package android:name="org.mozilla.klar" />
-        <package android:name="org.mozilla.fennec_fdroid" />
-        <package android:name="io.github.forkmaintainers.iceraven" />
-        <package android:name="us.spotco.fennec_dos" />
-        <package android:name="org.torproject.torbrowser" />
-        <package android:name="org.torproject.torbrowser_alpha" />
-        <package android:name="com.opera.browser" />
-        <package android:name="com.opera.browser.beta" />
-        <package android:name="com.opera.mini.native" />
-        <package android:name="com.opera.gx" />
-        <package android:name="com.duckduckgo.mobile.android" />
-        <package android:name="com.sec.android.app.sbrowser" />
-        <package android:name="com.sec.android.app.sbrowser.beta" />
+        <!-- Safety-critical components SafetyPolicy resolves instead of guessing by name. -->
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.CALL" />
+            <data android:scheme="tel" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.DIAL_EMERGENCY" />
+            <data android:scheme="tel" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.content.pm.action.REQUEST_PERMISSIONS" />
+        </intent>
+        <!-- Section 4.3: browsers are resolved, not listed. The hard-coded package list this
+             replaces could not see a browser released after it was written. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="http" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
     </queries>
 
     <application
@@ -109,6 +118,34 @@
             android:theme="@style/Theme.Voward.NoActionBar"
             android:parentActivityName="com.example.voward.AppPackagesListEditorActivity" />
             
+        <!-- Escape ladder rung 2. Exported so it can be started with
+             adb shell am start -n com.example.voward/.ReleaseActivity when the main screen
+             will not open. Opening it reveals nothing: it still demands the recovery key,
+             the cooldown, and the confirmation window. Its own task affinity and a platform
+             theme keep it independent of the rest of the app's UI. -->
+        <!-- Where the system's "paused by your admin" dialog sends the user. Without this
+             a suspended app has no route back to the decision gate. -->
+        <activity
+            android:name="com.example.voward.SuspendedAppDetailsActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:theme="@android:style/Theme.DeviceDefault.Light.Dialog.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.SHOW_SUSPENDED_APP_DETAILS" />
+                <!-- The platform sends this implicitly, package-targeted, so without DEFAULT
+                     the filter cannot resolve and the button leads nowhere. -->
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name="com.example.voward.ReleaseActivity"
+            android:exported="true"
+            android:label="@string/release_title"
+            android:taskAffinity=".release"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.DeviceDefault.Light.DarkActionBar" />
+
         <activity
             android:name="com.example.voward.DecisionGateActivity"
             android:exported="false"
@@ -117,18 +154,39 @@
             android:theme="@style/Theme.Voward.NoActionBar" />
 
         <service
-            android:name="com.example.voward.AttentionFirewallService"
-            android:enabled="true"
-            android:exported="true"
-            android:label="@string/accessibility_service_label"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            android:name="com.example.voward.PolicyReconcileJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <receiver
+            android:name="com.example.voward.SessionDeadlineReceiver"
+            android:exported="false" />
+
+        <!-- The only package event the platform still delivers to a manifest receiver. There
+             is no PACKAGE_ADDED equivalent; the short reconcile poll covers that direction. -->
+        <receiver
+            android:name="com.example.voward.PackageRemovedReceiver"
+            android:exported="true">
             <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
+                <action android:name="android.intent.action.PACKAGE_FULLY_REMOVED" />
+                <data android:scheme="package" />
             </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/attention_firewall_accessibility_service" />
-        </service>
+        </receiver>
+
+        <receiver
+            android:name="com.example.voward.BootCompletedReceiver"
+            android:exported="true"
+            android:directBootAware="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <activity
+            android:name="com.example.voward.BrowserCheckActivity"
+            android:exported="false"
+            android:label="@string/browser_check_title"
+            android:theme="@android:style/Theme.DeviceDefault.Light.DarkActionBar" />
 
         <receiver
             android:name="com.example.voward.MyDeviceAdminReceiver"

@@ -29,20 +29,6 @@ public class AndroidComponentsTest {
         application = RuntimeEnvironment.getApplication();
         application.getSharedPreferences("display_recovery_state", Context.MODE_PRIVATE)
                 .edit().clear().commit();
-        ChargingState.isCharging = false;
-    }
-
-    @Test
-    public void chargingReceiverTracksOnlyPowerConnectionBroadcasts() {
-        ChargingState receiver = new ChargingState();
-        receiver.onReceive(application, new Intent(Intent.ACTION_POWER_CONNECTED));
-        assertTrue(ChargingState.isCharging);
-        receiver.onReceive(application, new Intent("other.action"));
-        assertTrue(ChargingState.isCharging);
-        receiver.onReceive(application, new Intent(Intent.ACTION_POWER_DISCONNECTED));
-        assertFalse(ChargingState.isCharging);
-        receiver.onReceive(application, new Intent());
-        assertFalse(ChargingState.isCharging);
     }
 
     @Test

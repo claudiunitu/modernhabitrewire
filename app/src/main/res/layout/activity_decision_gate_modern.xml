@@ -106,7 +106,7 @@
                     </com.google.android.material.textfield.TextInputLayout>
                 </LinearLayout>
 
-                <TextView android:id="@+id/gatePlanSummary" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_lg" android:background="@drawable/bg_status_active" android:padding="@dimen/spacing_md" android:textAppearance="?attr/textAppearanceTitleMedium" android:visibility="gone" />
+                <TextView android:id="@+id/gatePlanSummary" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_lg" android:background="@drawable/bg_info_banner" android:padding="@dimen/spacing_md" android:textAppearance="?attr/textAppearanceTitleMedium" android:visibility="gone" />
                 <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_lg" android:text="@string/healthy_next_step" android:textAppearance="?attr/textAppearanceTitleMedium" />
                 <TextView android:id="@+id/replacement_prompt" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs" android:text="@string/gate_replacement_prompt" android:textAppearance="?attr/textAppearanceBodyMedium" android:textColor="?attr/colorOnSurfaceVariant" />
                 <com.google.android.material.chip.ChipGroup android:id="@+id/replacementActions" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_sm" app:chipSpacingHorizontal="@dimen/spacing_sm" app:chipSpacingVertical="@dimen/spacing_xs" app:singleLine="false">

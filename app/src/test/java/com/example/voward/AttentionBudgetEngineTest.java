@@ -12,6 +12,8 @@ import org.robolectric.annotation.Config;
 
 import java.lang.reflect.Field;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -140,6 +142,62 @@ public class AttentionBudgetEngineTest {
         assertEquals(0, preferences.getDailySessionCount());
         assertEquals(0, preferences.getFrictionAbortedCount());
         assertEquals(marker.toEpochDay(), preferences.getLastBudgetResetEpochDay());
+    }
+
+    @Test
+    public void forwardClockJumpWithoutMonotonicProgressGrantsNothing() {
+        LocalDate today = LocalDate.now();
+        long wall = today.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                + TimeUnit.HOURS.toMillis(9);
+        preferences.setDailyAllowanceSeconds(100);
+        preferences.setRemainingBudgetSeconds(0);
+        preferences.setLastBudgetResetEpochDay(today.toEpochDay());
+        preferences.setBudgetClockMarker(wall, TimeUnit.HOURS.toMillis(5), 7);
+
+        // The clock says tomorrow, elapsedRealtime says one more minute has passed.
+        engine.resetBudgetIfNeeded(wall + TimeUnit.DAYS.toMillis(1),
+                TimeUnit.HOURS.toMillis(5) + TimeUnit.MINUTES.toMillis(1), 7);
+
+        assertEquals(0, preferences.getRemainingBudgetSeconds());
+        assertEquals(today.toEpochDay(), preferences.getLastBudgetResetEpochDay());
+    }
+
+    @Test
+    public void realDayBoundaryIsGrantedWhenMonotonicTimeAgrees() {
+        LocalDate today = LocalDate.now();
+        long wall = today.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                + TimeUnit.HOURS.toMillis(9);
+        preferences.setDailyAllowanceSeconds(100);
+        preferences.setRemainingBudgetSeconds(0);
+        preferences.setLastBudgetResetEpochDay(today.toEpochDay());
+        preferences.setBudgetClockMarker(wall, TimeUnit.HOURS.toMillis(5), 7);
+
+        long day = TimeUnit.DAYS.toMillis(1);
+        engine.resetBudgetIfNeeded(wall + day, TimeUnit.HOURS.toMillis(5) + day, 7);
+
+        assertEquals(100, preferences.getRemainingBudgetSeconds());
+        assertEquals(today.plusDays(1).toEpochDay(), preferences.getLastBudgetResetEpochDay());
+        assertEquals(7, preferences.getBudgetClockBootCount());
+        assertEquals(TimeUnit.HOURS.toMillis(5) + day,
+                preferences.getBudgetClockElapsedRealtimeMs());
+    }
+
+    @Test
+    public void rebootCapsTheGrantAtOneDayInsteadOfWithholdingIt() {
+        LocalDate today = LocalDate.now();
+        long wall = today.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                + TimeUnit.HOURS.toMillis(9);
+        preferences.setDailyAllowanceSeconds(100);
+        preferences.setCarryoverCapDays(5);
+        preferences.setRemainingBudgetSeconds(0);
+        preferences.setLastBudgetResetEpochDay(today.minusDays(4).toEpochDay());
+        preferences.setBudgetClockMarker(wall, TimeUnit.HOURS.toMillis(90), 7);
+
+        // Monotonic time restarted, so four calendar days cannot be verified; one is paid.
+        engine.resetBudgetIfNeeded(wall, TimeUnit.MINUTES.toMillis(2), 8);
+
+        assertEquals(100, preferences.getRemainingBudgetSeconds());
+        assertEquals(today.toEpochDay(), preferences.getLastBudgetResetEpochDay());
     }
 
     private static void resetSingleton() throws Exception {

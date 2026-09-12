@@ -11,7 +11,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.material.checkbox.MaterialCheckBox;
+import com.google.android.material.chip.Chip;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -20,8 +20,7 @@ class UrlViewHolder extends RecyclerView.ViewHolder {
     TextView textView;
     TextView typeView;
     ImageView deleteButton;
-    MaterialCheckBox strictRuleCheckbox;
-    TextView strictBadge;
+    Chip strictRuleCheckbox;
 
     UrlViewHolder(@NonNull View itemView, Boolean isLocked) {
         super(itemView);
@@ -30,7 +29,6 @@ class UrlViewHolder extends RecyclerView.ViewHolder {
         typeView = itemView.findViewById(R.id.url_rule_type);
         deleteButton = itemView.findViewById(R.id.delete_button);
         strictRuleCheckbox = itemView.findViewById(R.id.strict_rule_checkbox);
-        strictBadge = itemView.findViewById(R.id.strict_badge);
         deleteButton.setVisibility(isLocked ? View.GONE : View.VISIBLE);
     }
 }
@@ -43,6 +41,11 @@ public class UrlListRecyclerAdapter extends RecyclerView.Adapter<UrlViewHolder> 
         void onDeleteClick(String url);
     }
 
+    /** Tapping a rule asks for a session against it. See UrlListEditorActivity. */
+    public interface OnRuleClickListener {
+        void onRuleClick(String url);
+    }
+
     public interface OnStrictChangedListener {
         void onStrictChanged(String url, boolean strict);
     }
@@ -50,14 +53,17 @@ public class UrlListRecyclerAdapter extends RecyclerView.Adapter<UrlViewHolder> 
     private List<String> urlList;
     private final OnDeleteClickListener deleteListener;
     private final OnStrictChangedListener strictChangedListener;
+    private final OnRuleClickListener ruleClickListener;
 
     public UrlListRecyclerAdapter(
             List<String> urlList,
             OnDeleteClickListener listener,
-            OnStrictChangedListener strictChangedListener) {
+            OnStrictChangedListener strictChangedListener,
+            OnRuleClickListener ruleClickListener) {
         this.urlList = urlList;
         this.deleteListener = listener;
         this.strictChangedListener = strictChangedListener;
+        this.ruleClickListener = ruleClickListener;
     }
 
     @NonNull
@@ -89,10 +95,6 @@ public class UrlListRecyclerAdapter extends RecyclerView.Adapter<UrlViewHolder> 
         holder.strictRuleCheckbox.setEnabled(!protectionActive || !strict);
         holder.strictRuleCheckbox.setClickable(!protectionActive || !strict);
         holder.strictRuleCheckbox.setFocusable(!protectionActive || !strict);
-        holder.strictRuleCheckbox.setText(protectionActive && strict
-                ? R.string.strict_rule_locked_label : R.string.strict_rule_row_label);
-        holder.strictBadge.setVisibility(holder.strictRuleCheckbox.isChecked()
-                ? View.VISIBLE : View.GONE);
         holder.strictRuleCheckbox.setOnCheckedChangeListener((button, checked) -> {
             if (appPreferencesManagerSingleton.getIsBlockerActive() && !checked) {
                 Toast.makeText(context, R.string.blocker_active_cannot_relax,
@@ -102,12 +104,12 @@ public class UrlListRecyclerAdapter extends RecyclerView.Adapter<UrlViewHolder> 
                 return;
             }
             strictChangedListener.onStrictChanged(url, checked);
-            holder.strictBadge.setVisibility(checked ? View.VISIBLE : View.GONE);
             if (appPreferencesManagerSingleton.getIsBlockerActive() && checked) {
                 int adapterPosition = holder.getBindingAdapterPosition();
                 if (adapterPosition != RecyclerView.NO_POSITION) notifyItemChanged(adapterPosition);
             }
         });
+        holder.itemView.setOnClickListener(v -> ruleClickListener.onRuleClick(url));
         holder.deleteButton.setOnClickListener(v -> {
             if(!appPreferencesManagerSingleton.getIsBlockerActive()){
                 deleteListener.onDeleteClick(url);

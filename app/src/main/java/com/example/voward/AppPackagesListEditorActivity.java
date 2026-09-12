@@ -1,22 +1,13 @@
 package com.example.voward;
 
 import android.content.Intent;
-import android.content.pm.ResolveInfo;
-import android.graphics.drawable.Drawable;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.text.Editable;
-import android.text.TextWatcher;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.BaseAdapter;
 import android.widget.Button;
-import android.widget.EditText;
-import android.widget.LinearLayout;
-import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -28,10 +19,6 @@ import com.google.android.material.checkbox.MaterialCheckBox;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Locale;
 
 public class AppPackagesListEditorActivity extends AppCompatActivity {
 
@@ -71,12 +58,22 @@ public class AppPackagesListEditorActivity extends AppCompatActivity {
             appPreferencesManagerSingleton.removeRestrictedAppPackage(packageName);
             refreshList();
         }, (packageName, strict) ->
-                appPreferencesManagerSingleton.setRestrictedAppStrict(packageName, strict));
+                appPreferencesManagerSingleton.setRestrictedAppStrict(packageName, strict),
+                this::requestSession);
 
         recyclerView.setAdapter(adapter);
         boolean locked = appPreferencesManagerSingleton.getIsBlockerActive();
-        findViewById(R.id.lockedBanner).setVisibility(locked ? View.VISIBLE : View.GONE);
+        TextView lockedBanner = findViewById(R.id.lockedBanner);
+        lockedBanner.setVisibility(locked ? View.VISIBLE : View.GONE);
+        // A suspended app cannot be launched, so nothing reaches the gate on its own. On the
+        // OEMs whose paused-app dialog offers no details button, tapping a row here is the
+        // only route to a session, so it has to be said.
+        if (locked) {
+            lockedBanner.setText(getString(R.string.rules_locked_read_only)
+                    + " " + getString(R.string.app_session_hint));
+        }
         findViewById(R.id.editorComposer).setVisibility(View.VISIBLE);
+        RuleComposer.bind(this, appPreferencesManagerSingleton.getRestrictedAppPackages().isEmpty());
         refreshList();
 
         addButton.setOnClickListener(v -> {
@@ -106,6 +103,34 @@ public class AppPackagesListEditorActivity extends AppCompatActivity {
         return true;
     }
 
+    /**
+     * The way back to the gate for an app rule.
+     *
+     * <p>A suspended package has no launch to intercept, and the system's "paused by your
+     * admin" dialog only reaches {@link SuspendedAppDetailsActivity} on the OEMs that offer a
+     * details button. Without this the rule would quietly become a hard block on every other
+     * device, which is exactly what strict mode is for.</p>
+     */
+    private void requestSession(String packageName) {
+        if (!appPreferencesManagerSingleton.getIsBlockerActive()) return;
+        if (appPreferencesManagerSingleton.isStrictRestrictedApp(packageName)) {
+            Toast.makeText(this, R.string.strict_rule_no_session, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            // Suspension does not hide a package, so this still resolves for a paused app.
+            // A rule written ahead of the install it names is what it screens out.
+            getPackageManager().getApplicationInfo(packageName, 0);
+        } catch (PackageManager.NameNotFoundException notInstalled) {
+            Toast.makeText(this, R.string.app_session_not_installed, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        appPreferencesManagerSingleton.setLastInterceptedApp(packageName);
+        appPreferencesManagerSingleton.setLastInterceptedUrl("");
+        appPreferencesManagerSingleton.setLastInterceptionKind("APP");
+        startActivity(new Intent(this, DecisionGateActivity.class));
+    }
+
     private void refreshList() {
         adapter.updateList(appPreferencesManagerSingleton.getRestrictedAppPackages());
         findViewById(R.id.emptyState).setVisibility(
@@ -113,117 +138,29 @@ public class AppPackagesListEditorActivity extends AppCompatActivity {
                         ? View.VISIBLE : View.GONE);
     }
 
+    /** The installed app's name, or empty when the rule names something not installed yet. */
+    private String resolveLabel(String packageName) {
+        try {
+            return getPackageManager().getApplicationLabel(
+                    getPackageManager().getApplicationInfo(packageName, 0)).toString();
+        } catch (PackageManager.NameNotFoundException notInstalled) {
+            return "";
+        }
+    }
+
     private boolean addValidatedPackage(String packageName, boolean strict) {
-        if (SafetyPolicy.isCriticalPackage(packageName, getPackageName())) {
+        if (SafetyPolicy.isCriticalPackage(this, packageName)) {
             Toast.makeText(this, R.string.critical_app_cannot_be_blocked, Toast.LENGTH_LONG).show();
             return false;
         }
         if (!AppPreferencesManagerSingleton.isPlausiblePackageName(packageName)) return false;
         appPreferencesManagerSingleton.addRestrictedAppPackage(packageName, strict);
+        // Recorded now, while the package still resolves: a strict rule hides it, and a hidden
+        // package has no label left to look up.
+        appPreferencesManagerSingleton.rememberAppLabel(packageName, resolveLabel(packageName));
         if (newStrictRuleCheckbox != null) newStrictRuleCheckbox.setChecked(false);
         refreshList();
         return true;
     }
 
-    private void showInstalledAppPicker() {
-        Intent launcherIntent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
-        List<ResolveInfo> resolved = getPackageManager().queryIntentActivities(launcherIntent, 0);
-        List<AppChoice> choices = new ArrayList<>();
-        for (ResolveInfo info : resolved) {
-            if (info.activityInfo == null) continue;
-            String packageName = info.activityInfo.packageName;
-            if (SafetyPolicy.isCriticalPackage(packageName, getPackageName())) continue;
-            String label = String.valueOf(info.loadLabel(getPackageManager()));
-            choices.add(new AppChoice(label, packageName, info.loadIcon(getPackageManager())));
-        }
-        choices.sort(Comparator.comparing(choice -> choice.label, String.CASE_INSENSITIVE_ORDER));
-        LinearLayout container = new LinearLayout(this);
-        container.setOrientation(LinearLayout.VERTICAL);
-        int padding = (int) (16 * getResources().getDisplayMetrics().density);
-        container.setPadding(padding, padding / 2, padding, 0);
-        EditText search = new EditText(this);
-        search.setHint(R.string.search_apps);
-        search.setSingleLine(true);
-        ListView list = new ListView(this);
-        AppChoiceAdapter pickerAdapter = new AppChoiceAdapter(choices);
-        list.setAdapter(pickerAdapter);
-        container.addView(search, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        container.addView(list, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                (int) (360 * getResources().getDisplayMetrics().density)));
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(R.string.choose_installed_app)
-                .setView(container)
-                .setNegativeButton(R.string.cancel, null)
-                .create();
-        list.setOnItemClickListener((parent, view, position, id) -> {
-            addValidatedPackage(pickerAdapter.getItem(position).packageName,
-                    newStrictRuleCheckbox != null && newStrictRuleCheckbox.isChecked());
-            dialog.dismiss();
-        });
-        search.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                pickerAdapter.filter(s.toString());
-            }
-            @Override public void afterTextChanged(Editable s) {}
-        });
-        dialog.show();
-    }
-
-    private static final class AppChoice {
-        final String label;
-        final String packageName;
-        final Drawable icon;
-        AppChoice(String label, String packageName, Drawable icon) {
-            this.label = label;
-            this.packageName = packageName;
-            this.icon = icon;
-        }
-    }
-
-    private final class AppChoiceAdapter extends BaseAdapter {
-        private final List<AppChoice> all;
-        private final List<AppChoice> shown;
-
-        AppChoiceAdapter(List<AppChoice> choices) {
-            all = new ArrayList<>(choices);
-            shown = new ArrayList<>(choices);
-        }
-
-        void filter(String query) {
-            String needle = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
-            shown.clear();
-            for (AppChoice choice : all) {
-                if (needle.isEmpty() || choice.label.toLowerCase(Locale.ROOT).contains(needle)
-                        || choice.packageName.toLowerCase(Locale.ROOT).contains(needle)) {
-                    shown.add(choice);
-                }
-            }
-            notifyDataSetChanged();
-        }
-
-        @Override public int getCount() { return shown.size(); }
-        @Override public AppChoice getItem(int position) { return shown.get(position); }
-        @Override public long getItemId(int position) { return position; }
-
-        @Override
-        public View getView(int position, View convertView, ViewGroup parent) {
-            View row = convertView;
-            if (row == null) {
-                row = getLayoutInflater().inflate(android.R.layout.simple_list_item_2, parent, false);
-            }
-            AppChoice choice = getItem(position);
-            TextView title = row.findViewById(android.R.id.text1);
-            TextView subtitle = row.findViewById(android.R.id.text2);
-            title.setText(choice.label);
-            subtitle.setText(choice.packageName);
-            int iconSize = (int) (40 * getResources().getDisplayMetrics().density);
-            if (choice.icon != null) choice.icon.setBounds(0, 0, iconSize, iconSize);
-            title.setCompoundDrawablePadding((int) (12 * getResources().getDisplayMetrics().density));
-            title.setCompoundDrawables(choice.icon, null, null, null);
-            return row;
-        }
-    }
 }

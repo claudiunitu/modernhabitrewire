@@ -136,7 +136,7 @@ public class ActivityAndAdapterTest {
         preferences.setIsBlockerActive(true);
         UrlListRecyclerAdapter adapter = new UrlListRecyclerAdapter(
                 preferences.getRestrictedUrls(), preferences::removeUrl,
-                preferences::setRestrictedUrlStrict);
+                preferences::setRestrictedUrlStrict, url -> { });
         ActivityController<UrlListEditorActivity> controller =
                 Robolectric.buildActivity(UrlListEditorActivity.class).setup();
         UrlViewHolder holder = adapter.onCreateViewHolder(new FrameLayout(controller.get()), 0);
@@ -158,9 +158,11 @@ public class ActivityAndAdapterTest {
         AtomicReference<String> deleted = new AtomicReference<>();
         AtomicReference<String> strictChanged = new AtomicReference<>();
         AtomicBoolean strictValue = new AtomicBoolean();
+        AtomicReference<String> tapped = new AtomicReference<>();
         UrlListRecyclerAdapter adapter = new UrlListRecyclerAdapter(
                 preferences.getRestrictedUrls(), deleted::set,
-                (url, strict) -> { strictChanged.set(url); strictValue.set(strict); });
+                (url, strict) -> { strictChanged.set(url); strictValue.set(strict); },
+                tapped::set);
         ActivityController<UrlListEditorActivity> controller =
                 Robolectric.buildActivity(UrlListEditorActivity.class).setup();
         FrameLayout parent = new FrameLayout(controller.get());
@@ -175,6 +177,10 @@ public class ActivityAndAdapterTest {
         holder.strictRuleCheckbox.setChecked(true);
         assertEquals("example.com", strictChanged.get());
         assertTrue(strictValue.get());
+        // Tapping the row is the only way to ask for a session once the browser enforces the
+        // rule itself, so the row has to report the tap.
+        holder.itemView.performClick();
+        assertEquals("example.com", tapped.get());
 
         adapter.onBindViewHolder(holder, 1);
         assertEquals(application.getString(R.string.url_rule_path), holder.typeView.getText());
@@ -192,9 +198,10 @@ public class ActivityAndAdapterTest {
         preferences.setRestrictedAppStrict("missing.package", true);
         AtomicReference<String> deleted = new AtomicReference<>();
         AtomicBoolean changed = new AtomicBoolean();
+        AtomicReference<String> tapped = new AtomicReference<>();
         AppPackagesListRecyclerAdapter adapter = new AppPackagesListRecyclerAdapter(
                 preferences.getRestrictedAppPackages(), deleted::set,
-                (name, strict) -> changed.set(!strict));
+                (name, strict) -> changed.set(!strict), tapped::set);
         ActivityController<AppPackagesListEditorActivity> controller =
                 Robolectric.buildActivity(AppPackagesListEditorActivity.class).setup();
         AppPackagesViewHolder holder = adapter.onCreateViewHolder(
@@ -208,6 +215,10 @@ public class ActivityAndAdapterTest {
         assertEquals("missing.package", deleted.get());
         holder.strictRuleCheckbox.setChecked(false);
         assertTrue(changed.get());
+        // A suspended app has no launch to intercept, so tapping the row is the only route to
+        // a session on an OEM whose paused-app dialog offers no details button.
+        holder.itemView.performClick();
+        assertEquals("missing.package", tapped.get());
         adapter.updateList(List.of("one", "two"));
         assertEquals(2, adapter.getItemCount());
         controller.destroy();

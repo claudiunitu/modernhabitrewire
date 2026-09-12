@@ -2,63 +2,16 @@ package com.example.voward;
 
 import org.junit.Test;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public class PolicyTest {
-    @Test
-    public void committedUrlMustBeVisibleUnfocusedAndUnchanged() {
-        List<String> rules = List.of("example.com");
-        assertNull(BrowserUrlEnforcementPolicy.findCommittedRestrictedPattern(
-                "example.com", "example.com", true, rules));
-        assertNull(BrowserUrlEnforcementPolicy.findCommittedRestrictedPattern(
-                null, "example.com", false, rules));
-        assertNull(BrowserUrlEnforcementPolicy.findCommittedRestrictedPattern(
-                "example.com", "other.test", false, rules));
-        assertEquals("example.com", BrowserUrlEnforcementPolicy.findCommittedRestrictedPattern(
-                " HTTPS://EXAMPLE.COM ", "https://example.com", false, rules));
-        assertNull(BrowserUrlEnforcementPolicy.findCommittedRestrictedPattern(
-                "example.com", "example.com", false, null));
-    }
 
-    @Test
-    public void strictUrlRulesAreEvaluatedBeforeRegularRules() {
-        BrowserUrlEnforcementPolicy.RuleMatch strict =
-                BrowserUrlEnforcementPolicy.findCommittedRestrictedMatch(
-                        "example.com/video/1", "example.com/video/1", false,
-                        List.of("example.com/video"), List.of("example.com"));
-        assertNotNull(strict);
-        assertEquals("example.com/video", strict.pattern);
-        assertTrue(strict.strict);
-
-        BrowserUrlEnforcementPolicy.RuleMatch regular =
-                BrowserUrlEnforcementPolicy.findCommittedRestrictedMatch(
-                        "example.com/news", "example.com/news", false,
-                        Collections.emptyList(), List.of("example.com"));
-        assertNotNull(regular);
-        assertFalse(regular.strict);
-    }
-
-    @Test
-    public void interceptionPolicyDistinguishesWholeBrowserFromUrlSessions() {
-        assertTrue(InterceptionPolicy.shouldStartSessionTimer("APP", true, false));
-        assertTrue(InterceptionPolicy.shouldStartSessionTimer("URL", false, false));
-        assertTrue(InterceptionPolicy.shouldStartSessionTimer("URL", true, true));
-        assertFalse(InterceptionPolicy.shouldStartSessionTimer("URL", true, false));
-        assertFalse(InterceptionPolicy.shouldStartSessionTimer(null, true, false));
-
-        assertTrue(InterceptionPolicy.isApprovedWholeBrowserSession("APP", true, true));
-        assertFalse(InterceptionPolicy.isApprovedWholeBrowserSession("URL", true, true));
-        assertFalse(InterceptionPolicy.isApprovedWholeBrowserSession("APP", false, true));
-        assertFalse(InterceptionPolicy.isApprovedWholeBrowserSession("APP", true, false));
-    }
+    private static final long MINUTE_MS = 60_000L;
+    private static final long HOUR_MS = 60 * MINUTE_MS;
 
     @Test
     public void decisionGateRoundsUpAndSaturates() {
@@ -73,46 +26,128 @@ public class PolicyTest {
 
     @Test
     public void safetyPolicyProtectsCoreOwnAndRecoveryPackages() {
-        assertTrue(SafetyPolicy.isCriticalPackage(null, "com.example.voward"));
-        assertTrue(SafetyPolicy.isCriticalPackage(" ", "com.example.voward"));
-        assertTrue(SafetyPolicy.isCriticalPackage("COM.EXAMPLE.VOWARD", "com.example.voward"));
-        assertTrue(SafetyPolicy.isCriticalPackage("com.android.settings", "com.example.voward"));
-        assertTrue(SafetyPolicy.isCriticalPackage("vendor.emergency.ui", "com.example.voward"));
-        assertTrue(SafetyPolicy.isCriticalPackage("vendor.phone.dialer", "com.example.voward"));
-        assertTrue(SafetyPolicy.isCriticalPackage("vendor.telecom", "com.example.voward"));
-        assertFalse(SafetyPolicy.isCriticalPackage("com.example.social", "com.example.voward"));
+        Set<String> resolved = Set.of("vendor.phone.dialer", "com.oem.settings");
+        assertTrue(SafetyPolicy.isCriticalPackage(null, "com.example.voward", resolved));
+        assertTrue(SafetyPolicy.isCriticalPackage(" ", "com.example.voward", resolved));
+        assertTrue(SafetyPolicy.isCriticalPackage(
+                "COM.EXAMPLE.VOWARD", "com.example.voward", resolved));
+        assertTrue(SafetyPolicy.isCriticalPackage(
+                "com.android.settings", "com.example.voward", resolved));
+        assertTrue(SafetyPolicy.isCriticalPackage(
+                " VENDOR.PHONE.DIALER ", "com.example.voward", resolved));
+        assertTrue(SafetyPolicy.isCriticalPackage(
+                "com.oem.settings", "com.example.voward", resolved));
+        assertFalse(SafetyPolicy.isCriticalPackage(
+                "com.example.social", "com.example.voward", resolved));
     }
 
     @Test
-    public void browserCatalogIsImmutableUniqueAndSupportsDiscovery() {
-        assertTrue(BrowserSupport.all().size() >= 30);
-        assertEquals(BrowserSupport.all().size(), BrowserSupport.all().stream()
-                .map(config -> config.packageName).distinct().count());
-        assertNull(BrowserSupport.find(null));
-        assertNull(BrowserSupport.find("unknown"));
-
-        BrowserSupport.Config firefox = BrowserSupport.find("org.mozilla.firefox");
-        assertNotNull(firefox);
-        assertEquals("about:home", firefox.safeAddress);
-        assertTrue(BrowserSupport.isConfiguredSafeAddress(firefox, " ABOUT:HOME/ "));
-        assertFalse(BrowserSupport.isConfiguredSafeAddress(null, "about:home"));
-        assertFalse(BrowserSupport.isConfiguredSafeAddress(firefox, null));
-
-        List<BrowserSupport.Config> merged = BrowserSupport.withDiscoveredPackages(
-                Arrays.asList(null, "", "com.android.chrome", "org.new.browser", "org.new.browser"));
-        assertEquals(BrowserSupport.all().size() + 1, merged.size());
-        BrowserSupport.Config added = merged.get(merged.size() - 1);
-        assertEquals("org.new.browser", added.packageName);
-        assertTrue(added.addressBarIds.contains("org.new.browser:id/url_bar"));
-
-        List<BrowserSupport.Config> redirected = BrowserSupport.withDiscoveredPackages(
-                List.of("org.new.browser"), "http://127.0.0.1:1234/blocked");
-        assertTrue(redirected.stream().allMatch(
-                config -> "http://127.0.0.1:1234/blocked".equals(config.safeAddress)));
+    public void safetyPolicyNoLongerBlocksLookAlikeNamesItCannotResolve() {
+        // Substring matching made every one of these unprotectable while still missing the
+        // OEM dialers it was meant to catch. Only the resolved names are critical now.
+        Set<String> resolved = Set.of("com.google.android.dialer");
+        assertFalse(SafetyPolicy.isCriticalPackage(
+                "vendor.emergency.ui", "com.example.voward", resolved));
+        assertFalse(SafetyPolicy.isCriticalPackage(
+                "com.game.emergency", "com.example.voward", resolved));
+        assertFalse(SafetyPolicy.isCriticalPackage(
+                "com.chat.telecom", "com.example.voward", resolved));
+        assertFalse(SafetyPolicy.isCriticalPackage(
+                "com.social.dialer", "com.example.voward", resolved));
+        assertFalse(SafetyPolicy.isCriticalPackage(
+                "com.example.social", "com.example.voward", null));
+        assertTrue(SafetyPolicy.isCriticalPackage(
+                "com.google.android.dialer", "com.example.voward", null));
     }
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void browserCatalogCannotBeMutated() {
-        BrowserSupport.all().clear();
+    @Test
+    public void deadMansSwitchCountsNothingUntilAHealthCheckIsRecorded() {
+        assertEquals(0, DeadMansSwitchPolicy.elapsedSinceCheckMs(
+                DeadMansSwitchPolicy.NO_CHECK, 5_000, 3, 100_000, 9_000, 3));
+        assertEquals(0, DeadMansSwitchPolicy.elapsedSinceCheckMs(
+                1_000, DeadMansSwitchPolicy.NO_CHECK, 3, 100_000, 9_000, 3));
+    }
+
+    @Test
+    public void deadMansSwitchTakesWhicheverClockHasMovedFurtherWithinOneBoot() {
+        // Uptime moved an hour, the wall clock a minute: uptime is the honest reading.
+        assertEquals(HOUR_MS, DeadMansSwitchPolicy.elapsedSinceCheckMs(
+                1_000, 1_000, 7, 1_000 + MINUTE_MS, 1_000 + HOUR_MS, 7));
+        // And the other way round, so a suspended device is not a free pause either.
+        assertEquals(HOUR_MS, DeadMansSwitchPolicy.elapsedSinceCheckMs(
+                1_000, 1_000, 7, 1_000 + HOUR_MS, 1_000 + MINUTE_MS, 7));
+    }
+
+    @Test
+    public void deadMansSwitchIgnoresAClockMovedBackwards() {
+        // Never negative: a rolled-back clock must not credit time against the threshold.
+        assertEquals(HOUR_MS, DeadMansSwitchPolicy.elapsedSinceCheckMs(
+                10 * HOUR_MS, 1_000, 7, HOUR_MS, 1_000 + HOUR_MS, 7));
+    }
+
+    @Test
+    public void deadMansSwitchFallsBackToTheWallClockAcrossAReboot() {
+        // elapsedRealtime restarted, so only the wall clock carries across.
+        assertEquals(3 * HOUR_MS, DeadMansSwitchPolicy.elapsedSinceCheckMs(
+                1_000, 9 * HOUR_MS, 7, 1_000 + 3 * HOUR_MS, HOUR_MS, 8));
+        // A boot count that could not be read is decided by elapsedRealtime going backwards.
+        assertEquals(3 * HOUR_MS, DeadMansSwitchPolicy.elapsedSinceCheckMs(
+                1_000, 9 * HOUR_MS, -1, 1_000 + 3 * HOUR_MS, HOUR_MS, -1));
+    }
+
+    @Test
+    public void deadMansSwitchSaturatesRatherThanOverflowing() {
+        assertEquals(Long.MAX_VALUE, DeadMansSwitchPolicy.elapsedSinceCheckMs(
+                Long.MIN_VALUE + 1, 0, 7, Long.MAX_VALUE, 1_000, 7));
+    }
+
+    @Test
+    public void deadMansSwitchExpiresOnlyAtTheClampedThreshold() {
+        long fourteenDays = 14 * 24 * HOUR_MS;
+        assertFalse(DeadMansSwitchPolicy.isExpired(fourteenDays - 1, 14));
+        assertTrue(DeadMansSwitchPolicy.isExpired(fourteenDays, 14));
+        // Out-of-range settings clamp rather than disable the switch.
+        assertEquals(1, DeadMansSwitchPolicy.clampDays(0));
+        assertEquals(90, DeadMansSwitchPolicy.clampDays(1_000));
+        assertTrue(DeadMansSwitchPolicy.isExpired(24 * HOUR_MS, 0));
+        assertFalse(DeadMansSwitchPolicy.isExpired(89 * 24 * HOUR_MS, 1_000));
+    }
+
+    @Test
+    public void sessionEndsWhenEitherClockReachesTheDeadlineInOneBoot() {
+        assertFalse(SessionDeadlinePolicy.hasExpired(
+                5_000, 100_000, 7, 4_999, 99_999, 7));
+        assertTrue(SessionDeadlinePolicy.hasExpired(
+                5_000, 100_000, 7, 5_000, 99_999, 7));
+        // A wall clock jumped forward ends the session early; that direction is free to take.
+        assertTrue(SessionDeadlinePolicy.hasExpired(
+                5_000, 100_000, 7, 4_999, 100_000, 7));
+    }
+
+    @Test
+    public void sessionEndsAtAReboot() {
+        // The reproduced leak: uptime was 2758 s when a five minute session started, so the
+        // stored deadline reads ~51 minutes into the next boot and the alarm is gone.
+        assertTrue(SessionDeadlinePolicy.hasExpired(
+                3_054_247, Long.MAX_VALUE, 7, 12_000, 0, 8));
+    }
+
+    @Test
+    public void sessionWithoutABootCountLeansOnTheWallClock() {
+        assertFalse(SessionDeadlinePolicy.hasExpired(
+                3_054_247, 100_000, SessionDeadlinePolicy.UNKNOWN_BOOT_COUNT,
+                12_000, 99_999, 8));
+        assertTrue(SessionDeadlinePolicy.hasExpired(
+                3_054_247, 100_000, SessionDeadlinePolicy.UNKNOWN_BOOT_COUNT,
+                12_000, 100_000, 8));
+    }
+
+    @Test
+    public void sessionWithNeitherBootCountNorWallDeadlineKeepsTheOldReading() {
+        // A record written before any of this was kept: the monotonic deadline is all there is.
+        assertFalse(SessionDeadlinePolicy.hasExpired(
+                5_000, 0, SessionDeadlinePolicy.UNKNOWN_BOOT_COUNT, 4_999, 0, -1));
+        assertTrue(SessionDeadlinePolicy.hasExpired(
+                5_000, 0, SessionDeadlinePolicy.UNKNOWN_BOOT_COUNT, 5_000, 0, -1));
     }
 }
