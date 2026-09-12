@@ -13,7 +13,6 @@
         tools:ignore="ProtectedPermissions" />
     <!-- Ends an approved session on time whether or not Voward is still running. -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <!-- Hosts the offline browser block page on the device loopback interface only. -->
     <!-- Grayscale mode: must be granted once via ADB:
          adb shell pm grant com.example.voward android.permission.WRITE_SECURE_SETTINGS -->
     <!-- Optional developer/device-owner feature; normal installs run without grayscale. -->
@@ -159,6 +158,17 @@
         <receiver
             android:name="com.example.voward.SessionDeadlineReceiver"
             android:exported="false" />
+
+        <!-- The only package event the platform still delivers to a manifest receiver. There
+             is no PACKAGE_ADDED equivalent; the short reconcile poll covers that direction. -->
+        <receiver
+            android:name="com.example.voward.PackageRemovedReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_FULLY_REMOVED" />
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
 
         <receiver
             android:name="com.example.voward.BootCompletedReceiver"

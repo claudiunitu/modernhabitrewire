@@ -674,12 +674,22 @@ public class ModernMainActivity extends AppCompatActivity {
         Set<String> waiting = preferences.getQuarantinedPackages();
         if (waiting.isEmpty()) {
             banner.setVisibility(View.GONE);
+            banner.setOnClickListener(null);
+            banner.setClickable(false);
             return;
         }
         List<String> labels = new ArrayList<>();
         for (String packageName : waiting) labels.add(labelOf(packageName));
         banner.setText(getString(R.string.quarantine_pending, String.join(", ", labels)));
         banner.setVisibility(View.VISIBLE);
+        // Asking the question here as well as from the paused-app dialog. That dialog's details
+        // button is the intended route and this phone's OEM does not offer one, which leaves an
+        // app paused with no way to answer for it — a hard block nobody chose. One app per tap;
+        // the banner comes back for the next until none are left.
+        String next = waiting.iterator().next();
+        banner.setOnClickListener(view -> startActivity(
+                new Intent(this, SuspendedAppDetailsActivity.class)
+                        .putExtra(Intent.EXTRA_PACKAGE_NAME, next)));
     }
 
     private String labelOf(String packageName) {

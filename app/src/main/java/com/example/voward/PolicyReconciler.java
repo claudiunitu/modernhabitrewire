@@ -4,14 +4,18 @@ import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.RestrictionsManager;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * The only place in Voward that is allowed to call {@link DevicePolicyManager}.
@@ -61,13 +65,16 @@ final class PolicyReconciler {
         Log.i(TAG, "Reconciling " + previous + " -> " + desired);
         applyUserRestrictions(previous.userRestrictions, desired.userRestrictions);
         if (TamperPolicy.requiresAutomaticTime(desired.userRestrictions)) requireAutomaticTime();
-        applySuspension(previous.suspendedPackages, desired.suspendedPackages);
-        applyHiding(previous.hiddenPackages, desired.hiddenPackages);
+        Set<String> suspended = applySuspension(previous.suspendedPackages,
+                desired.suspendedPackages);
+        Set<String> hidden = applyHiding(previous.hiddenPackages, desired.hiddenPackages);
         applyUninstallBlock(desired.uninstallBlocked);
         applyUserControlBlock(desired.uninstallBlocked);
         applyBrowserPolicy(previous.managedBrowsers, desired.managedBrowsers, desired.urlBlocklist);
         applySupportMessage(true);
-        writeMirror(desired);
+        // What was applied, not what was asked for: a package the platform refused has to stay
+        // out of the mirror, or the equality check above would never let this run again.
+        writeMirror(desired.withApplied(suspended, hidden));
         return true;
     }
 
@@ -87,10 +94,12 @@ final class PolicyReconciler {
         EnforcementState previous = mirroredState();
         Log.i(TAG, "Releasing from " + previous);
 
+        EnforcementState released = EnforcementState.released();
         clearFactoryResetProtection();
-        applyUserRestrictions(previous.userRestrictions, EnforcementState.released().userRestrictions);
-        applySuspension(previous.suspendedPackages, EnforcementState.released().suspendedPackages);
-        applyHiding(previous.hiddenPackages, EnforcementState.released().hiddenPackages);
+        applyUserRestrictions(previous.userRestrictions, released.userRestrictions);
+        Set<String> suspended = applySuspension(previous.suspendedPackages,
+                released.suspendedPackages);
+        Set<String> hidden = applyHiding(previous.hiddenPackages, released.hiddenPackages);
         applyUninstallBlock(false);
         applyUserControlBlock(false);
         // Every installed browser, not just the ones the mirror knows about: the browser test
@@ -101,7 +110,13 @@ final class PolicyReconciler {
         applyBrowserPolicy(everyBrowser, Collections.emptySet(), Collections.emptySet());
         stopRequiringAutomaticTime();
         applySupportMessage(false);
-        writeMirror(EnforcementState.released());
+        // A package that refused to come back is still restricted, and saying otherwise would
+        // leave the user holding a block that no later reconcile knows to lift.
+        writeMirror(released.withApplied(suspended, hidden));
+        if (!suspended.isEmpty() || !hidden.isEmpty()) {
+            Log.w(TAG, "Release left " + suspended.size() + " suspended and " + hidden.size()
+                    + " hidden package(s) that could not be restored");
+        }
         Log.i(TAG, "Release complete");
         return true;
     }
@@ -171,38 +186,124 @@ final class PolicyReconciler {
         }
     }
 
-    /** One batched call per direction: suspending package by package is a per-package IPC. */
-    private void applySuspension(Set<String> previous, Set<String> desired) {
-        setSuspended(difference(previous, desired), false);
-        setSuspended(difference(desired, previous), true);
+    /**
+     * One batched call per direction: suspending package by package is a per-package IPC.
+     *
+     * @return the packages that are suspended once the calls have been made, which is what the
+     *         mirror must record. A package the platform refused is not in it, so the next
+     *         reconcile sees work left to do instead of a state it thinks it already reached.
+     */
+    private Set<String> applySuspension(Set<String> previous, Set<String> desired) {
+        Set<String> refusedRelease = setSuspended(difference(previous, desired), false);
+        Set<String> refusedSuspend = setSuspended(difference(desired, previous), true);
+        Set<String> applied = new TreeSet<>(desired);
+        applied.removeAll(refusedSuspend);
+        // A package that would not come back is still suspended unless it has gone entirely,
+        // and one that has gone has no state left to record.
+        for (String packageName : refusedRelease) {
+            if (isSuspendedNow(packageName)) applied.add(packageName);
+        }
+        return applied;
     }
 
-    private void setSuspended(Set<String> packages, boolean suspended) {
-        if (packages.isEmpty()) return;
+    /** @return the packages the platform would not move, empty when every one of them moved. */
+    private Set<String> setSuspended(Set<String> packages, boolean suspended) {
+        if (packages.isEmpty()) return Collections.emptySet();
         try {
             String[] failed = devicePolicyManager.setPackagesSuspended(
                     admin, packages.toArray(new String[0]), suspended);
-            if (failed != null && failed.length > 0) {
-                Log.w(TAG, "Suspension refused for " + failed.length + " package(s)");
-            }
+            if (failed == null || failed.length == 0) return Collections.emptySet();
+            Log.w(TAG, "Suspension refused for " + Arrays.toString(failed));
+            return new HashSet<>(Arrays.asList(failed));
         } catch (SecurityException | IllegalArgumentException refused) {
             Log.e(TAG, "Could not change suspension", refused);
+            return new HashSet<>(packages);
         }
     }
 
-    private void applyHiding(Set<String> previous, Set<String> desired) {
-        setHidden(difference(previous, desired), false);
-        setHidden(difference(desired, previous), true);
+    /** @return the packages that are hidden once the calls have been made. See
+     *          {@link #applySuspension} for why the mirror needs this rather than the desire. */
+    private Set<String> applyHiding(Set<String> previous, Set<String> desired) {
+        Set<String> refusedReveal = setHidden(difference(previous, desired), false);
+        Set<String> refusedHide = setHidden(difference(desired, previous), true);
+        Set<String> applied = new TreeSet<>(desired);
+        // Both directions are checked against the platform rather than trusted, because
+        // setApplicationHidden reports "did not change it" and "could not change it" with the
+        // same false, and an already-hidden package is the first of those.
+        for (String packageName : refusedHide) {
+            if (!isHiddenNow(packageName)) applied.remove(packageName);
+        }
+        for (String packageName : refusedReveal) {
+            if (isHiddenNow(packageName)) applied.add(packageName);
+        }
+        return applied;
     }
 
-    private void setHidden(Set<String> packages, boolean hidden) {
+    /** @return the packages the platform would not move, empty when every one of them moved. */
+    private Set<String> setHidden(Set<String> packages, boolean hidden) {
+        Set<String> failed = new HashSet<>();
         for (String packageName : packages) {
             try {
-                devicePolicyManager.setApplicationHidden(admin, packageName, hidden);
+                if (!devicePolicyManager.setApplicationHidden(admin, packageName, hidden)) {
+                    failed.add(packageName);
+                }
             } catch (SecurityException | IllegalArgumentException refused) {
                 Log.e(TAG, "Could not change hidden state for " + packageName, refused);
+                failed.add(packageName);
             }
         }
+        if (!failed.isEmpty()) Log.w(TAG, "Hiding refused for " + failed);
+        return failed;
+    }
+
+    /**
+     * Whether the package is suspended right now, read from the platform rather than assumed.
+     *
+     * <p>Only asked about the handful of packages a call refused, so this is never a per-rule
+     * cost. A suspended package still resolves through {@code PackageManager}; one that is not
+     * installed does not, and that is the answer we want — nothing there to record.</p>
+     */
+    private boolean isSuspendedNow(String packageName) {
+        try {
+            ApplicationInfo info =
+                    appContext.getPackageManager().getApplicationInfo(packageName, 0);
+            return (info.flags & ApplicationInfo.FLAG_SUSPENDED) != 0;
+        } catch (PackageManager.NameNotFoundException absent) {
+            return false;
+        }
+    }
+
+    /** Hiding removes the package from {@code PackageManager}, so the admin has to be asked. */
+    private boolean isHiddenNow(String packageName) {
+        try {
+            return devicePolicyManager.isApplicationHidden(admin, packageName);
+        } catch (SecurityException | IllegalArgumentException unknown) {
+            return false;
+        }
+    }
+
+    /**
+     * Drops a package the phone no longer has from the mirror.
+     *
+     * <p>An uninstall changes the device without going through {@link #reconcile}, and the
+     * mirror is what reconcile diffs against. Left alone, the entry would make a reinstalled
+     * package look like one that is already suspended, so the diff would find nothing to do
+     * and the reinstalled copy would run free — uninstall and reinstall being the cheapest
+     * bypass there is, since Voward deliberately never blocks either.</p>
+     */
+    void forgetPackage(String packageName) {
+        if (!isProvisioned() || packageName == null || packageName.isEmpty()) return;
+        EnforcementState mirror = mirroredState();
+        if (!mirror.suspendedPackages.contains(packageName)
+                && !mirror.hiddenPackages.contains(packageName)) {
+            return;
+        }
+        Set<String> suspended = new TreeSet<>(mirror.suspendedPackages);
+        Set<String> hidden = new TreeSet<>(mirror.hiddenPackages);
+        suspended.remove(packageName);
+        hidden.remove(packageName);
+        Log.i(TAG, "Forgetting " + packageName + " from the mirror after an uninstall");
+        writeMirror(mirror.withApplied(suspended, hidden));
     }
 
     /**

@@ -75,6 +75,21 @@ final class EnforcementState {
     }
 
     /**
+     * This state with the packages that were really suspended and hidden, for the mirror.
+     *
+     * <p>The mirror has to describe the device rather than the intention. {@code
+     * setPackagesSuspended} refuses a package that is not installed, and writing a rule before
+     * the app it names is something Voward supports on purpose — so recording the refusal as
+     * success would leave {@link PolicyReconciler#reconcile} short-circuiting for ever on a
+     * state the device never reached, and the app would go unsuspended once installed.</p>
+     */
+    EnforcementState withApplied(Collection<String> appliedSuspended,
+                                 Collection<String> appliedHidden) {
+        return new EnforcementState(active, appliedSuspended, appliedHidden, userRestrictions,
+                uninstallBlocked, urlBlocklist, managedBrowsers);
+    }
+
+    /**
      * What protection currently asks for.
      *
      * <p>Strict rules are hidden, regular rules are suspended, and the single package holding
@@ -151,19 +166,17 @@ final class EnforcementState {
      * Section 4.6: a browser Voward cannot configure is suspended, not hidden. The icon staying
      * put with a system explanation reads as a decision; the icon vanishing reads as a bug.
      *
-     * <p>Section 4.7 guard rail: the sweep is skipped entirely unless at least one filtering
-     * browser survives the app rules the user wrote. Leaving the phone with no way to open a
-     * link is a worse outcome than leaving one unfiltered browser on it.</p>
+     * <p>The 4.7 guard rail used to skip the sweep unless a filtering browser survived the app
+     * rules, on the grounds that a phone with no browser is worse than a phone with an
+     * unfiltered one. It is gone: that reasoning also let the user uninstall every filtering
+     * browser and keep the unfilterable one, which turns every website rule off at once. The
+     * sweep now runs whatever is left, so the answer to "nothing here can be filtered" is no
+     * browsing rather than free browsing.</p>
      */
     private static void suspendUnfilterableBrowsers(BrowserPolicy.Landscape browsers,
                                                     String ownPackage,
                                                     Set<String> criticalPackages,
                                                     Set<String> suspended, Set<String> hidden) {
-        Set<String> stillUsable = new TreeSet<>(browsers.filterable);
-        stillUsable.removeAll(suspended);
-        stillUsable.removeAll(hidden);
-        if (stillUsable.isEmpty()) return;
-
         for (String browser : browsers.unfilterable) {
             if (SafetyPolicy.isCriticalPackage(browser, ownPackage, criticalPackages)) continue;
             if (hidden.contains(browser)) continue;

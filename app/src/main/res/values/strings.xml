@@ -464,7 +464,7 @@
     <string name="quarantine_message">%1$s was installed after protection was switched on, so Voward paused it once. Keep it, or make it a rule so it goes through the gate like the rest.</string>
     <string name="quarantine_keep">Keep it</string>
     <string name="quarantine_restrict">Make it a rule</string>
-    <string name="quarantine_pending">Paused pending your decision: %1$s. Open one from your app list to choose.</string>
+    <string name="quarantine_pending">Paused pending your decision: %1$s. Tap here to choose.</string>
     <string name="guard_quarantine_label">Quarantine new apps</string>
     <string name="guard_quarantine_helper">Any newly installed app is paused once and you decide whether to keep it. This catches clones and web wrappers that would otherwise slip past your rules. You can still install anything you want.</string>
     <string name="info_quarantine_title">Quarantine new apps</string>

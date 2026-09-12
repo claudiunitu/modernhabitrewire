@@ -253,7 +253,11 @@ permanent state, not a per-launch decision.
 
 ### 4.7 Guard rails
 
-- Refuse to suspend a browser if it would leave zero usable `http` handlers.
+- ~~Refuse to suspend a browser if it would leave zero usable `http` handlers.~~ **Withdrawn.**
+  It was the cheapest bypass in the app: uninstall every filtering browser, keep one that cannot
+  be filtered, and every website rule stops being enforced with no key and no cooldown. A phone
+  that cannot open a link until a filtering browser is installed is the lesser harm, and
+  installing one is never blocked.
 - Never suspend the approved browser; it is the enforcement point.
 - ~~Fix the suffix matching at `SafetyPolicy.java:28-30`~~ **Done in Phase 1.** The dialer,
   emergency dialer, telecom, Settings and permission-controller packages are resolved through
@@ -812,10 +816,11 @@ of its job; the test device is API 30.
   requirement that the user can use any browser they like.
 - **Unfilterable browsers are only suspended when website rules exist.** With no website rules
   there is nothing to escape to, so pausing a browser would be a restriction nobody asked for.
-- **The guard rail is checked after the app rules, not before.** 4.7 says never suspend the
-  approved browser, but an explicit app rule on a browser is the decision of the person who
-  wrote it. The sweep is skipped instead when no filtering browser would survive those rules,
-  which is the outcome 4.7 actually protects.
+- **The zero-handlers guard rail is gone.** It was written to keep the phone usable, and what it
+  actually did was let a user uninstall Brave, install Firefox, and turn every website rule off.
+  The sweep now runs on whatever browsers are installed, so a phone with nothing filterable on it
+  has no browser rather than an unfiltered one. 4.7's other rule stands: an explicit app rule on
+  a browser is still the decision of the person who wrote it.
 
 Not done here: the gate for a blocked website. Chromium shows its own block page, which cannot
 link back to Voward, so a user who wants a session for a website has no in-the-moment way to ask

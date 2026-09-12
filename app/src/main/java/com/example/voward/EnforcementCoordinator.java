@@ -28,7 +28,9 @@ final class EnforcementCoordinator {
     private static final String TAG = "EnforcementCoordinator";
     private static final int RECONCILE_JOB_ID = 4411;
     private static final int SESSION_DEADLINE_REQUEST = 4412;
+    private static final int FAST_RECONCILE_JOB_ID = 4413;
     private static final long RECONCILE_INTERVAL_MS = TimeUnit.MINUTES.toMillis(15);
+    private static final long FAST_RECONCILE_INTERVAL_MS = TimeUnit.MINUTES.toMillis(2);
 
     private EnforcementCoordinator() {}
 
@@ -256,6 +258,9 @@ final class EnforcementCoordinator {
      * Keeps enforcement true to the desired state without anything staying resident. Persisted
      * so it survives reboot on its own; the boot receiver re-registers it in case the OEM
      * dropped it.
+     *
+     * <p>This is the backbone, and it also arms the short poll, whose only job is to notice
+     * what this one is too slow for.</p>
      */
     static void schedulePeriodicReconcile(Context context) {
         JobScheduler scheduler = context.getSystemService(JobScheduler.class);
@@ -272,6 +277,60 @@ final class EnforcementCoordinator {
         } catch (IllegalArgumentException | IllegalStateException refused) {
             Log.e(TAG, "Could not schedule the reconcile job", refused);
         }
+        scheduleFastReconcile(context);
+    }
+
+    /**
+     * The short poll that notices a browser that has just been installed.
+     *
+     * <p>A new package is the one change the device makes without telling Voward. Measured on
+     * this device as device owner, a manifest {@code PACKAGE_ADDED} receiver is never delivered,
+     * so there is no install event to react to, and until something reconciles, a browser that
+     * cannot be filtered is a browser with no website rules on it at all. The platform floors
+     * {@code setPeriodic} at fifteen minutes, which was that whole window; a one-shot job has no
+     * floor.</p>
+     *
+     * <p>It re-arms itself after each run. If that chain ever breaks — the process killed
+     * between finishing and rescheduling — the fifteen minute job puts it back, which is why
+     * both still exist.</p>
+     */
+    static void scheduleFastReconcile(Context context) {
+        JobScheduler scheduler = context.getSystemService(JobScheduler.class);
+        if (scheduler == null) return;
+        JobInfo job = new JobInfo.Builder(FAST_RECONCILE_JOB_ID,
+                new ComponentName(context, PolicyReconcileJobService.class))
+                .setMinimumLatency(FAST_RECONCILE_INTERVAL_MS)
+                .setPersisted(true)
+                .setRequiresDeviceIdle(false)
+                .setRequiresCharging(false)
+                .build();
+        try {
+            scheduler.schedule(job);
+        } catch (IllegalArgumentException | IllegalStateException refused) {
+            Log.e(TAG, "Could not schedule the fast reconcile job", refused);
+        }
+    }
+
+    /**
+     * An app has been uninstalled: forget it, then reconcile from what is really there.
+     *
+     * <p>Forgetting first is the point. The mirror is what the reconciler diffs against, so an
+     * entry for a package that no longer exists would make the copy installed in its place look
+     * like one that is already suspended, and it would never be suspended again.</p>
+     */
+    static void onPackageRemoved(Context context, String packageName) {
+        AppPreferencesManagerSingleton preferences =
+                AppPreferencesManagerSingleton.getInstance(context);
+        if (!preferences.getIsBlockerActive()) return;
+        // The survey caches for a minute, and the browser landscape has just changed.
+        BrowserPolicy.invalidate();
+        // A quarantine holds an app for one decision. Uninstalling it is one, and leaving the
+        // entry behind would have every reconcile from here on ask the platform to suspend a
+        // package that is not there and be refused. A rule the user wrote is different and is
+        // deliberately kept: writing one before installing the app is a supported thing to do.
+        preferences.releaseFromQuarantine(packageName);
+        new PolicyReconciler(context).forgetPackage(packageName);
+        reconcileNow(context);
     }
 
     private static boolean hasDeadMansSwitchExpired(Context context,

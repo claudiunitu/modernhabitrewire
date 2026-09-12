@@ -81,9 +81,12 @@ final class BrowserPolicy {
     /**
      * Sorts every installed browser into filterable and unfilterable.
      *
-     * <p>Guard rail from section 4.7: if nothing on the phone can be filtered, nothing is
-     * suspended either. A device with only Firefox on it is left with a working browser and no
-     * website rules, which is a weaker phone but still a usable one.</p>
+     * <p>An empty filterable set is a real answer and is reported as one. Section 4.7 used to
+     * collapse the whole landscape in that case, so that a phone with only Firefox on it kept a
+     * working browser; the cost was that uninstalling every filtering browser turned every
+     * website rule off, which is the cheapest bypass in the app. Suspending the last browser
+     * leaves a phone that cannot open a link until a filtering one is installed, and that is
+     * the trade that was chosen.</p>
      */
     static Landscape survey(Context context, AppPreferencesManagerSingleton preferences) {
         long now = SystemClock.elapsedRealtime();
@@ -112,7 +115,6 @@ final class BrowserPolicy {
             else if (declaresUrlBlocklist(context, packageName)) filterable.add(packageName);
             else unfilterable.add(packageName);
         }
-        if (filterable.isEmpty()) return Landscape.empty();
         return new Landscape(filterable, unfilterable);
     }
 

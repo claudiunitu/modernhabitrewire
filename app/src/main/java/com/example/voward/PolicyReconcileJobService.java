@@ -20,14 +20,20 @@ public class PolicyReconcileJobService extends JobService {
         executor.execute(() -> {
             EnforcementCoordinator.reconcileNow(getApplicationContext());
             jobFinished(params, false);
+            // After finishing, never before: rescheduling an id that is still running would
+            // stop the run that is doing it. The short poll is a one-shot, so this is the link
+            // that keeps the chain going.
+            EnforcementCoordinator.scheduleFastReconcile(getApplicationContext());
         });
         return true;
     }
 
     @Override
     public boolean onStopJob(JobParameters params) {
-        // The next tick reconciles from scratch, so an interrupted pass needs no retry.
-        return false;
+        // An interrupted pass reconciles from scratch next time and needs no retry of its own,
+        // but the short poll only survives by being rescheduled, and being stopped is exactly
+        // the case where the code above never ran.
+        return true;
     }
 
     @Override
