@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- A block notice, not a badge: no built-in padding, because a full-width banner sets its own. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="@color/status_positive_container" />
+    <solid android:color="@color/status_warning_container" />
     <corners android:radius="@dimen/card_corner_radius_compact" />
 </shape>

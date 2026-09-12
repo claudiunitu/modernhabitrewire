@@ -83,6 +83,7 @@ public class SetupActivity extends AppCompatActivity {
                 v -> startActivity(new Intent(this, HelpActivity.class)));
         findViewById(R.id.setupGuardButton).setOnClickListener(v -> configureGuard());
         findViewById(R.id.setupNotificationButton).setOnClickListener(v -> requestNotifications());
+        findViewById(R.id.setupExactAlarmButton).setOnClickListener(v -> requestExactAlarms());
 
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override public void handleOnBackPressed() {
@@ -102,7 +103,8 @@ public class SetupActivity extends AppCompatActivity {
         MaterialAutoCompleteTextView cooldown = findViewById(R.id.setupDeactivationCooldownSpinner);
         MaterialAutoCompleteTextView window = findViewById(R.id.setupDeactivationWindowSpinner);
         cooldown.setText(formatCooldownChoice(preferences.getDeactivationCooldownMinutes()), false);
-        window.setText(getString(R.string.window_hours_choice,
+        window.setText(getResources().getQuantityString(R.plurals.window_hours_choice,
+                preferences.getDeactivationWindowHours(),
                 preferences.getDeactivationWindowHours()), false);
         refreshDeactivationTimingControls();
     }
@@ -116,12 +118,13 @@ public class SetupActivity extends AppCompatActivity {
         }
         String[] windowLabels = new String[WINDOW_HOURS.length];
         for (int i = 0; i < WINDOW_HOURS.length; i++) {
-            windowLabels[i] = getString(R.string.window_hours_choice, WINDOW_HOURS[i]);
+            windowLabels[i] = getResources().getQuantityString(
+                    R.plurals.window_hours_choice, WINDOW_HOURS[i], WINDOW_HOURS[i]);
         }
         cooldown.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_dropdown_item_1line, cooldownLabels));
+                R.layout.dropdown_menu_item, cooldownLabels));
         window.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_dropdown_item_1line, windowLabels));
+                R.layout.dropdown_menu_item, windowLabels));
         cooldown.setText(cooldownLabels[indexOf(COOLDOWN_MINUTES,
                 preferences.getDeactivationCooldownMinutes())], false);
         window.setText(windowLabels[indexOf(WINDOW_HOURS,
@@ -148,8 +151,7 @@ public class SetupActivity extends AppCompatActivity {
 
     private String formatCooldownChoice(int minutes) {
         if (minutes == 0) return getString(R.string.cooldown_zero_choice);
-        if (minutes == 1) return getString(R.string.cooldown_one_minute_choice);
-        return getString(R.string.cooldown_hours_choice, minutes / 60);
+        return formatCooldownDuration(minutes);
     }
 
     private String formatCooldownDuration(int minutes) {
@@ -193,6 +195,9 @@ public class SetupActivity extends AppCompatActivity {
                 R.string.uninstall_permission_ready, R.string.uninstall_permission_optional);
         refreshPermissionRow(R.id.setupNotificationStatus, R.id.setupNotificationButton, notifications,
                 R.string.notifications_ready, R.string.notifications_optional);
+        refreshPermissionRow(R.id.setupExactAlarmStatus, R.id.setupExactAlarmButton,
+                AlarmPermission.isGranted(this),
+                R.string.exact_alarms_ready, R.string.exact_alarms_missing);
 
         boolean keyReady = !preferences.getDeactivationKey().isEmpty();
         findViewById(R.id.setupKeyReady).setVisibility(keyReady ? View.VISIBLE : View.GONE);
@@ -328,6 +333,16 @@ public class SetupActivity extends AppCompatActivity {
         } else {
             Toast.makeText(this, R.string.notifications_ready, Toast.LENGTH_SHORT).show();
         }
+    }
+
+    /** Without this a session deadline is an inexact alarm and the session runs past its end. */
+    private void requestExactAlarms() {
+        Intent intent = AlarmPermission.requestIntent(this);
+        if (intent == null || intent.resolveActivity(getPackageManager()) == null) {
+            Toast.makeText(this, R.string.exact_alarms_unavailable, Toast.LENGTH_LONG).show();
+            return;
+        }
+        settingsLauncher.launch(intent);
     }
 
     /** {@code setUninstallBlocked} in PackageManager, which needs nothing but the device owner. */

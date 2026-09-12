@@ -26,6 +26,8 @@
     <color name="status_positive_container">#DCE8DE</color>
     <color name="status_warning">#A84434</color>
     <color name="status_warning_container">#FFE2DA</color>
+    <color name="status_neutral">#4E5B56</color>
+    <color name="status_neutral_container">#EFECE4</color>
     <color name="hero_manage_background">#FCFAF6</color>
     <color name="hero_manage_foreground">#174A42</color>
     <color name="hero_manage_outline">#89938D</color>
@@ -69,4 +71,6 @@
     <color name="status_positive_container_dark">#1D3E34</color>
     <color name="status_warning_dark">#F2B8AD</color>
     <color name="status_warning_container_dark">#4A2C27</color>
+    <color name="status_neutral_dark">#C2C9C4</color>
+    <color name="status_neutral_container_dark">#303532</color>
 </resources>

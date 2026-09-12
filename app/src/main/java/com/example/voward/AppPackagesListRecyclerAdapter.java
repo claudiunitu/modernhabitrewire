@@ -85,10 +85,17 @@ public class AppPackagesListRecyclerAdapter extends RecyclerView.Adapter<AppPack
         try {
             android.content.pm.ApplicationInfo info = context.getPackageManager()
                     .getApplicationInfo(appPackage, 0);
-            holder.appNameView.setText(context.getPackageManager().getApplicationLabel(info));
+            String label = context.getPackageManager().getApplicationLabel(info).toString();
+            // Keeps the name for rules written before labels were remembered, so the first
+            // look at a rule while the app is still visible is enough to hold on to it.
+            appPreferencesManagerSingleton.rememberAppLabel(appPackage, label);
+            holder.appNameView.setText(label);
             holder.appIcon.setImageDrawable(context.getPackageManager().getApplicationIcon(info));
-        } catch (Exception ignored) {
-            holder.appNameView.setText(appPackage);
+        } catch (Exception unresolved) {
+            // A strict rule hides the package, which takes it out of PackageManager entirely;
+            // the remembered name is all there is left to show.
+            String remembered = appPreferencesManagerSingleton.getRememberedAppLabel(appPackage);
+            holder.appNameView.setText(remembered.isEmpty() ? appPackage : remembered);
             holder.appIcon.setImageResource(android.R.drawable.sym_def_app_icon);
         }
         holder.strictRuleCheckbox.setOnCheckedChangeListener(null);

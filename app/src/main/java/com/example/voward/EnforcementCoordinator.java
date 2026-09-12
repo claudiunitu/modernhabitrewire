@@ -7,7 +7,6 @@ import android.app.job.JobScheduler;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Build;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
@@ -54,7 +53,7 @@ final class EnforcementCoordinator {
 
         // A session whose deadline passed while nothing was running ends here, so a missed
         // alarm costs at most one tick rather than an open-ended free pass.
-        if (hasExpiredSession(preferences)) endSession(context);
+        if (hasExpiredSession(context, preferences)) endSession(context);
 
         // A clock shift or a reboot invalidates a pending deactivation request. The service that
         // used to watch for TIME_CHANGED is gone, so the reconcile carries this now: it runs on
@@ -117,8 +116,10 @@ final class EnforcementCoordinator {
         new AttentionBudgetEngine(context).incrementSessionCount();
         long deadlineElapsed = SystemClock.elapsedRealtime()
                 + TimeUnit.SECONDS.toMillis(quotedSeconds);
+        // The boot count goes in with the deadline: elapsedRealtime restarts at zero on boot,
+        // so without it a reboot leaves a deadline that reads as far in the future.
         preferences.startManagedSession(packageName, urlPattern, quotedSeconds,
-                System.currentTimeMillis(), deadlineElapsed);
+                System.currentTimeMillis(), deadlineElapsed, readBootCount(context));
         new PolicyReconciler(context).reconcile(desiredState(context, preferences));
         armDeadline(context, deadlineElapsed);
         StatusNotifier.refresh(context, preferences);
@@ -201,18 +202,25 @@ final class EnforcementCoordinator {
         preferences.clearPendingBrowserEviction();
     }
 
-    private static boolean hasExpiredSession(AppPreferencesManagerSingleton preferences) {
-        return !preferences.getManagedSessionPackage().isEmpty()
-                && SystemClock.elapsedRealtime()
-                >= preferences.getManagedSessionDeadlineElapsedMs();
+    private static boolean hasExpiredSession(Context context,
+                                             AppPreferencesManagerSingleton preferences) {
+        if (preferences.getManagedSessionPackage().isEmpty()) return false;
+        // The wall-clock deadline is derived rather than stored, which also covers a session
+        // that was already running when this check was introduced.
+        long deadlineWallMs = preferences.getManagedSessionStartWallMs() <= 0 ? 0
+                : preferences.getManagedSessionStartWallMs()
+                + TimeUnit.SECONDS.toMillis(preferences.getManagedSessionQuotedSeconds());
+        return SessionDeadlinePolicy.hasExpired(
+                preferences.getManagedSessionDeadlineElapsedMs(), deadlineWallMs,
+                preferences.getManagedSessionBootCount(), SystemClock.elapsedRealtime(),
+                System.currentTimeMillis(), readBootCount(context));
     }
 
     private static void armDeadline(Context context, long deadlineElapsedMs) {
         AlarmManager alarms = context.getSystemService(AlarmManager.class);
         if (alarms == null) return;
         PendingIntent onDeadline = deadlineIntent(context);
-        boolean exact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S
-                || alarms.canScheduleExactAlarms();
+        boolean exact = AlarmPermission.isGranted(context);
         try {
             if (exact) {
                 alarms.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,

@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Android uses the alpha channel as a monochrome notification mask. Percentage-based
-     negative insets crop the adaptive-launcher padding independently of source density. -->
-<inset xmlns:android="http://schemas.android.com/apk/res/android"
-    android:drawable="@drawable/ic_launcher_foreground_voward"
-    android:insetBottom="-39%"
-    android:insetLeft="-45%"
-    android:insetRight="-45%"
-    android:insetTop="-39%" />

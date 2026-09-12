@@ -31,6 +31,8 @@ final class EnforcementState {
     private static final String KEY_UNINSTALL_BLOCKED = "uninstallBlocked";
     private static final String KEY_URL_BLOCKLIST = "urlBlocklist";
     private static final String KEY_MANAGED_BROWSERS = "managedBrowsers";
+    private static final String KEY_UNAPPLIED_SUSPENDED = "unappliedSuspended";
+    private static final String KEY_UNAPPLIED_HIDDEN = "unappliedHidden";
 
     final boolean active;
     /** Regular rules: the icon stays and the system explains the block. */
@@ -44,12 +46,18 @@ final class EnforcementState {
     final Set<String> urlBlocklist;
     /** The browsers that receive {@code urlBlocklist}. */
     final Set<String> managedBrowsers;
+    /** Mirror only: wanted suspended, refused by the platform. See {@link #withApplied}. */
+    final Set<String> unappliedSuspended;
+    /** Mirror only: wanted hidden, refused by the platform. */
+    final Set<String> unappliedHidden;
 
     private EnforcementState(boolean active, Collection<String> suspendedPackages,
                              Collection<String> hiddenPackages,
                              Collection<String> userRestrictions, boolean uninstallBlocked,
                              Collection<String> urlBlocklist,
-                             Collection<String> managedBrowsers) {
+                             Collection<String> managedBrowsers,
+                             Collection<String> unappliedSuspended,
+                             Collection<String> unappliedHidden) {
         this.active = active;
         this.suspendedPackages = sortedCopy(suspendedPackages);
         this.hiddenPackages = sortedCopy(hiddenPackages);
@@ -57,11 +65,13 @@ final class EnforcementState {
         this.uninstallBlocked = uninstallBlocked;
         this.urlBlocklist = sortedCopy(urlBlocklist);
         this.managedBrowsers = sortedCopy(managedBrowsers);
+        this.unappliedSuspended = sortedCopy(unappliedSuspended);
+        this.unappliedHidden = sortedCopy(unappliedHidden);
     }
 
     /** Nothing enforced. Both the pre-activation state and the post-release state. */
     static EnforcementState released() {
-        return new EnforcementState(false, null, null, null, false, null, null);
+        return new EnforcementState(false, null, null, null, false, null, null, null, null);
     }
 
     static EnforcementState active(Collection<String> suspendedPackages,
@@ -71,7 +81,7 @@ final class EnforcementState {
                                    Collection<String> urlBlocklist,
                                    Collection<String> managedBrowsers) {
         return new EnforcementState(true, suspendedPackages, hiddenPackages, userRestrictions,
-                uninstallBlocked, urlBlocklist, managedBrowsers);
+                uninstallBlocked, urlBlocklist, managedBrowsers, null, null);
     }
 
     /**
@@ -82,11 +92,61 @@ final class EnforcementState {
      * the app it names is something Voward supports on purpose — so recording the refusal as
      * success would leave {@link PolicyReconciler#reconcile} short-circuiting for ever on a
      * state the device never reached, and the app would go unsuspended once installed.</p>
+     *
+     * <p>What was refused is recorded alongside, which is what lets the comparison in
+     * {@link #matchesApplied} settle instead of finding work to do on every single tick.</p>
      */
     EnforcementState withApplied(Collection<String> appliedSuspended,
                                  Collection<String> appliedHidden) {
-        return new EnforcementState(active, appliedSuspended, appliedHidden, userRestrictions,
-                uninstallBlocked, urlBlocklist, managedBrowsers);
+        Set<String> suspendedNow = sortedCopy(appliedSuspended);
+        Set<String> hiddenNow = sortedCopy(appliedHidden);
+        return new EnforcementState(active, suspendedNow, hiddenNow, userRestrictions,
+                uninstallBlocked, urlBlocklist, managedBrowsers,
+                without(suspendedPackages, suspendedNow), without(hiddenPackages, hiddenNow));
+    }
+
+    /**
+     * This mirror with one package dropped from every record of it, after an uninstall.
+     *
+     * <p>{@link #withApplied} cannot be used for that: it works out what was refused by
+     * subtracting the applied sets from the desired ones, and a mirror is not a desire. A
+     * package that is gone was not refused, it is simply gone.</p>
+     */
+    EnforcementState withoutPackage(String packageName) {
+        return new EnforcementState(active, minus(suspendedPackages, packageName),
+                minus(hiddenPackages, packageName), userRestrictions, uninstallBlocked,
+                urlBlocklist, managedBrowsers, minus(unappliedSuspended, packageName),
+                minus(unappliedHidden, packageName));
+    }
+
+    /**
+     * Whether {@code applied} is this state as far as the device would let it be taken.
+     *
+     * <p>Plain equality cannot answer that. {@code setPackagesSuspended} refuses a package that
+     * is not installed, and writing a rule ahead of the app it names is supported on purpose, so
+     * the mirror stays short of the desire by exactly that package — and a reconcile that
+     * short-circuits on equality then never short-circuits again. Measured on a Pixel 10, one
+     * rule naming an app that was not installed had every user restriction, suspension, hide,
+     * uninstall block and browser blocklist rewritten every two minutes, indefinitely.</p>
+     *
+     * <p>Recording what the platform refused keeps "we asked and were told no" apart from "we
+     * never asked". The caller still has to notice a refused package that has since appeared;
+     * this only says that nothing else has moved.</p>
+     */
+    boolean matchesApplied(EnforcementState applied) {
+        return active == applied.active
+                && uninstallBlocked == applied.uninstallBlocked
+                && userRestrictions.equals(applied.userRestrictions)
+                && urlBlocklist.equals(applied.urlBlocklist)
+                && managedBrowsers.equals(applied.managedBrowsers)
+                && suspendedPackages.equals(
+                        union(applied.suspendedPackages, applied.unappliedSuspended))
+                && hiddenPackages.equals(union(applied.hiddenPackages, applied.unappliedHidden));
+    }
+
+    /** The packages the platform would not move, which a later reconcile has to re-try. */
+    Set<String> unappliedPackages() {
+        return union(unappliedSuspended, unappliedHidden);
     }
 
     /**
@@ -197,6 +257,8 @@ final class EnforcementState {
         bundle.putBoolean(KEY_UNINSTALL_BLOCKED, uninstallBlocked);
         bundle.putStringArray(KEY_URL_BLOCKLIST, toArray(urlBlocklist));
         bundle.putStringArray(KEY_MANAGED_BROWSERS, toArray(managedBrowsers));
+        bundle.putStringArray(KEY_UNAPPLIED_SUSPENDED, toArray(unappliedSuspended));
+        bundle.putStringArray(KEY_UNAPPLIED_HIDDEN, toArray(unappliedHidden));
         return bundle;
     }
 
@@ -211,7 +273,9 @@ final class EnforcementState {
                     toList(bundle.getStringArray(KEY_RESTRICTIONS)),
                     bundle.getBoolean(KEY_UNINSTALL_BLOCKED, false),
                     toList(bundle.getStringArray(KEY_URL_BLOCKLIST)),
-                    toList(bundle.getStringArray(KEY_MANAGED_BROWSERS)));
+                    toList(bundle.getStringArray(KEY_MANAGED_BROWSERS)),
+                    toList(bundle.getStringArray(KEY_UNAPPLIED_SUSPENDED)),
+                    toList(bundle.getStringArray(KEY_UNAPPLIED_HIDDEN)));
         } catch (RuntimeException unreadable) {
             return released();
         }
@@ -228,13 +292,16 @@ final class EnforcementState {
                 && hiddenPackages.equals(that.hiddenPackages)
                 && userRestrictions.equals(that.userRestrictions)
                 && urlBlocklist.equals(that.urlBlocklist)
-                && managedBrowsers.equals(that.managedBrowsers);
+                && managedBrowsers.equals(that.managedBrowsers)
+                && unappliedSuspended.equals(that.unappliedSuspended)
+                && unappliedHidden.equals(that.unappliedHidden);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(active, uninstallBlocked, suspendedPackages, hiddenPackages,
-                userRestrictions, urlBlocklist, managedBrowsers);
+                userRestrictions, urlBlocklist, managedBrowsers, unappliedSuspended,
+                unappliedHidden);
     }
 
     @Override
@@ -245,7 +312,8 @@ final class EnforcementState {
                 + ", restrictions=" + userRestrictions
                 + ", uninstallBlocked=" + uninstallBlocked
                 + ", urlRules=" + urlBlocklist.size()
-                + ", browsers=" + managedBrowsers.size() + "}";
+                + ", browsers=" + managedBrowsers.size()
+                + ", unapplied=" + (unappliedSuspended.size() + unappliedHidden.size()) + "}";
     }
 
     private static Set<String> sortedCopy(Collection<String> values) {
@@ -255,6 +323,27 @@ final class EnforcementState {
             if (value != null && !value.trim().isEmpty()) copy.add(value.trim());
         }
         return Collections.unmodifiableSet(copy);
+    }
+
+    private static Set<String> without(Set<String> values, Set<String> removed) {
+        if (values.isEmpty()) return Collections.emptySet();
+        Set<String> remaining = new TreeSet<>(values);
+        remaining.removeAll(removed);
+        return Collections.unmodifiableSet(remaining);
+    }
+
+    private static Set<String> minus(Set<String> values, String removed) {
+        if (!values.contains(removed)) return values;
+        Set<String> remaining = new TreeSet<>(values);
+        remaining.remove(removed);
+        return Collections.unmodifiableSet(remaining);
+    }
+
+    private static Set<String> union(Set<String> first, Set<String> second) {
+        if (second.isEmpty()) return first;
+        Set<String> all = new TreeSet<>(first);
+        all.addAll(second);
+        return Collections.unmodifiableSet(all);
     }
 
     private static String[] toArray(Set<String> values) {

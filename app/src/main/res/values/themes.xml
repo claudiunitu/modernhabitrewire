@@ -70,9 +70,6 @@
     </style>
 
     <!-- Resource aliases retained so older layouts inherit the Voward design tokens. -->
-    <style name="ShapeAppearance.ModernHabit.Small" parent="@style/ShapeAppearance.Voward.Small" />
-    <style name="ShapeAppearance.ModernHabit.Medium" parent="@style/ShapeAppearance.Voward.Medium" />
-    <style name="ShapeAppearance.ModernHabit.Large" parent="@style/ShapeAppearance.Voward.Large" />
     <style name="Widget.ModernHabit.Card" parent="@style/Widget.Voward.Card" />
     <style name="Widget.ModernHabit.Card.Hero" parent="@style/Widget.Voward.Card.Hero" />
     <style name="Widget.ModernHabit.Card.Compact" parent="@style/Widget.Voward.Card.Compact" />

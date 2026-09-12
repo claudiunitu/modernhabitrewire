@@ -132,6 +132,9 @@
             android:theme="@android:style/Theme.DeviceDefault.Light.Dialog.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.SHOW_SUSPENDED_APP_DETAILS" />
+                <!-- The platform sends this implicitly, package-targeted, so without DEFAULT
+                     the filter cannot resolve and the button leads nowhere. -->
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
 

@@ -1,6 +1,5 @@
 package com.example.voward;
 
-import android.app.admin.DevicePolicyManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.BroadcastReceiver;
@@ -165,6 +164,7 @@ public class ModernMainActivity extends AppCompatActivity {
             }
         });
         findViewById(R.id.notificationPermissionButton).setOnClickListener(v -> requestNotifications());
+        findViewById(R.id.exactAlarmButton).setOnClickListener(v -> openExactAlarmSettings());
         infoSheet = new InfoSheet(this);
         bindInfoButtons();
         findViewById(R.id.usageAccessButton).setOnClickListener(v -> openUsageAccessSettings());
@@ -190,12 +190,13 @@ public class ModernMainActivity extends AppCompatActivity {
         }
         String[] windowLabels = new String[WINDOW_HOURS.length];
         for (int i = 0; i < WINDOW_HOURS.length; i++) {
-            windowLabels[i] = getString(R.string.window_hours_choice, WINDOW_HOURS[i]);
+            windowLabels[i] = getResources().getQuantityString(
+                    R.plurals.window_hours_choice, WINDOW_HOURS[i], WINDOW_HOURS[i]);
         }
         cooldown.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_dropdown_item_1line, cooldownLabels));
+                R.layout.dropdown_menu_item, cooldownLabels));
         window.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_dropdown_item_1line, windowLabels));
+                R.layout.dropdown_menu_item, windowLabels));
         cooldown.setText(cooldownLabels[indexOf(COOLDOWN_MINUTES,
                 preferences.getDeactivationCooldownMinutes())], false);
         window.setText(windowLabels[indexOf(WINDOW_HOURS,
@@ -277,6 +278,7 @@ public class ModernMainActivity extends AppCompatActivity {
         bindInfo(R.id.info_app_rules, R.string.info_app_rules_title, R.string.info_app_rules_body);
         bindInfo(R.id.info_website_rules, R.string.info_website_rules_title, R.string.info_website_rules_body);
         bindInfo(R.id.info_notifications, R.string.info_notifications_title, R.string.info_notifications_body);
+        bindInfo(R.id.info_exact_alarms, R.string.info_exact_alarms_title, R.string.info_exact_alarms_body);
         bindInfo(R.id.info_usage_access, R.string.info_usage_access_title, R.string.info_usage_access_body);
         bindInfo(R.id.info_grayscale, R.string.info_grayscale_title, R.string.info_grayscale_body);
         bindInfo(R.id.info_activate, R.string.info_activate_title, R.string.info_activate_body);
@@ -331,7 +333,8 @@ public class ModernMainActivity extends AppCompatActivity {
         MaterialAutoCompleteTextView cooldown = findViewById(R.id.deactivationCooldownSpinner);
         MaterialAutoCompleteTextView window = findViewById(R.id.deactivationWindowSpinner);
         cooldown.setText(formatCooldownChoice(preferences.getDeactivationCooldownMinutes()), false);
-        window.setText(getString(R.string.window_hours_choice,
+        window.setText(getResources().getQuantityString(R.plurals.window_hours_choice,
+                preferences.getDeactivationWindowHours(),
                 preferences.getDeactivationWindowHours()), false);
         updatingFields = false;
         refreshCooldownControls();
@@ -474,18 +477,29 @@ public class ModernMainActivity extends AppCompatActivity {
                 && preferences.getDailyAllowanceSeconds() > 0
                 && !preferences.getDeactivationKey().isEmpty();
         boolean operational = active && essentialsReady;
+        // Three states, not two: a fully configured app that is simply switched off is paused,
+        // and saying "setup needed" there contradicts the readiness card on the same screen.
+        boolean paused = !active && essentialsReady;
 
         TextView badge = findViewById(R.id.protectionStatusBadge);
-        badge.setText(operational ? R.string.protection_on_badge : R.string.protection_off_badge);
-        badge.setBackgroundResource(operational ? R.drawable.bg_status_active : R.drawable.bg_status_attention);
-        badge.setTextColor(ContextCompat.getColor(this,
-                operational ? R.color.status_positive : R.color.status_warning));
+        badge.setText(operational ? R.string.protection_on_badge
+                : paused ? R.string.protection_paused_badge : R.string.protection_off_badge);
+        badge.setBackgroundResource(operational ? R.drawable.bg_status_active
+                : paused ? R.drawable.bg_status_paused : R.drawable.bg_status_attention);
+        badge.setTextColor(ContextCompat.getColor(this, operational ? R.color.status_positive
+                : paused ? R.color.status_neutral : R.color.status_warning));
+        // Three states here too: "Ready when you are" over a SETUP NEEDED badge said the
+        // opposite of the badge and of the detail line right under it.
         ((TextView) findViewById(R.id.protectionStatusTitle)).setText(operational
                 ? R.string.protection_active_title
-                : active ? R.string.protection_incomplete_title : R.string.protection_needs_attention);
+                : active ? R.string.protection_incomplete_title
+                : paused ? R.string.protection_needs_attention
+                : R.string.protection_setup_title);
         ((TextView) findViewById(R.id.protectionStatusDetail)).setText(operational
                 ? R.string.protection_status_active_detail
-                : active ? R.string.protection_incomplete_detail : R.string.protection_status_inactive_detail);
+                : active ? R.string.protection_incomplete_detail
+                : paused ? R.string.protection_paused_detail
+                : R.string.protection_status_inactive_detail);
         ((TextView) findViewById(R.id.remainingBudgetValue)).setText(formatMinutesSeconds(remaining));
         int dailyAllowance = preferences.getDailyAllowanceSeconds();
         ((AllowanceRingView) findViewById(R.id.allowanceRing)).setFraction(
@@ -548,6 +562,9 @@ public class ModernMainActivity extends AppCompatActivity {
 
         refreshPermissionRow(R.id.notificationPermissionStatus, R.id.notificationPermissionButton,
                 notificationsReady, R.string.notifications_ready, R.string.notifications_optional);
+        refreshPermissionRow(R.id.exactAlarmStatus, R.id.exactAlarmButton,
+                AlarmPermission.isGranted(this),
+                R.string.exact_alarms_ready, R.string.exact_alarms_missing);
         refreshPermissionRow(R.id.usageAccessStatus, R.id.usageAccessButton,
                 UsageMeter.hasUsageAccess(this),
                 R.string.usage_access_ready, R.string.usage_access_optional);
@@ -1042,6 +1059,19 @@ public class ModernMainActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Android 12 and later do not grant SCHEDULE_EXACT_ALARM at install, and nothing was asking
+     * for it, so every session deadline fell back to an inexact alarm and ran over.
+     */
+    private void openExactAlarmSettings() {
+        Intent intent = AlarmPermission.requestIntent(this);
+        if (intent == null || intent.resolveActivity(getPackageManager()) == null) {
+            Toast.makeText(this, R.string.exact_alarms_unavailable, Toast.LENGTH_LONG).show();
+            return;
+        }
+        externalSettingsLauncher.launch(intent);
+    }
+
 
     private boolean areNotificationsReady() {
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
@@ -1170,8 +1200,7 @@ public class ModernMainActivity extends AppCompatActivity {
 
     private String formatCooldownChoice(int minutes) {
         if (minutes == 0) return getString(R.string.cooldown_zero_choice);
-        if (minutes == 1) return getString(R.string.cooldown_one_minute_choice);
-        return getString(R.string.cooldown_hours_choice, minutes / 60);
+        return formatCooldownDuration(minutes);
     }
 
     private String formatCooldownDuration(int minutes) {
@@ -1180,7 +1209,10 @@ public class ModernMainActivity extends AppCompatActivity {
     }
 
     private static String formatCompactDuration(long seconds) {
-        long minutes = Math.max(0, seconds) / 60;
+        long safe = Math.max(0, seconds);
+        long minutes = safe / 60;
+        // Rounding a real but short session down to "0m" next to "3 sessions" reads as a bug.
+        if (minutes == 0) return safe == 0 ? "0m" : "<1m";
         if (minutes < 60) return minutes + "m";
         return String.format(Locale.getDefault(), "%dh %02dm", minutes / 60, minutes % 60);
     }

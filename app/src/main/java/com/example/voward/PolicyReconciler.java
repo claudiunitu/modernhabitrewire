@@ -60,7 +60,9 @@ final class PolicyReconciler {
     boolean reconcile(EnforcementState desired) {
         if (!isProvisioned()) return false;
         EnforcementState previous = mirroredState();
-        if (desired.equals(previous)) return true;
+        if (desired.matchesApplied(previous) && !anyRefusedPackageIsInstalled(previous)) {
+            return true;
+        }
 
         Log.i(TAG, "Reconciling " + previous + " -> " + desired);
         applyUserRestrictions(previous.userRestrictions, desired.userRestrictions);
@@ -73,7 +75,7 @@ final class PolicyReconciler {
         applyBrowserPolicy(previous.managedBrowsers, desired.managedBrowsers, desired.urlBlocklist);
         applySupportMessage(true);
         // What was applied, not what was asked for: a package the platform refused has to stay
-        // out of the mirror, or the equality check above would never let this run again.
+        // out of the applied sets, and be recorded as refused so the check above can settle.
         writeMirror(desired.withApplied(suspended, hidden));
         return true;
     }
@@ -135,6 +137,34 @@ final class PolicyReconciler {
             return true;
         } catch (SecurityException | IllegalStateException refused) {
             Log.e(TAG, "Could not clear device owner", refused);
+            return false;
+        }
+    }
+
+    /**
+     * Whether a package the platform refused has turned up since, which is the one thing that
+     * makes an otherwise settled state worth applying again.
+     *
+     * <p>Asked only about the handful of packages that were refused, and a rule normally names
+     * an app that is installed, so this is nothing per tick. It is what lets the short reconcile
+     * poll still catch an install: a rule written before its app exists is supported, and the
+     * app has to be suspended the moment it arrives.</p>
+     */
+    private boolean anyRefusedPackageIsInstalled(EnforcementState mirror) {
+        for (String packageName : mirror.unappliedPackages()) {
+            if (isInstalled(packageName)) {
+                Log.i(TAG, "Refused package " + packageName + " is installed now; re-applying");
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isInstalled(String packageName) {
+        try {
+            appContext.getPackageManager().getApplicationInfo(packageName, 0);
+            return true;
+        } catch (PackageManager.NameNotFoundException absent) {
             return false;
         }
     }
@@ -295,15 +325,12 @@ final class PolicyReconciler {
         if (!isProvisioned() || packageName == null || packageName.isEmpty()) return;
         EnforcementState mirror = mirroredState();
         if (!mirror.suspendedPackages.contains(packageName)
-                && !mirror.hiddenPackages.contains(packageName)) {
+                && !mirror.hiddenPackages.contains(packageName)
+                && !mirror.unappliedPackages().contains(packageName)) {
             return;
         }
-        Set<String> suspended = new TreeSet<>(mirror.suspendedPackages);
-        Set<String> hidden = new TreeSet<>(mirror.hiddenPackages);
-        suspended.remove(packageName);
-        hidden.remove(packageName);
         Log.i(TAG, "Forgetting " + packageName + " from the mirror after an uninstall");
-        writeMirror(mirror.withApplied(suspended, hidden));
+        writeMirror(mirror.withoutPackage(packageName));
     }
 
     /**

@@ -43,6 +43,7 @@ public class AppPreferencesManagerSingleton {
     private static final String KEY_SESSION_START_WALL_MS = "managed_session_start_wall_ms";
     private static final String KEY_SESSION_DEADLINE_ELAPSED_MS = "managed_session_deadline_elapsed_ms";
     private static final String KEY_SESSION_URL_PATTERN = "managed_session_url_pattern";
+    private static final String KEY_SESSION_BOOT_COUNT = "managed_session_boot_count";
     private static final String KEY_PENDING_BROWSER_EVICTION = "pending_browser_eviction_v1";
     private static final String KEY_APPROVED_BROWSERS = "approved_browsers_v1";
     private static final String KEY_REJECTED_BROWSERS = "rejected_browsers_v1";
@@ -51,6 +52,7 @@ public class AppPreferencesManagerSingleton {
     private static final String KEY_QUARANTINED_PACKAGES = "quarantined_packages_v1";
     private static final String KEY_QUARANTINE_ENABLED = "new_app_quarantine_enabled";
     private static final String KEY_BROWSER_VERDICT_TIMES = "browser_verdict_times_v1";
+    private static final String KEY_APP_LABELS = "app_labels_v1";
     private static final String KEY_TEMP_ALLOW_APP_LAUNCH = "temp_allow_app_launch";
     private static final String KEY_LAST_INTERCEPTED_APP = "last_intercepted_app";
     private static final String KEY_LAST_INTERCEPTED_URL = "last_intercepted_url";
@@ -449,6 +451,15 @@ public class AppPreferencesManagerSingleton {
     }
 
     /**
+     * The boot count when the session started, or {@link SessionDeadlinePolicy#UNKNOWN_BOOT_COUNT}
+     * for a session that started before this was recorded. The monotonic deadline above is only
+     * meaningful within one boot, and this is what says whether it still is.
+     */
+    public int getManagedSessionBootCount() {
+        return prefs.getInt(KEY_SESSION_BOOT_COUNT, SessionDeadlinePolicy.UNKNOWN_BOOT_COUNT);
+    }
+
+    /**
      * The one website rule lifted for an approved session, or empty. A browser session lifts a
      * rule rather than a package: the browser itself is never suspended, because it is where
      * the filtering happens.
@@ -458,18 +469,20 @@ public class AppPreferencesManagerSingleton {
     }
 
     public void startManagedSession(String packageName, long quotedSeconds, long startWallMs,
-                                    long deadlineElapsedMs) {
-        startManagedSession(packageName, null, quotedSeconds, startWallMs, deadlineElapsedMs);
+                                    long deadlineElapsedMs, int bootCount) {
+        startManagedSession(packageName, null, quotedSeconds, startWallMs, deadlineElapsedMs,
+                bootCount);
     }
 
     public void startManagedSession(String packageName, String urlPattern, long quotedSeconds,
-                                    long startWallMs, long deadlineElapsedMs) {
+                                    long startWallMs, long deadlineElapsedMs, int bootCount) {
         prefs.edit()
                 .putString(KEY_SESSION_PACKAGE, packageName == null ? "" : packageName)
                 .putString(KEY_SESSION_URL_PATTERN, urlPattern == null ? "" : urlPattern)
                 .putLong(KEY_SESSION_QUOTED_SECONDS, Math.max(0, quotedSeconds))
                 .putLong(KEY_SESSION_START_WALL_MS, startWallMs)
                 .putLong(KEY_SESSION_DEADLINE_ELAPSED_MS, deadlineElapsedMs)
+                .putInt(KEY_SESSION_BOOT_COUNT, bootCount)
                 .commit();
     }
 
@@ -477,6 +490,7 @@ public class AppPreferencesManagerSingleton {
         prefs.edit().remove(KEY_SESSION_PACKAGE).remove(KEY_SESSION_URL_PATTERN)
                 .remove(KEY_SESSION_QUOTED_SECONDS)
                 .remove(KEY_SESSION_START_WALL_MS).remove(KEY_SESSION_DEADLINE_ELAPSED_MS)
+                .remove(KEY_SESSION_BOOT_COUNT)
                 .commit();
     }
 
@@ -556,6 +570,37 @@ public class AppPreferencesManagerSingleton {
             return times.toString();
         } catch (JSONException unreadable) {
             return "{}";
+        }
+    }
+
+    /**
+     * The name a rule was written under, remembered so a strict rule keeps it.
+     *
+     * <p>Hiding a package removes it from {@code PackageManager}, so once protection is on the
+     * label cannot be resolved any more and the rule would show a raw package name — exactly
+     * when the user is least able to do anything about it.</p>
+     */
+    public void rememberAppLabel(String packageName, String label) {
+        if (packageName == null || packageName.isEmpty() || label == null) return;
+        String clean = label.trim();
+        if (clean.isEmpty() || clean.equals(packageName)) return;
+        try {
+            JSONObject labels = new JSONObject(prefs.getString(KEY_APP_LABELS, "{}"));
+            labels.put(packageName, clean);
+            prefs.edit().putString(KEY_APP_LABELS, labels.toString()).apply();
+        } catch (JSONException unreadable) {
+            prefs.edit().putString(KEY_APP_LABELS, "{}").apply();
+        }
+    }
+
+    /** The remembered name, or empty when none was ever recorded. */
+    public String getRememberedAppLabel(String packageName) {
+        if (packageName == null || packageName.isEmpty()) return "";
+        try {
+            return new JSONObject(prefs.getString(KEY_APP_LABELS, "{}"))
+                    .optString(packageName, "");
+        } catch (JSONException unreadable) {
+            return "";
         }
     }
 
@@ -1342,7 +1387,10 @@ public class AppPreferencesManagerSingleton {
                 .put("strictRestrictedApps", new JSONArray(getStrictRestrictedAppPackages()))
                 .put("dailyAllowanceSeconds", getDailyAllowanceSeconds())
                 .put("baseWaitTimeSeconds", getBaseWaitTimeSeconds())
-                .put("reentryGrowth", getReentryGrowth())
+                // Widening the stored float to a double writes 0.3499999940395355 for 35 %.
+                // The value is only ever set as whole percent, so two places is its real
+                // precision and the file the user keeps stops looking broken.
+                .put("reentryGrowth", Math.round(getReentryGrowth() * 100f) / 100d)
                 .put("defaultSessionSeconds", getDefaultSessionSeconds())
                 .put("carryoverCapDays", getCarryoverCapDays())
                 .put("launchFrictionEnabled", getLaunchFrictionEnabled())

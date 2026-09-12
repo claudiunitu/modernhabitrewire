@@ -6,5 +6,16 @@
   `adb shell dpm remove-active-admin`, which would be a bypass rather than a convenience.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:testOnly="true" />
+    <application android:testOnly="true">
+
+        <!--
+          Debug-only: the one way to watch the dead man's switch actually fire. Reachable from
+          `adb shell` and nothing else — WRITE_SECURE_SETTINGS is held by the shell user and by
+          no ordinary app — and absent from a release build entirely.
+        -->
+        <receiver
+            android:name="com.example.voward.DebugDeadMansSwitchReceiver"
+            android:exported="true"
+            android:permission="android.permission.WRITE_SECURE_SETTINGS" />
+    </application>
 </manifest>

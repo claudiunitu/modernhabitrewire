@@ -62,7 +62,9 @@ public class UrlListEditorActivity extends AppCompatActivity {
             String newUrl = urlEditText.getText() != null
                     ? urlEditText.getText().toString().trim() : "";
             if (!newUrl.isEmpty()) {
-                if (UrlPatternMatcher.isValidPattern(newUrl)) {
+                if (isRetiredKeywordRule(newUrl)) {
+                    urlInputLayout.setError(getString(R.string.keyword_rule_rejected));
+                } else if (UrlPatternMatcher.isValidPattern(newUrl)) {
                     urlInputLayout.setError(null);
                     appPreferencesManagerSingleton.addRestrictedUrl(
                             newUrl, newStrictRuleCheckbox.isChecked());
@@ -74,6 +76,17 @@ public class UrlListEditorActivity extends AppCompatActivity {
                 }
             }
         });
+    }
+
+    /**
+     * {@code keyword:} rules match page text and {@code URLBlocklist} matches addresses, so the
+     * browser cannot enforce one. Rules written before that move are still shown, and named by
+     * the retired-rules banner; writing a new one is refused here rather than accepted and then
+     * disowned. The matcher still understands the shape, because the old rules have to be
+     * readable.
+     */
+    private static boolean isRetiredKeywordRule(String rule) {
+        return rule.toLowerCase(java.util.Locale.ROOT).startsWith("keyword:");
     }
 
     /**

@@ -1,47 +1,24 @@
 <resources>
     <string name="app_name">Voward</string>
-    <string name="uninstall_guard_blocked_message">Protected while Voward is active. Deactivate protection in Voward first.</string>
     <string name="restricted_urls_title">Restricted URLs</string>
     <string name="add_restricted_url">Add restricted URL</string>
     <string name="restricted_url_hint">Enter a restricted URL rule</string>
-    <string name="edit_restricted_urls">Edit restricted URLs</string>
-    <string name="N_A">N/A</string>
     <string name="Remove">Remove</string>
-    <string name="ButtonBlockerDeactivateLabel">Deactivate Blocker</string>
-    <string name="ButtonBlockerActivateLabel">Activate Blocker</string>
-    <string name="BlockerDeactivationKeyPlaceholder">Deactivation Key</string>
-    <string name="BlockerDeactivationKeySetButtonlabel">Set Deactivation Key</string>
-    <string name="BlockerDeactivationKeyUnsetButtonlabel">Unset Deactivation Key</string>
-    <string name="LabelNotSet">Label not set</string>
-    <string name="uninstall_guard_label">Disallow uninstall</string>
     <string name="restricted_apps_title">Restricted apps</string>
     <string name="restricted_app_package_hint">Add a restricted app package</string>
-    <string name="add_restricted_app">Add restricted app</string>
-    <string name="edit_restricted_apps">Edit restricted apps</string>
 
     <!-- New strings for internationalization -->
     <string name="attention_firewall">Attention Firewall</string>
     <string name="system_state_initial">System State:\n---\nSessions today: 0\nCurrent cost: 1.0x\nRemaining allowance: 00:00:00</string>
     <string name="cancel">Cancel</string>
-    <string name="enter_key_to_deactivate">Enter Key to Deactivate</string>
-    <string name="attention_budget">Daily allowance</string>
-    <string name="daily_budget">Daily allowance (minutes)</string>
-    <string name="base_wait_time">Base re-entry pause (seconds)</string>
-    <string name="reentry_pause_growth">Re-entry pause growth (0–100%)</string>
-    <string name="default_session_minutes">Default planned session (1–60 minutes)</string>
-    <string name="functional_goal_hint">What should more intentional use make easier in real life?</string>
     <string name="reset_daily_stats_debug">Reset today’s statistics</string>
 
     <!-- Notification strings -->
     <string name="notification_channel_description">Shows real-time allowance and session statistics</string>
     <string name="blocker_active">Voward protection is active</string>
+    <string name="end_session_now">End session now</string>
 
     <!-- Decision Gate strings -->
-    <string name="system_state_template">Sessions today: %1$d\nRemaining allowance: %2$s\n%3$s\nOne allowance second equals one use second</string>
-    <plurals name="quoted_reentry_pause">
-        <item quantity="one">Quoted re-entry pause: %d second</item>
-        <item quantity="other">Quoted re-entry pause: %d seconds</item>
-    </plurals>
     <plurals name="interaction_latency_template">
         <item quantity="one">Pause: %d second remaining…</item>
         <item quantity="other">Pause: %d seconds remaining…</item>
@@ -51,13 +28,10 @@
     <string name="cannot_be_empty">Cannot be empty</string>
     <string name="all_stats_reset">All stats reset</string>
     <string name="reset_stats_blocked">Deactivate protection before resetting today’s statistics.</string>
-    <string name="session_complete_redirect_message">Planned session complete. Redirecting this tab.</string>
     <string name="gate_purpose_hint">What exactly are you opening this for?</string>
-    <string name="gate_planned_minutes_hint">Planned duration (1–60 minutes)</string>
     <string name="gate_replacement_prompt">Choose an option to leave the protected content and return Home.</string>
     <string name="gate_replacement_with_goal">Your intention: %1$s\nChoose an option to leave the protected content and return Home.</string>
     <string name="gate_terms_before_plan">Your final cap will be the smaller of the planned duration and the remaining allowance.</string>
-    <string name="gate_terms_quoted">Fixed session cap: %1$s. It will not become more expensive while you use it.</string>
     <string name="gate_purpose_required">Name a specific purpose before continuing</string>
     <string name="gate_minutes_error">Enter 1 to 60 minutes</string>
     <string name="gate_start_pause">Start pause</string>
@@ -71,18 +45,10 @@
     <string name="help_intro_title">Use protected apps and sites intentionally</string>
     <string name="help_intro_content">Voward adds a planning pause and clear time limits before selected apps and websites. It is a private self-management tool—not medical treatment or a diagnostic device. If digital use causes significant distress, sleep loss, unsafe behavior, or loss of control, consider seeking help from a qualified mental-health professional.</string>
     
-    <string name="help_guide_title">How to Rewire Your Habits</string>
-    <string name="help_guide_content">1. Review the disclosure, then grant only the permissions you accept.\n2. Choose restricted apps from the installed-app picker and add domain/path rules for sites.\n3. Set a daily allowance in minutes and a default planned session.\n4. Create a recovery key, then choose the deactivation cooldown and how long you will have to confirm deactivation afterward.\n5. At each gate, write a purpose, choose a duration, wait, and confirm again.\n6. Review whether sessions ended early or reached their limit; adjust gradually.</string>
 
-    <string name="help_model_title">Transparent model and URL rules</string>
-    <string name="help_model_content">One allowance second always buys one second of restricted use. The balance carries at most one daily allowance and can never fall below zero or borrow from a future day. When today’s allowance is depleted, no new restricted session can start. Each repeat entry adds the configured percentage of the base pause; it never changes a quoted session cap. Domain rules match the domain and subdomains. A path matches only that path and its subtree; a configured query must match exactly. Use keyword:text only when broad text matching is intentional.</string>
 
-    <string name="help_security_title">Security &amp; Friction</string>
-    <string name="help_security_content">The recovery key is the only in-app way to deactivate active protection. With a positive cooldown, enter it once to request deactivation and again during the confirmation period. Protection remains active while waiting. Rules are enforced by Android as the device owner, so they hold even when Voward is not running, but a recovery-mode factory reset can always wipe the phone. Data stays on-device unless you explicitly export it.</string>
 
         <!-- UI section titles -->
-        <string name="blocked_content_section_title">Blocked Content</string>
-        <string name="security_section_title">Security</string>
 
         <!-- Help screen -->
         <string name="done_label">Done</string>
@@ -102,15 +68,11 @@
         <string name="search_apps">Search apps</string>
         <string name="critical_app_cannot_be_blocked">This app is required for emergency access or device recovery and cannot be restricted.</string>
         <string name="invalid_app_package_name">Enter a valid Android package identifier, such as com.example.app.</string>
-        <string name="progress_summary_template">Today: %1$s remaining · sessions: %2$d\nEnded early: %3$d · limits reached: %4$d\n%5$s</string>
         <string name="grayscale_available">Grayscale reminder available</string>
         <string name="grayscale_unavailable">Grayscale unavailable (optional ADB grant not present)</string>
-        <string name="setup_disclosure_title">Before enabling control permissions</string>
-        <string name="setup_disclosure_message">Voward blocks apps and websites as the device owner: Android pauses a protected app and your browser refuses a blocked address. Notification access shows allowance status, and usage access measures how long a session really lasted. Records stay on this device unless you export configuration. Emergency and recovery apps are never blocked. This is a self-management tool, not medical treatment.</string>
-        <string name="setup_continue">I understand — continue setup</string>
-        <string name="setup_not_now">Not now</string>
-        <string name="url_rule_helper">Examples: example.com · example.com/news · keyword:shorts</string>
-        <string name="invalid_url_rule">Use a domain, an optional domain/path, or an explicit keyword:text rule.</string>
+        <string name="url_rule_helper">Examples: example.com · example.com/news</string>
+        <string name="invalid_url_rule">Use a domain or a domain/path.</string>
+        <string name="keyword_rule_rejected">Website rules now run inside the browser, which matches addresses and not page text, so a keyword: rule cannot be enforced. Use an address or a path rule.</string>
 
         <!-- 2026 expressive information architecture -->
         <string name="nav_today">Today</string>
@@ -125,6 +87,9 @@
         <string name="protection_status_inactive_detail">Finish the essentials, then activate protection.</string>
         <string name="protection_incomplete_title">Protection needs attention</string>
         <string name="protection_incomplete_detail">Protection is switched on, but an essential setup item is missing.</string>
+        <string name="protection_paused_badge">PAUSED</string>
+        <string name="protection_setup_title">A few things left to set up</string>
+        <string name="protection_paused_detail">Everything is set up. Activate protection whenever you are ready.</string>
         <string name="remaining_today">remaining today</string>
         <string name="next_pause">next pause</string>
         <string name="rules_protected">rules</string>
@@ -152,12 +117,9 @@
     <string name="settings_allowance_section">Allowance and pauses</string>
     <string name="custom_duration_action">Set a custom duration</string>
         <string name="today_usage">Used today</string>
-        <string name="week_usage">Used this week</string>
         <string name="week_sessions">Sessions this week</string>
-        <string name="progress_value_minutes">%1$s</string>
         <string name="most_common_time">Most common start time · %1$s</string>
         <string name="no_time_pattern">No session-time pattern yet</string>
-        <string name="rules_lock_icon">Locked while protection is active</string>
         <string name="no_goal_yet">Add a real-life goal so each pause has something meaningful to point back to.</string>
         <string name="sessions_metric">%1$d\nSessions</string>
         <string name="early_metric">%1$d\nEnded early</string>
@@ -168,16 +130,13 @@
         <string name="no_apps_protected">No apps selected yet.</string>
         <string name="no_sites_protected">No website rules added yet.</string>
         <string name="manage_apps">Manage apps</string>
-        <string name="view_locked_apps">Add or strengthen apps</string>
         <string name="manage_websites">Manage websites</string>
-        <string name="view_locked_websites">Add or strengthen websites</string>
         <string name="rules_locked_read_only">Protection is active. You can add rules or make existing rules strict. Removing rules or making them less restrictive requires deactivation.</string>
         <string name="rules_privacy_note">Rules and usage records stay on this device. App names and website rules are not sent to an analytics service.</string>
         <string name="settings_locked_title">Settings are protected</string>
         <string name="settings_locked_body">Deactivate protection to change the goal, timing, or optional recovery behavior. Your current values remain visible here.</string>
         <string name="settings_locked_values">Goal: %1$s\nDaily allowance (min): %2$d · Default session (min): %3$d\nBase pause (sec): %4$d · Re-entry growth: %5$d%%</string>
         <string name="no_goal_compact">Not set</string>
-        <string name="goal_and_time">Goal &amp; time</string>
         <string name="functional_goal_short">Real-life goal</string>
         <string name="functional_goal_helper">What should more intentional use make easier?</string>
         <string name="daily_budget_short">Daily allowance</string>
@@ -188,13 +147,17 @@
         <string name="seconds_short">sec</string>
         <string name="uninstall_guard_optional_label">Use optional uninstall protection</string>
         <string name="permissions_title">Permissions</string>
-        <string name="permissions_body">Voward enforces your rules as the device owner, through Android itself. Notifications and usage access are separate optional choices.</string>
+        <string name="permissions_body">Voward enforces your rules as the device owner, through Android itself. Alarms, notifications and usage access are separate choices Android asks you for.</string>
         <string name="uninstall_permission_ready">Uninstall protection · Ready</string>
         <string name="uninstall_permission_optional">Uninstall protection · Optional</string>
         <string name="notifications_ready">Allowance notifications · Ready</string>
         <string name="notifications_optional">Allowance notifications · Optional</string>
         <string name="configure_optional_protection">Configure optional protection</string>
         <string name="allow_notifications">Allow notifications</string>
+        <string name="exact_alarms_ready">Alarms &amp; reminders · Allowed</string>
+        <string name="exact_alarms_missing">Alarms &amp; reminders · Sessions may run over</string>
+        <string name="allow_exact_alarms">Allow alarms &amp; reminders</string>
+        <string name="exact_alarms_unavailable">This device has no alarms &amp; reminders screen.</string>
         <string name="protection_and_recovery">Protection &amp; recovery</string>
         <string name="recovery_explanation">Your recovery key is the only in-app deactivation method. A positive cooldown requires the key twice and keeps protection active while you wait. For stronger commitment, let someone you trust create and keep the key.</string>
         <string name="create_recovery_key">Create a recovery key</string>
@@ -226,7 +189,7 @@
         <string name="setup_rules_title">Choose where to pause</string>
         <string name="setup_rules_body">Select apps by their familiar names and add website domain or path rules. Emergency and recovery apps can never be restricted.</string>
         <string name="setup_permissions_title">Enable only what you choose</string>
-        <string name="setup_permissions_body">Device owner provisioning is required and is done once from a computer. Uninstall protection and notifications are optional.</string>
+        <string name="setup_permissions_body">Device owner provisioning is required and is done once from a computer. Alarms &amp; reminders keeps sessions ending on time. Uninstall protection and notifications are optional.</string>
         <string name="setup_key_title">Create a recovery path</string>
         <string name="setup_key_body">Choose a key you can retrieve when needed, then choose how long deactivation must wait and how much time you will have to confirm it afterward. The key is stored only as a salted, slow password hash.</string>
         <string name="setup_review_title">Review and activate</string>
@@ -272,7 +235,7 @@
         <string name="replacement_task">Do one small task</string>
         <string name="pause_countdown_description">Intentional pause countdown</string>
         <string name="apps_empty_state">No protected apps yet. Choose installed apps by name to add the intentional-use gate.</string>
-        <string name="sites_empty_state">No protected websites yet. Add a domain, path, or explicit keyword rule.</string>
+        <string name="sites_empty_state">No protected websites yet. Add a domain or a path rule.</string>
         <string name="package_name_advanced_helper">Advanced: enter an Android package identifier, even if the app is not installed yet.</string>
         <string name="add_package_name">Add package name</string>
         <string name="url_rule_domain">Domain and subdomains</string>
@@ -280,15 +243,15 @@
         <string name="url_rule_keyword">Broad keyword match</string>
         <string name="no_apps_found">No matching installed apps</string>
         <string name="help_quick_start_title">Quick start</string>
-        <string name="help_quick_start_content">1. Set a daily allowance, a default session length, and a real-life goal.\n2. Choose at least one protected app or website.\n3. Make Voward the device owner from a computer, once. Uninstall protection and notifications are optional.\n4. Create a recovery key, then choose the deactivation cooldown and how long you will have to confirm deactivation afterward.\n5. Review the setup summary and activate protection.</string>
+        <string name="help_quick_start_content">1. Set a daily allowance, a default session length, and a real-life goal.\n2. Choose at least one protected app or website.\n3. Make Voward the device owner from a computer, once. Allow alarms &amp; reminders so a session ends at the second it was quoted for. Uninstall protection and notifications are optional.\n4. Create a recovery key, then choose the deactivation cooldown and how long you will have to confirm deactivation afterward.\n5. Review the setup summary and activate protection.</string>
         <string name="help_pause_title">How the intentional pause works</string>
         <string name="help_pause_content">At the gate, name a specific purpose and choose 1–60 minutes. Start the circular pause, then review the plan and explicitly choose Open intentionally or Not now. Finishing the timer never opens protected content automatically. You can configure three alternatives in Settings; choosing one leaves the protected content, returns you Home, and is counted in Progress.</string>
         <string name="help_budget_title">Allowance and session limits</string>
-        <string name="help_budget_content">One allowance second buys one second of approved protected use. A session ends at the smaller of its planned duration or the allowance remaining when it starts. Unused allowance carries forward only up to one daily allowance, and the balance never becomes negative. Repeat entries increase only the next pause; they do not change the cost of a quoted session.</string>
+        <string name="help_budget_content">One allowance second buys one second of approved protected use. A session ends at the smaller of its planned duration or the allowance remaining when it starts. Unused allowance carries forward only up to one daily allowance, and the balance never becomes negative. Repeat entries increase only the next pause; they do not change the cost of a quoted session. A session also ends if the phone restarts. With notifications allowed, End session now on the session notification stops it early.</string>
         <string name="help_progress_title">Progress and local history</string>
         <string name="help_progress_content">The Progress tab shows measured protected-use time, sessions, early exits, limits reached, the most common session start time, and the most frequently chosen alternative for the current week. Completed daily summaries are kept locally for up to 14 days. Voward does not estimate time saved or infer wellbeing, urges, or health outcomes.</string>
         <string name="help_rules_title">App and website rules</string>
-        <string name="help_rules_content">Choose apps from the installed-app picker. For websites, example.com covers that domain and subdomains; example.com/news covers that path and its subtree; and a configured query must match exactly. Use keyword:shorts only for an intentionally broad match. A strict rule stays blocked regardless of remaining allowance. While protection is active, rules can only become more restrictive: you may add new rules or mark existing rules strict, but you cannot remove rules or turn strict mode off.</string>
+        <string name="help_rules_content">Choose apps from the installed-app picker. For websites, example.com covers that domain and subdomains; example.com/news covers that path and its subtree; and a configured query must match exactly. A strict rule stays blocked regardless of remaining allowance. While protection is active, rules can only become more restrictive: you may add new rules or mark existing rules strict, but you cannot remove rules or turn strict mode off.</string>
         <string name="help_grayscale_title">Optional grayscale for restricted sessions</string>
         <string name="help_grayscale_content">Grayscale is automatic for approved sessions in regular restricted apps and websites after a one-time ADB permission grant; there is no separate in-app switch. Strict rules never open, so grayscale does not apply to them. To enable it:\n1. Install Android Platform Tools on a computer.\n2. On the phone, enable Developer options and USB debugging, connect it to the computer, and approve the debugging prompt.\n3. Run: adb shell pm grant com.example.voward android.permission.WRITE_SECURE_SETTINGS\n4. Open Voward → Settings → Advanced and data and confirm that it says “Grayscale reminder available.”\nVoward restores the previous Android color-correction setting when the approved session ends. To revoke access, run: adb shell pm revoke com.example.voward android.permission.WRITE_SECURE_SETTINGS</string>
         <string name="help_privacy_title">Privacy and permissions</string>
@@ -312,12 +275,13 @@
     <string name="deactivation_timing_helper">A shorter confirmation period provides stronger protection against impulsive deactivation.</string>
     <string name="deactivation_cooldown_label">Deactivation cooldown</string>
     <string name="deactivation_window_label">Time allowed to confirm deactivation</string>
-    <string name="cooldown_zero_choice">Cooldown: 0</string>
-    <string name="cooldown_one_minute_choice">Cooldown: 1 minute</string>
-    <string name="cooldown_hours_choice">Cooldown: %1$d hours</string>
+    <string name="cooldown_zero_choice">Deactivate immediately</string>
     <string name="one_minute">1 minute</string>
     <string name="hours_duration">%1$d hours</string>
-    <string name="window_hours_choice">Confirm deactivation within: %1$d hours</string>
+    <plurals name="window_hours_choice">
+        <item quantity="one">%d hour</item>
+        <item quantity="other">%d hours</item>
+    </plurals>
     <string name="request_deactivation">Request deactivation</string>
     <string name="cancel_deactivation_request">Cancel request</string>
     <string name="deactivation_no_request">Protection is active. Enter your recovery key to begin the deactivation cooldown.</string>
@@ -346,7 +310,7 @@
     <string name="release_done">Released. Every restriction has been cleared.</string>
 
     <!-- Suspension support message shown on the system's paused-app dialog. -->
-    <string name="suspended_support_message">Paused by Voward. Tap for details to request a session.</string>
+    <string name="suspended_support_message">Paused by Voward. Open Voward → Rules and tap this app to request a session.</string>
 
     <string name="usage_access_ready">Usage access · Ready</string>
     <string name="usage_access_optional">Usage access · Optional</string>
@@ -440,9 +404,11 @@
     <string name="info_app_rules_title">App rules and strict rules</string>
     <string name="info_app_rules_body">A regular rule asks for a purpose and a pause before opening. A strict rule cannot be opened at all while protection is active — no gate, no allowance, no exception. While protection is active you can add rules and make them strict, but you cannot remove them or make them regular again.</string>
     <string name="info_website_rules_title">Website rules</string>
-    <string name="info_website_rules_body">Addresses and paths, matched by the browser rather than by reading the screen. A rule for a domain covers its subdomains. Keyword rules match page text and have no equivalent inside a browser, so they stop being enforced once your browser takes over — the rules screen names any you still have.</string>
+    <string name="info_website_rules_body">Addresses and paths, matched by the browser rather than by reading the screen. A rule for a domain covers its subdomains. Keyword rules match page text and have no equivalent inside a browser, so a new one is refused and any you wrote earlier is no longer enforced — the rules screen names them.</string>
     <string name="info_notifications_title">Notifications</string>
-    <string name="info_notifications_body">Optional allowance reminders. Deactivation is deliberately silent — you will never be notified that your confirmation window has opened.</string>
+    <string name="info_notifications_body">Optional allowance reminders. During an approved session the notification counts down and carries End session now, which is the only way to stop a session before its deadline. Deactivation is deliberately silent — you will never be notified that your confirmation window has opened.</string>
+    <string name="info_exact_alarms_title">Alarms &amp; reminders</string>
+    <string name="info_exact_alarms_body">Ends an approved session at the second it was quoted for. Android does not grant this automatically, and without it the deadline is an inexact alarm that the system may hold back — a five minute session measured six minutes on a Pixel 10. The session still ends, just late.</string>
     <string name="info_usage_access_title">Usage access</string>
     <string name="info_usage_access_body">Lets Voward measure how long you actually spent in an app, so a session ends on time. Granted from Android Settings, not from a computer. Without it, sessions end on the clock rather than on real use, and you are charged the full length you asked for.</string>
     <string name="info_grayscale_title">Grayscale</string>

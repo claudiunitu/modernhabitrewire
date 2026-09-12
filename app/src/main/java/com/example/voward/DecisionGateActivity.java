@@ -170,11 +170,12 @@ public class DecisionGateActivity extends AppCompatActivity {
         }
         long remainingSeconds = budgetEngine.getRemainingBudget();
         int waitSeconds = budgetEngine.calculateWaitSeconds();
-        String waitDescription = getResources().getQuantityString(
-                R.plurals.quoted_reentry_pause, waitSeconds, waitSeconds);
+        // A bare duration, not a sentence: gate_summary_friendly already says "next pause".
+        String waitDuration = getResources().getQuantityString(
+                R.plurals.seconds_compact, waitSeconds, waitSeconds);
 
         String stats = getString(R.string.gate_summary_friendly,
-                formatMinutesSeconds(remainingSeconds), waitDescription);
+                formatMinutesSeconds(remainingSeconds), waitDuration);
 
         statsTextView.setText(stats);
 

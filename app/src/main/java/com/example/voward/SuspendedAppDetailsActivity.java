@@ -71,7 +71,10 @@ public class SuspendedAppDetailsActivity extends Activity {
 
     private void decide(AppPreferencesManagerSingleton preferences, String packageName,
                         boolean restrict) {
-        if (restrict) preferences.addRestrictedAppPackage(packageName, false);
+        if (restrict) {
+            preferences.addRestrictedAppPackage(packageName, false);
+            preferences.rememberAppLabel(packageName, labelOf(packageName));
+        }
         preferences.releaseFromQuarantine(packageName);
         Context context = getApplicationContext();
         // Off the main thread: this is device policy IPC, and the screen is about to go away.

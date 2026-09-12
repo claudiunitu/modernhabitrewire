@@ -28,6 +28,7 @@ final class StatusNotifier {
 
     private static final String CHANNEL_ID = "firewall_stats_channel";
     private static final int NOTIFICATION_ID = 1;
+    private static final int END_SESSION_REQUEST = 4414;
 
     private StatusNotifier() {}
 
@@ -79,10 +80,22 @@ final class StatusNotifier {
                     .setShowWhen(true)
                     .setUsesChronometer(true)
                     .setChronometerCountDown(true);
+            // The only way to stop the clock. Without usage access the quoted duration is
+            // charged whatever the user does, so leaving the app early has to be worth
+            // something; with it, this is simply the honest end of a session.
+            builder.addAction(0, context.getString(R.string.end_session_now),
+                    endSessionIntent(context));
         } else {
             builder.setShowWhen(false);
         }
         manager.notify(NOTIFICATION_ID, builder.build());
+    }
+
+    private static PendingIntent endSessionIntent(Context context) {
+        return PendingIntent.getBroadcast(context, END_SESSION_REQUEST,
+                new Intent(context, SessionDeadlineReceiver.class)
+                        .setAction(SessionDeadlineReceiver.ACTION_END_SESSION_NOW),
+                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
     private static void createChannel(Context context, NotificationManager manager) {

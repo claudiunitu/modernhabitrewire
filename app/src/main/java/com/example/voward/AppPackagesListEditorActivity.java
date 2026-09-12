@@ -138,6 +138,16 @@ public class AppPackagesListEditorActivity extends AppCompatActivity {
                         ? View.VISIBLE : View.GONE);
     }
 
+    /** The installed app's name, or empty when the rule names something not installed yet. */
+    private String resolveLabel(String packageName) {
+        try {
+            return getPackageManager().getApplicationLabel(
+                    getPackageManager().getApplicationInfo(packageName, 0)).toString();
+        } catch (PackageManager.NameNotFoundException notInstalled) {
+            return "";
+        }
+    }
+
     private boolean addValidatedPackage(String packageName, boolean strict) {
         if (SafetyPolicy.isCriticalPackage(this, packageName)) {
             Toast.makeText(this, R.string.critical_app_cannot_be_blocked, Toast.LENGTH_LONG).show();
@@ -145,6 +155,9 @@ public class AppPackagesListEditorActivity extends AppCompatActivity {
         }
         if (!AppPreferencesManagerSingleton.isPlausiblePackageName(packageName)) return false;
         appPreferencesManagerSingleton.addRestrictedAppPackage(packageName, strict);
+        // Recorded now, while the package still resolves: a strict rule hides it, and a hidden
+        // package has no label left to look up.
+        appPreferencesManagerSingleton.rememberAppLabel(packageName, resolveLabel(packageName));
         if (newStrictRuleCheckbox != null) newStrictRuleCheckbox.setChecked(false);
         refreshList();
         return true;

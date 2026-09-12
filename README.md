@@ -32,7 +32,7 @@ Voward runs as the Android **Device Owner**. Rules are not enforced by watching 
 
 Consequences worth knowing before you install:
 
-- **Nothing stays resident.** There is no foreground service, no accessibility service, no wakelock, and no polling loop. Killing Voward, letting it crash, or OOM-killing it changes nothing — the blocks live in `system_server`. A persisted 15-minute job and a boot receiver reconcile state back to what your settings ask for.
+- **Nothing stays resident.** There is no foreground service, no accessibility service, no wakelock, and no polling loop. Killing Voward, letting it crash, or OOM-killing it changes nothing — the blocks live in `system_server`. A persisted 15-minute job, a short one-shot job that re-arms itself every two minutes, and a boot receiver reconcile state back to what your settings ask for.
 - **There is no network layer.** No VPN, no DNS pinning, no external service. Your own VPN is never touched and cannot bypass anything here, because nothing is enforced at the packet level.
 - **You can still install anything.** Play or unknown sources, either way. New apps are paused once and you decide whether to keep them.
 - **You can use any browser.** Browsers Voward can filter get the policy; browsers it cannot filter are paused rather than uninstalled, and only when you actually have website rules.
@@ -47,6 +47,7 @@ Consequences worth knowing before you install:
 - Require a second **Open intentionally** choice after the pause; the app never opens protected content automatically when the timer reaches zero.
 - Offer three configurable alternative next steps at the gate; selecting one returns to Android Home.
 - Spend one allowance second for each second of approved protected use and end the session at the smaller of the planned duration or remaining allowance.
+- End a session early from **End session now** on the session notification; a restart also ends one.
 - Mark individual app or website rules as strict. Strict rules cannot be opened while protection is active.
 - Test any browser against a real blocked page and record the verdict; a browser that stops honouring policy after an update is re-probed.
 - Quarantine newly installed apps: each is paused once and you choose to keep it or make it a rule.
@@ -64,7 +65,8 @@ Consequences worth knowing before you install:
 - Android 8.0 (API 26) or newer. **Android 11 (API 30) or newer is strongly recommended** — `setUserControlDisabledPackages` is API 30+, `DISALLOW_CONFIG_DATE_TIME` is unknown to API 26–27, and the private-space restriction needs API 35.
 - **Device Owner provisioning is mandatory.** Without it Voward enforces nothing at all, activation refuses, and the app says so on its provisioning row. There is no fallback path.
 - A computer with Android SDK Platform Tools, once, to provision.
-- Notification permission is optional.
+- Notification permission is optional. It also carries **End session now**, the only manual way to end a session early.
+- **Alarms & reminders** (`SCHEDULE_EXACT_ALARM`) is asked for inside the app, no computer needed. Android 13 and later refuse it until you grant it, and without it a session deadline is an inexact alarm the system may hold back — measured on a Pixel 10, a five-minute session ran five minutes and forty-three seconds.
 - Usage access is optional; without it a session is charged its quoted duration rather than measured foreground time.
 - Grayscale is optional and requires `WRITE_SECURE_SETTINGS`, granted once over ADB.
 
@@ -193,11 +195,12 @@ Usage access can also be granted without a computer: Settings → Apps → Speci
 1. Open Voward and read the disclosure.
 2. Set your goal, daily allowance, default session length, base pause, and repeat-entry growth. Tap the **ⓘ** on anything you are unsure about.
 3. Add at least one app or website rule. Mark a rule strict only if it should stay closed for the whole protection period.
-4. Check the approved-browser list. Run **Test this browser** for anything not already approved — some browsers honour the policy without declaring it.
-5. Choose the enforcement toggles. Block safe mode, block extra users, and lock date and time default **on**; disable USB debugging and block factory reset in Settings default **off**, because those two close an escape route rather than a bypass.
-6. Create the recovery key. **Write it down somewhere that is not this phone.** It is stored as a salted PBKDF2-HMAC-SHA256 hash and cannot be displayed or recovered by anyone, including you.
-7. Choose the deactivation cooldown, the confirmation window, and the dead man's switch interval (1–90 days, default 14).
-8. Review the summary and activate.
+4. Grant **Alarms & reminders** from the permissions card, so a session ends at the second it was quoted for.
+5. Check the approved-browser list. Run **Test this browser** for anything not already approved — some browsers honour the policy without declaring it.
+6. Choose the enforcement toggles. Block safe mode, block extra users, and lock date and time default **on**; disable USB debugging and block factory reset in Settings default **off**, because those two close an escape route rather than a bypass.
+7. Create the recovery key. **Write it down somewhere that is not this phone.** It is stored as a salted PBKDF2-HMAC-SHA256 hash and cannot be displayed or recovered by anyone, including you.
+8. Choose the deactivation cooldown, the confirmation window, and the dead man's switch interval (1–90 days, default 14).
+9. Review the summary and activate.
 
 Activation requires device-owner provisioning, at least one rule, a positive daily allowance, and a recovery key.
 
@@ -335,13 +338,13 @@ next_pause = clamp(base pause × (1 + growth × ln(1 + sessions today)), 1, 3600
 
 One allowance second always buys one second of approved protected use. The session limit shown at the gate stays fixed for that session. The remaining balance cannot fall below zero, and carried allowance is capped at one daily allowance.
 
-An approved session unsuspends exactly one package, or lifts exactly one rule out of the browser blocklist, for a bounded time. The deadline is an exact alarm, so a session ends on time even if Voward was killed the moment after it started; where exact alarms are unavailable the alarm degrades to inexact and the 15-minute reconcile catches the overrun.
+An approved session unsuspends exactly one package, or lifts exactly one rule out of the browser blocklist, for a bounded time. The deadline is an exact alarm, so a session ends on time even if Voward was killed the moment after it started. That needs the **Alarms & reminders** permission; without it the alarm degrades to inexact, the session runs over, and the reconcile poll catches it rather than the deadline. A restart also ends a running session: the deadline is recorded against the boot count and the wall clock as well as the monotonic clock, and whichever says the time is up wins.
 
 **How to reach the gate.** A protected app is paused at the PackageManager level, so there is no launch to intercept and the gate has to be pulled rather than pushed. **Tap the rule** — in Voward's app list or website list — to ask for a session. Some OEMs also offer a details button on the system's "paused by your admin" dialog, which opens the same gate in the moment; Samsung on API 30 does not, so the rules list is the reliable route on any device.
 
 Session time is measured with `UsageStatsManager`, pulled once at session end over that session's own window, so you are charged for foreground time actually spent in the app rather than for wall time. Without usage access there is nothing to measure and the quoted duration is charged in full.
 
-Choosing **Not now** or leaving during the pause returns to the Android Home screen. When no allowance remains, a new regular session cannot start. Strict rules ignore allowance and stay blocked until protection is deactivated.
+**End session now** on the session notification stops a session before its deadline; without notification permission there is no manual way to end one early. Choosing **Not now** or leaving during the pause returns to the Android Home screen. When no allowance remains, a new regular session cannot start. Strict rules ignore allowance and stay blocked until protection is deactivated.
 
 ## Website rules and browsers
 
@@ -349,7 +352,7 @@ Choosing **Not now** or leaving during the pause returns to the Android Home scr
 - `example.com/news` matches `/news` and its subtree, but not `/newspaper`.
 - `example.com/search?q=focus` requires that exact query string.
 
-Ambiguous single-word and malformed rules are rejected. Rules are translated into a `URLBlocklist` managed configuration and enforced inside the browser's own network stack: in fullscreen, across redirects, in subframes, in Custom Tabs, and in private windows. Clearing the browser's data does not remove them, because the policy lives in `system_server`.
+Ambiguous single-word, malformed, and `keyword:` rules are rejected. Rules are translated into a `URLBlocklist` managed configuration and enforced inside the browser's own network stack: in fullscreen, across redirects, in subframes, in Custom Tabs, and in private windows. Clearing the browser's data does not remove them, because the policy lives in `system_server`.
 
 Tap a website rule to request a session against it. The browser shows its own block page and that page cannot link back to Voward, so the rules list is the entry point.
 
@@ -365,7 +368,7 @@ Tap a website rule to request a session against it. The browser shows its own bl
 
 A browser that declares no policy support is *unknown*, not unsupported — some Chromium forks honour a policy they never declare, which is what the test flow is for. Browsers that genuinely cannot filter are paused rather than uninstalled, and only when website rules exist.
 
-**Permanently out of scope:** in-app WebViews inside permitted apps (Reddit, Telegram, X), web-wrapper apps that do not register as browsers, and `keyword:` rules. `URLBlocklist` matches URLs, not page text, so any existing `keyword:` rule stops being enforced; the rules screen names each retired rule and says what to replace it with.
+**Permanently out of scope:** in-app WebViews inside permitted apps (Reddit, Telegram, X), web-wrapper apps that do not register as browsers, and `keyword:` rules. `URLBlocklist` matches URLs, not page text, so a new `keyword:` rule is refused when you add it and any existing one stops being enforced; the rules screen names each retired rule and says what to replace it with.
 
 ## Progress
 
