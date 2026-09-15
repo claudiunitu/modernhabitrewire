@@ -54,7 +54,7 @@ Consequences worth knowing before you install:
 - Optional tamper restrictions: block safe mode, block extra users and profiles, lock date and time, block factory reset in Settings, disable USB debugging.
 - Dead man's switch: if Voward fails its health check for N days, every restriction releases itself.
 - Show the remaining allowance, next pause, protected-rule count, sessions, sessions ended early, and limits reached.
-- Keep up to 14 completed daily summaries on-device and show current-week protected-use time, sessions, outcomes, and common session start time.
+- Keep up to 14 completed daily summaries on-device and show current-week protected-use time, sessions, outcomes, common session start time, and the most chosen alternative.
 - While protection is active, allow only additive rule changes: add new rules or make existing rules strict; removal and strict-to-regular changes stay locked.
 - Import and export portable configuration as JSON.
 - Optional allowance notifications and system grayscale during approved sessions.
@@ -333,10 +333,10 @@ All allowance values are stored in seconds:
 ```text
 session_cost = elapsed approved seconds
 session_limit = min(remaining allowance at entry, planned duration)
-next_pause = clamp(base pause × (1 + growth × ln(1 + sessions today)), 1, 3600)
+next_pause = clamp(base pause × (1 + growth × sessions today), 1, 3600)
 ```
 
-One allowance second always buys one second of approved protected use. The session limit shown at the gate stays fixed for that session. The remaining balance cannot fall below zero, and carried allowance is capped at one daily allowance.
+Each completed session adds the same percentage of the base pause, so a 10-second base with 50% growth gives 10, 15, 20, 25 seconds. One allowance second always buys one second of approved protected use. The session limit shown at the gate stays fixed for that session. The remaining balance cannot fall below zero, and carried allowance is capped at one daily allowance.
 
 An approved session unsuspends exactly one package, or lifts exactly one rule out of the browser blocklist, for a bounded time. The deadline is an exact alarm, so a session ends on time even if Voward was killed the moment after it started. That needs the **Alarms & reminders** permission; without it the alarm degrades to inexact, the session runs over, and the reconcile poll catches it rather than the deadline. A restart also ends a running session: the deadline is recorded against the boot count and the wall clock as well as the monotonic clock, and whichever says the time is up wins.
 
@@ -372,7 +372,7 @@ A browser that declares no policy support is *unknown*, not unsupported — some
 
 ## Progress
 
-The Progress tab reports only activity measured by Voward: protected-use time, session count, sessions ended early, limits reached, and the most common session start hour for the current week. Completed daily summaries are retained locally for up to 14 days. Voward does not estimate "time saved" or infer urges, wellbeing, or health outcomes.
+The Progress tab reports only activity measured by Voward: protected-use time, session count, sessions ended early, limits reached, the most common session start hour, and the most chosen alternative for the current week. Completed daily summaries are retained locally for up to 14 days. Voward does not estimate "time saved" or infer urges, wellbeing, or health outcomes.
 
 Resetting today's statistics clears the current day's counters without restoring allowance. That action and the other timing controls are unavailable while protection is active.
 
